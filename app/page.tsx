@@ -16,6 +16,7 @@ const offlineEvents = [
     location: "서울 성수동",
     category: "게임",
     imageColor: "bg-gradient-to-br from-indigo-400 to-indigo-600",
+    reservationType: "자유입장" as const,
   },
   {
     id: 2,
@@ -24,6 +25,7 @@ const offlineEvents = [
     location: "서울 강남",
     category: "유튜버",
     imageColor: "bg-gradient-to-br from-pink-400 to-pink-600",
+    reservationType: "예약필수" as const,
   },
   {
     id: 3,
@@ -32,6 +34,7 @@ const offlineEvents = [
     location: "부산 벡스코",
     category: "게임",
     imageColor: "bg-gradient-to-br from-green-400 to-green-600",
+    reservationType: "예약우대" as const,
   },
   {
     id: 4,
@@ -40,6 +43,7 @@ const offlineEvents = [
     location: "서울 동대문",
     category: "유튜버",
     imageColor: "bg-gradient-to-br from-orange-400 to-orange-600",
+    reservationType: "자유입장" as const,
   },
   {
     id: 5,
@@ -48,6 +52,7 @@ const offlineEvents = [
     location: "서울 예술의전당",
     category: "게임",
     imageColor: "bg-gradient-to-br from-purple-400 to-purple-600",
+    reservationType: "예약필수" as const,
   },
   {
     id: 6,
@@ -56,6 +61,7 @@ const offlineEvents = [
     location: "서울 올림픽홀",
     category: "유튜버",
     imageColor: "bg-gradient-to-br from-red-400 to-red-600",
+    reservationType: "예약필수" as const,
   },
 ];
 
@@ -67,6 +73,7 @@ const onlineGoods = [
     location: "온라인 판매",
     category: "게임",
     imageColor: "bg-gradient-to-br from-teal-400 to-teal-600",
+    reservationType: "예약필수" as const,
   },
   {
     id: 102,
@@ -75,6 +82,7 @@ const onlineGoods = [
     location: "공식 스토어",
     category: "유튜버",
     imageColor: "bg-gradient-to-br from-amber-400 to-amber-600",
+    reservationType: "자유입장" as const,
   },
   {
     id: 103,
@@ -83,6 +91,7 @@ const onlineGoods = [
     location: "온라인 한정",
     category: "게임",
     imageColor: "bg-gradient-to-br from-cyan-400 to-cyan-600",
+    reservationType: "예약우대" as const,
   },
   {
     id: 104,
@@ -91,6 +100,7 @@ const onlineGoods = [
     location: "공식 스토어",
     category: "유튜버",
     imageColor: "bg-gradient-to-br from-rose-400 to-rose-600",
+    reservationType: "자유입장" as const,
   },
 ];
 
@@ -117,7 +127,7 @@ export default function Home() {
       <GoogleAd position="right" />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-2xl lg:px-0 px-4">
+      <div className="mx-auto max-w-5xl lg:px-8 px-4">
         <Header />
 
         <main className="pb-8">
@@ -147,6 +157,7 @@ export default function Home() {
                   location={event.location}
                   category={event.category}
                   imageColor={event.imageColor}
+                  reservationType={event.reservationType}
                 />
               ))}
             </div>
