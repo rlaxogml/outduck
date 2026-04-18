@@ -20,7 +20,7 @@ export function EventCard({
 }: EventCardProps) {
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <div className={`aspect-[4/3] ${imageColor} relative`}>
+      <div className={`aspect-[3/2] ${imageColor} relative`}>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-2/3 h-1/2 border-2 border-white/30 rounded-lg flex items-end p-3">
             <div className="w-full h-4 bg-white/20 rounded" />
@@ -34,14 +34,14 @@ export function EventCard({
           <Heart className="h-4 w-4" />
           <span className="sr-only">찜하기</span>
         </Button>
-        <span className="absolute top-2 left-2 px-2 py-0.5 bg-background/80 rounded text-xs font-medium">
+        <span className="absolute top-2 left-2 px-2 py-1 bg-background/80 rounded text-sm font-medium">
           {category}
         </span>
       </div>
-      <CardContent className="p-3">
-        <h3 className="font-medium text-sm line-clamp-2 mb-1">{title}</h3>
-        <p className="text-xs text-muted-foreground">{date}</p>
-        <p className="text-xs text-muted-foreground">{location}</p>
+      <CardContent className="p-4">
+        <h3 className="font-semibold text-base line-clamp-2 mb-2">{title}</h3>
+        <p className="text-sm text-muted-foreground">{date}</p>
+        <p className="text-sm text-muted-foreground">{location}</p>
       </CardContent>
     </Card>
   );
