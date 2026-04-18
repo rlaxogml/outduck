@@ -38,7 +38,7 @@ export function EventCard({
           {category}
         </span>
       </div>
-      <CardContent className="py-5 px-6">
+      <CardContent className="py-4 px-6">
         <h3 className="font-semibold text-lg line-clamp-2 mb-3">{title}</h3>
         <p className="text-base text-muted-foreground mb-1">{date}</p>
         <p className="text-base text-muted-foreground">{location}</p>
