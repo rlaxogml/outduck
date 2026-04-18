@@ -117,7 +117,7 @@ export default function Home() {
       <GoogleAd position="right" />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-6xl lg:px-8 px-4">
+      <div className="mx-auto max-w-4xl lg:px-8 px-4">
         <Header />
 
         <main className="pb-8">
@@ -137,7 +137,7 @@ export default function Home() {
 
           {/* Event Grid */}
           <section className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredEvents.map((event) => (
                 <EventCard
                   key={event.id}
