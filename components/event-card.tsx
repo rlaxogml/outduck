@@ -20,7 +20,7 @@ export function EventCard({
 }: EventCardProps) {
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <div className={`aspect-[2/1] ${imageColor} relative`}>
+      <div className={`aspect-[5/3] ${imageColor} relative`}>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-2/3 h-1/2 border-2 border-white/30 rounded-lg flex items-end p-3">
             <div className="w-full h-4 bg-white/20 rounded" />
@@ -38,7 +38,7 @@ export function EventCard({
           {category}
         </span>
       </div>
-      <CardContent className="p-5">
+      <CardContent className="py-5 px-6">
         <h3 className="font-semibold text-lg line-clamp-2 mb-3">{title}</h3>
         <p className="text-base text-muted-foreground mb-1">{date}</p>
         <p className="text-base text-muted-foreground">{location}</p>
