@@ -52,7 +52,7 @@ export function EventCard({
         <div className="flex justify-between items-start gap-4">
           <h3 className="font-semibold text-xl line-clamp-2 mb-2">{title}</h3>
           {reservationType && (
-            <span className={`shrink-0 mt-1 px-3 py-1.5 rounded text-sm font-semibold ${reservationBadgeColors[reservationType]}`}>
+            <span className={`shrink-0 mt-1 px-3.5 py-2 rounded text-[13px] font-semibold ${reservationBadgeColors[reservationType]}`}>
               {reservationType}
             </span>
           )}
