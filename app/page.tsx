@@ -73,6 +73,7 @@ const onlineGoods = [
     location: "온라인 판매",
     category: "게임",
     imageColor: "bg-gradient-to-br from-teal-400 to-teal-600",
+     reservationType: undefined,
   },
   {
     id: 102,
@@ -81,6 +82,7 @@ const onlineGoods = [
     location: "공식 스토어",
     category: "유튜버",
     imageColor: "bg-gradient-to-br from-amber-400 to-amber-600",
+     reservationType: undefined,
   },
   {
     id: 103,
@@ -89,6 +91,7 @@ const onlineGoods = [
     location: "온라인 한정",
     category: "게임",
     imageColor: "bg-gradient-to-br from-cyan-400 to-cyan-600",
+     reservationType: undefined,
   },
   {
     id: 104,
@@ -97,6 +100,7 @@ const onlineGoods = [
     location: "공식 스토어",
     category: "유튜버",
     imageColor: "bg-gradient-to-br from-rose-400 to-rose-600",
+     reservationType: undefined,
   },
 ];
 
