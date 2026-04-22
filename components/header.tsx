@@ -321,7 +321,7 @@ export function Header() {
                       >
                         <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-border">
                           <img
-                            src={channel.image_url ?? ""}
+                            src={channel.image_url ?? undefined}
                             alt={`${channel.name} 프로필`}
                             className="h-full w-full object-cover"
                             loading="lazy"

@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useMemo, useState} from "react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
+import { Star } from "lucide-react";
 
 type ChannelType = "game" | "youtuber" | "vtuber";
 
@@ -24,8 +24,6 @@ const channelTypeLabel: Record<ChannelType, string> = {
   youtuber: "유튜버",
   vtuber: "버튜버",
 };
-
-const favoriteCountByChannelId: Record<number, number> = {};
 
 function getChannelTypeText(type: ChannelType | null) {
   if (!type || !(type in channelTypeLabel)) {
@@ -50,6 +48,9 @@ export default function ChannelProfilePage() {
   const [errorText, setErrorText] = useState("");
   const [activeTab, setActiveTab] = useState<"events" | "goods">("events");
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [favoriteCount, setFavoriteCount] = useState(0);
+  const [isLoadingSubscribe, setIsLoadingSubscribe] = useState(false);
   const [isMemberListOpen, setIsMemberListOpen] = useState(false);
 
   useEffect(() => {
@@ -105,7 +106,27 @@ export default function ChannelProfilePage() {
       } else {
         setMemberChannels([]);
       }
+      // 찜 수 가져오기
+      const { count } = await supabase
+        .from("favorites")
+        .select("*", { count: "exact", head: true })
+        .eq("channel_id", channelId);
+      setFavoriteCount(count ?? 0);
 
+      // 현재 유저 가져오기
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      setUser(currentUser);
+
+      // 찜 여부 확인
+      if (currentUser) {
+        const { data: favData } = await supabase
+          .from("favorites")
+          .select("id")
+          .eq("channel_id", channelId)
+          .eq("user_id", currentUser.id)
+          .maybeSingle();
+        setIsSubscribed(!!favData);
+      }
       setIsLoading(false);
     };
 
@@ -127,8 +148,6 @@ export default function ChannelProfilePage() {
       </main>
     );
   }
-
-  const favoriteCount = favoriteCountByChannelId[channel.id] ?? 0;
 
   return (
     <>
@@ -164,7 +183,7 @@ export default function ChannelProfilePage() {
               <h1 className="text-2xl font-bold">{channel.name}</h1>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">{getChannelTypeText(channel.type)}</Badge>
-                <span className="text-sm text-muted-foreground">찜 {favoriteCount}</span>
+                <span className="text-sm text-muted-foreground">관심 {favoriteCount}</span>
               </div>
 
               {!channel.is_team && channel.team_id && teamChannel && (
@@ -189,9 +208,40 @@ export default function ChannelProfilePage() {
             </div>
           </div>
 
-          <Button onClick={() => setIsSubscribed((prev) => !prev)}>
-            {isSubscribed ? "구독중" : "구독"}
-          </Button>
+          <button
+            onClick={async () => {
+              if (!user) {
+                alert("로그인이 필요해요!");
+                return;
+              }
+              setIsLoadingSubscribe(true);
+              if (isSubscribed) {
+                await supabase
+                  .from("favorites")
+                  .delete()
+                  .eq("channel_id", channelId)
+                  .eq("user_id", user.id);
+                setIsSubscribed(false);
+                setFavoriteCount((prev) => prev - 1);
+              } else {
+                await supabase
+                  .from("favorites")
+                  .insert({ channel_id: channelId, user_id: user.id });
+                setIsSubscribed(true);
+                setFavoriteCount((prev) => prev + 1);
+              }
+              setIsLoadingSubscribe(false);
+            }}
+            disabled={isLoadingSubscribe}
+            className={`flex items-center gap-2 rounded-full px-4 py-2 border transition-colors ${
+              isSubscribed
+                ? "bg-yellow-400 border-yellow-400 text-white"
+                : "border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <Star className={`h-4 w-4 ${isSubscribed ? "fill-white" : ""}`} />
+            {isSubscribed ? "찜됨" : "찜하기"}
+          </button>
         </div>
 
         {channel.is_team && memberChannels.length > 0 && (
@@ -260,30 +310,30 @@ export default function ChannelProfilePage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-border bg-card p-4">
-        <div className="flex items-center gap-2 border-b border-border pb-3">
-          <button
-            type="button"
-            onClick={() => setActiveTab("events")}
-            className={`rounded-full px-4 py-1.5 text-sm ${
-              activeTab === "events"
-                ? "bg-foreground text-background"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            예정 행사
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("goods")}
-            className={`rounded-full px-4 py-1.5 text-sm ${
-              activeTab === "goods"
-                ? "bg-foreground text-background"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            굿즈 판매
-          </button>
-        </div>
+      <div className="flex border-b border-border">
+        <button
+          type="button"
+          onClick={() => setActiveTab("events")}
+          className={`flex-1 py-3 text-sm font-medium transition-colors ${
+            activeTab === "events"
+              ? "border-b-2 border-foreground text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          예정 행사 <span className="ml-1 text-xs">0</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("goods")}
+          className={`flex-1 py-3 text-sm font-medium transition-colors ${
+            activeTab === "goods"
+              ? "border-b-2 border-foreground text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          굿즈 판매 <span className="ml-1 text-xs">0</span>
+        </button>
+      </div>
 
         <div className="flex min-h-64 items-center justify-center">
           <p className="text-lg font-semibold text-muted-foreground">
