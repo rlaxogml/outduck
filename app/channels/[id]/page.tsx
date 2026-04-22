@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase/client";
+import { Header } from "@/components/header";
 
 type ChannelType = "game" | "youtuber" | "vtuber";
 
@@ -130,7 +131,11 @@ export default function ChannelProfilePage() {
   const favoriteCount = favoriteCountByChannelId[channel.id] ?? 0;
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-8">
+    <>
+      <div className="mx-auto w-full max-w-5xl lg:px-8 px-4">
+        <Header />
+      </div>
+      <main className="mx-auto w-full max-w-5xl lg:px-8 px-4 py-8">
       <section className="rounded-2xl border border-border bg-card p-6">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
@@ -142,10 +147,15 @@ export default function ChannelProfilePage() {
                   className="h-full w-full object-cover"
                   onError={(event) => {
                     event.currentTarget.style.display = "none";
+                    const fallback = event.currentTarget.nextElementSibling as HTMLSpanElement;
+                    if (fallback) fallback.style.display = "flex";
                   }}
                 />
               ) : null}
-              <span className="text-2xl font-bold text-foreground">
+              <span
+                className="text-2xl font-bold text-foreground"
+                style={{ display: channel.image_url ? "none" : "flex" }}
+              >
                 {getInitialText(channel.name)}
               </span>
             </div>
@@ -275,12 +285,13 @@ export default function ChannelProfilePage() {
           </button>
         </div>
 
-        <div className="pt-4 text-sm text-muted-foreground">
-          {activeTab === "events"
-            ? "예정 행사 데이터가 준비되면 여기에 표시됩니다."
-            : "굿즈 판매 데이터가 준비되면 여기에 표시됩니다."}
+        <div className="flex min-h-64 items-center justify-center">
+          <p className="text-lg font-semibold text-muted-foreground">
+            {activeTab === "events" ? "아직 등록된 행사가 없어요." : "아직 등록된 굿즈 구매 일정이 없어요."}
+          </p>
         </div>
       </section>
     </main>
+    </>
   );
 }
