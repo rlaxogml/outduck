@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { Calendar, Heart, MapPinned, Star } from "lucide-react";
+import { Calendar, Heart, MapPinned, Star, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
@@ -239,14 +239,14 @@ export function Header() {
     <header className="border-b border-border bg-background">
       {/* Top bar: Logo and Login */}
       <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-foreground">
-            <Star className="h-5 w-5" />
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border-[2.5px] border-foreground">
+            <Star className="h-6 w-6" />
           </div>
-          <span className="text-lg font-bold">아이콘</span>
+          <span className="text-2xl font-extrabold tracking-tight">아이콘</span>
         </div>
         {user ? (
-          <Avatar className="size-9 border border-border">
+          <Avatar className="size-11 border border-border">
             <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />
             <AvatarFallback>{avatarFallbackText}</AvatarFallback>
           </Avatar>
@@ -279,25 +279,28 @@ export function Header() {
         </button>
       </nav>
 
-      <div className="border-t border-border px-4 py-4">
+      <div className="border-t border-border px-4 py-3">
         <div className="relative mx-auto w-full max-w-3xl">
-          <input
-            type="text"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            onKeyDown={handleSearchInputKeyDown}
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => {
-              window.setTimeout(() => {
-                setIsSearchFocused(false);
-              }, 120);
-            }}
-            placeholder="채널명을 검색해보세요"
-            className="h-12 w-full rounded-full border border-border bg-background px-5 text-sm outline-none transition-colors focus:border-foreground"
-          />
+          <div className="relative flex w-full items-center">
+            <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
+            <input
+              type="text"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              onKeyDown={handleSearchInputKeyDown}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => {
+                window.setTimeout(() => {
+                  setIsSearchFocused(false);
+                }, 120);
+              }}
+              placeholder="채널명을 검색해보세요"
+              className="h-12 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-[15px] outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
+            />
+          </div>
 
           {isSearchFocused && (
-            <div className="absolute top-14 z-20 w-full rounded-2xl border border-border bg-background p-2 shadow-lg">
+            <div className="absolute top-[52px] z-20 w-full rounded-2xl border border-border bg-background p-2 shadow-lg">
               {displayedChannels.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
                   {hasTypedInput

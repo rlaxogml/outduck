@@ -19,7 +19,7 @@ export function EventTabs({ activeTab, onTabChange }: EventTabsProps) {
         )}
         onClick={() => onTabChange("offline")}
       >
-        오프라인 행사
+        오프라인 일정
       </button>
       <button
         className={cn(
@@ -30,7 +30,7 @@ export function EventTabs({ activeTab, onTabChange }: EventTabsProps) {
         )}
         onClick={() => onTabChange("online")}
       >
-        온라인 굿즈
+        온라인 일정
       </button>
     </div>
   );

@@ -7,6 +7,7 @@ import { EventTabs } from "@/components/event-tabs";
 import { CategoryFilter } from "@/components/category-filter";
 import { EventCard } from "@/components/event-card";
 import { GoogleAd } from "@/components/google-ad";
+import { FavoriteChannels } from "@/components/favorite-channels";
 
 const offlineEvents = [
   {
@@ -127,7 +128,7 @@ export default function Home() {
       <GoogleAd position="right" />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-5xl lg:px-8 px-4">
+      <div className="mx-auto max-w-5xl px-4 py-3">
         <Header />
 
         <main className="pb-8">
@@ -135,6 +136,9 @@ export default function Home() {
           <section className="py-4">
             <PosterSlider />
           </section>
+
+          {/* Favorite Channels */}
+          <FavoriteChannels />
 
           {/* Tabs */}
           <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />

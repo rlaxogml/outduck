@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState} from "react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
-import { Star } from "lucide-react";
+import { Star, Calendar, ShoppingBag } from "lucide-react";
 
 type ChannelType = "game" | "youtuber" | "vtuber";
 
@@ -151,10 +151,10 @@ export default function ChannelProfilePage() {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-5xl lg:px-8 px-4">
+      <div className="mx-auto w-full max-w-5xl px-4 py-3">
         <Header />
       </div>
-      <main className="mx-auto w-full max-w-5xl lg:px-8 px-4 py-8">
+      <main className="mx-auto w-full max-w-5xl px-4 py-8">
       <section className="rounded-2xl border border-border bg-card p-6">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
@@ -180,10 +180,14 @@ export default function ChannelProfilePage() {
             </div>
 
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold">{channel.name}</h1>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">{getChannelTypeText(channel.type)}</Badge>
-                <span className="text-sm text-muted-foreground">관심 {favoriteCount}</span>
+              <h1 className="text-3xl font-extrabold tracking-tight">{channel.name}</h1>
+              <div className="flex items-center gap-3">
+                <Badge variant="secondary" className="px-2.5 py-0.5 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-transparent">
+                  {getChannelTypeText(channel.type)}
+                </Badge>
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  <Star className="h-3.5 w-3.5 fill-muted-foreground/30 text-muted-foreground/50" /> {favoriteCount}
+                </span>
               </div>
 
               {!channel.is_team && channel.team_id && teamChannel && (
@@ -214,33 +218,45 @@ export default function ChannelProfilePage() {
                 alert("로그인이 필요해요!");
                 return;
               }
+              if (isLoadingSubscribe) return;
               setIsLoadingSubscribe(true);
-              if (isSubscribed) {
-                await supabase
-                  .from("favorites")
-                  .delete()
-                  .eq("channel_id", channelId)
-                  .eq("user_id", user.id);
-                setIsSubscribed(false);
-                setFavoriteCount((prev) => prev - 1);
-              } else {
-                await supabase
-                  .from("favorites")
-                  .insert({ channel_id: channelId, user_id: user.id });
-                setIsSubscribed(true);
-                setFavoriteCount((prev) => prev + 1);
+
+              const previousSubscribed = isSubscribed;
+              setIsSubscribed(!previousSubscribed);
+              setFavoriteCount((prev) => previousSubscribed ? prev - 1 : prev + 1);
+
+              try {
+                if (previousSubscribed) {
+                  await supabase
+                    .from("favorites")
+                    .delete()
+                    .eq("channel_id", channelId)
+                    .eq("user_id", user.id);
+                } else {
+                  await supabase
+                    .from("favorites")
+                    .insert({ channel_id: channelId, user_id: user.id });
+                }
+              } catch (error) {
+                setIsSubscribed(previousSubscribed);
+                setFavoriteCount((prev) => previousSubscribed ? prev + 1 : prev - 1);
+              } finally {
+                setIsLoadingSubscribe(false);
               }
-              setIsLoadingSubscribe(false);
             }}
             disabled={isLoadingSubscribe}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 border transition-colors ${
+            className={`flex items-center justify-center rounded-full h-11 font-semibold transition-all duration-500 hover:scale-105 active:scale-95 shadow-sm disabled:opacity-90 disabled:pointer-events-none ${
               isSubscribed
-                ? "bg-yellow-400 border-yellow-400 text-white"
-                : "border-border text-muted-foreground hover:bg-muted"
+                ? "px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40"
+                : "px-6 bg-muted text-muted-foreground border border-border hover:bg-muted/80"
             }`}
           >
-            <Star className={`h-4 w-4 ${isSubscribed ? "fill-white" : ""}`} />
-            {isSubscribed ? "찜됨" : "찜하기"}
+            <Star className={`h-5 w-5 transition-all duration-300 ${isSubscribed ? "fill-white text-white" : "text-muted-foreground"}`} />
+            <span className={`transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap ${
+              isSubscribed ? "max-w-0 opacity-0 ml-0" : "max-w-[100px] opacity-100 ml-2"
+            }`}>
+              찜하기
+            </span>
           </button>
         </div>
 
@@ -309,36 +325,48 @@ export default function ChannelProfilePage() {
         )}
       </section>
 
-      <section className="mt-6 rounded-2xl border border-border bg-card p-4">
-      <div className="flex border-b border-border">
-        <button
-          type="button"
-          onClick={() => setActiveTab("events")}
-          className={`flex-1 py-3 text-sm font-medium transition-colors ${
-            activeTab === "events"
-              ? "border-b-2 border-foreground text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          예정 행사 <span className="ml-1 text-xs">0</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("goods")}
-          className={`flex-1 py-3 text-sm font-medium transition-colors ${
-            activeTab === "goods"
-              ? "border-b-2 border-foreground text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          굿즈 판매 <span className="ml-1 text-xs">0</span>
-        </button>
-      </div>
+      <section className="mt-6 rounded-2xl border border-border bg-card p-6">
+        <div className="flex gap-2 p-1 bg-muted/40 rounded-xl mb-6 w-full md:w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab("events")}
+            className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${
+              activeTab === "events"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            }`}
+          >
+            오프라인 일정 <span className="ml-1 opacity-60">0</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("goods")}
+            className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${
+              activeTab === "goods"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            }`}
+          >
+            온라인 일정 <span className="ml-1 opacity-60">0</span>
+          </button>
+        </div>
 
-        <div className="flex min-h-64 items-center justify-center">
-          <p className="text-lg font-semibold text-muted-foreground">
-            {activeTab === "events" ? "아직 등록된 행사가 없어요." : "아직 등록된 굿즈 구매 일정이 없어요."}
-          </p>
+        <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
+            {activeTab === "events" ? (
+              <Calendar className="h-10 w-10 text-muted-foreground/60" />
+            ) : (
+              <ShoppingBag className="h-10 w-10 text-muted-foreground/60" />
+            )}
+          </div>
+          <div className="text-center space-y-1.5">
+            <h3 className="text-lg font-semibold text-foreground">
+              {activeTab === "events" ? "등록된 오프라인 일정이 없어요" : "등록된 온라인 일정이 없어요"}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              새로운 일정이 추가되면 이곳에서 확인하실 수 있습니다.
+            </p>
+          </div>
         </div>
       </section>
     </main>

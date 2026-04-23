@@ -63,7 +63,7 @@ export function PosterSlider() {
           {posters.map((poster) => (
             <div
               key={poster.id}
-              className={`min-w-full aspect-[21/9] flex flex-col items-center justify-center ${poster.bgColor} text-white`}
+              className={`min-w-full aspect-[16/7] md:aspect-[21/7] min-h-[180px] flex flex-col items-center justify-center ${poster.bgColor} text-white`}
             >
               <h2 className="text-2xl md:text-3xl font-bold mb-2">
                 {poster.title}
