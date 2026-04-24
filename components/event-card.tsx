@@ -11,6 +11,7 @@ interface EventCardProps {
   location: string;
   category: string;
   imageColor: string;
+  imageUrl?: string;
   reservationType?: ReservationType;
 }
 
@@ -26,16 +27,21 @@ export function EventCard({
   location,
   category,
   imageColor,
+  imageUrl,
   reservationType,
 }: EventCardProps) {
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <div className={`aspect-[5/3] ${imageColor} relative`}>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-2/3 h-1/2 border-2 border-white/30 rounded-lg flex items-end p-3">
-            <div className="w-full h-4 bg-white/20 rounded" />
+      <div className={`aspect-[5/3] ${!imageUrl ? imageColor : 'bg-muted'} relative`}>
+        {imageUrl ? (
+          <img src={imageUrl} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-2/3 h-1/2 border-2 border-white/30 rounded-lg flex items-end p-3">
+              <div className="w-full h-4 bg-white/20 rounded" />
+            </div>
           </div>
-        </div>
+        )}
         <Button
           variant="ghost"
           size="icon"
