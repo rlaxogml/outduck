@@ -19,6 +19,7 @@ type Event = {
   imageColor: string;
   imageUrl?: string;
   reservationType: "자유입장" | "예약필수" | "예약우대" | undefined;
+  channels: { name: string; image_url: string }[];
 };
 
 export default function Home() {
@@ -54,7 +55,8 @@ export default function Home() {
           event_channels (
             channels (
               name,
-              type
+              type,
+              image_url
             )
           )
         `)
@@ -62,7 +64,10 @@ export default function Home() {
 
       if (offlineData) {
         const formatted = offlineData.map((event, index) => {
-          const channel = event.event_channels?.[0]?.channels as any as { name: string; type: string } | null;
+          const channels = (event.event_channels || [])
+            .map((ec: any) => ec.channels)
+            .filter(Boolean) as { name: string; type: string; image_url: string }[];
+          const channel = channels[0];
           const date = event.end_date
             ? `${event.start_date.replaceAll("-", ".")} - ${event.end_date.replaceAll("-", ".")}`
             : event.start_date.replaceAll("-", ".");
@@ -75,6 +80,7 @@ export default function Home() {
             imageColor: imageColors[index % imageColors.length],
             imageUrl: event.image_url,
             reservationType: event.reservation_type as Event["reservationType"],
+            channels: channels.map(c => ({ name: c.name, image_url: c.image_url || "" })),
           };
         });
         setOfflineEvents(formatted);
@@ -92,7 +98,8 @@ export default function Home() {
           online_event_channels (
             channels (
               name,
-              type
+              type,
+              image_url
             )
           )
         `)
@@ -100,7 +107,10 @@ export default function Home() {
 
       if (onlineData) {
         const formatted = onlineData.map((event, index) => {
-          const channel = event.online_event_channels?.[0]?.channels as any as { name: string; type: string } | null;
+          const channels = (event.online_event_channels || [])
+            .map((ec: any) => ec.channels)
+            .filter(Boolean) as { name: string; type: string; image_url: string }[];
+          const channel = channels[0];
           const date = event.end_date
             ? `${event.start_date.replaceAll("-", ".")} - ${event.end_date.replaceAll("-", ".")}`
             : event.start_date?.replaceAll("-", ".") ?? "";
@@ -113,6 +123,7 @@ export default function Home() {
             imageColor: imageColors[index % imageColors.length],
             imageUrl: event.image_url,
             reservationType: undefined,
+            channels: channels.map(c => ({ name: c.name, image_url: c.image_url || "" })),
           };
         });
         setOnlineEvents(formatted);
@@ -183,6 +194,7 @@ export default function Home() {
                     imageColor={event.imageColor}
                     imageUrl={event.imageUrl}
                     reservationType={event.reservationType}
+                    channels={event.channels}
                   />
                 ))}
               </div>
