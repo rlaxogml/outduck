@@ -52,8 +52,8 @@ export default function Home() {
           location,
           image_url,
           reservation_type,
-          event_channels (
-            channels (
+          offline_event_channels(
+            channels(
               id,
               name,
               type,
@@ -65,7 +65,7 @@ export default function Home() {
 
       if (offlineData) {
         const formatted = offlineData.map((event, index) => {
-          const channels = (event.event_channels || [])
+          const channels = (event.offline_event_channels || [])
             .map((ec: any) => ec.channels)
             .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[]
           const channel = channels[0];
@@ -96,8 +96,8 @@ export default function Home() {
           start_date,
           end_date,
           image_url,
-          online_event_channels (
-            channels (
+          online_event_channels(
+            channels(
               id,
               name,
               type,
@@ -135,6 +135,7 @@ export default function Home() {
     };
 
     fetchEvents();
+
   }, []);
 
   const events = activeTab === "offline" ? offlineEvents : onlineEvents;
