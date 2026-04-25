@@ -17,7 +17,7 @@ type OfflineEvent = {
   category: string;
   imageColor: string;
   imageUrl?: string;
-  reservationType: "자유입장" | "예약필수" | "예약우대" | undefined;
+  reservationType: "자유입장" | "예약필수" | "예약우대" | "티켓팅" | undefined;
   channels: { id: number; name: string; image_url: string }[];
 };
 
