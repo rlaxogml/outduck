@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-type ReservationType = "예약필수" | "예약우대" | "자유입장";
+type ReservationType = "예약필수" | "예약우대" | "자유입장" | "티켓팅";
 
 interface EventCardProps {
   id: number;
@@ -16,13 +17,14 @@ interface EventCardProps {
   imageColor: string;
   imageUrl?: string;
   reservationType?: ReservationType;
-  channels?: { name: string; image_url: string }[];
+  channels?: { id: number; name: string; image_url: string }[];
 }
 
 const reservationBadgeColors: Record<ReservationType, string> = {
   "예약필수": "bg-red-500 text-white",
   "예약우대": "bg-orange-500 text-white",
   "자유입장": "bg-green-500 text-white",
+  "티켓팅": "bg-purple-500 text-white",
 };
 
 export function EventCard({
@@ -36,6 +38,21 @@ export function EventCard({
   channels,
 }: EventCardProps) {
   const [showChannels, setShowChannels] = useState(false);
+  const router = useRouter();
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setShowChannels(false);
+      }
+    };
+    if (showChannels) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showChannels]);
+
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <div className={`aspect-[5/3] ${!imageUrl ? imageColor : 'bg-muted'} relative`}>
@@ -61,12 +78,16 @@ export function EventCard({
         </span>
 
         {channels && channels.length > 0 && (
-          <div className="absolute -bottom-6 left-3 flex items-center">
+          <div className="absolute -bottom-6 left-3" ref={popupRef}>
             <button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setShowChannels(!showChannels);
+                if (channels.length === 1) {
+                  router.push(`/channels/${channels[0].id}`);
+                } else {
+                  setShowChannels(!showChannels);
+                }
               }}
               className="flex items-center -space-x-9 transition-transform hover:scale-105 active:scale-95"
             >
@@ -77,11 +98,7 @@ export function EventCard({
                   style={{ zIndex: 10 - i }}
                 >
                   {channel.image_url ? (
-                    <img
-                      src={channel.image_url}
-                      alt={channel.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <span className="text-xs font-bold text-muted-foreground">
@@ -100,6 +117,33 @@ export function EventCard({
                 </div>
               )}
             </button>
+
+            {showChannels && (
+              <div className="absolute bottom-full left-0 mb-2 z-50 bg-background border border-border rounded-2xl shadow-lg p-3 min-w-[160px]">
+                <div className="absolute -bottom-2 left-5 w-4 h-4 bg-background border-r border-b border-border rotate-45" />
+                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                  {channels.length === 1 ? "주최자" : "공동 주최자"}
+                </p>
+                <div className="flex flex-row gap-3">
+                  {channels.map((c, i) => (
+                    <div key={i} className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => router.push(`/channels/${c.id}`)}>
+                      <div className="w-14 h-14 rounded-full border border-border overflow-hidden bg-muted flex-shrink-0">
+                        {c.image_url ? (
+                          <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="text-xs font-bold text-muted-foreground">
+                              {c.name.charAt(0)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-center break-keep w-full">{c.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -114,21 +158,6 @@ export function EventCard({
         </div>
         <p className="text-lg text-muted-foreground mb-1">{date}</p>
         <p className="text-lg text-muted-foreground">{location}</p>
-
-        {showChannels && channels && channels.length > 0 && (
-          <div className="mt-4 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-200">
-            <p className="text-sm font-semibold mb-2 text-muted-foreground">
-              {channels.length === 1 ? "주최자" : "공동 주최자"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {channels.map((c, i) => (
-                <span key={i} className="text-sm bg-secondary/50 text-secondary-foreground px-2.5 py-1 rounded-md">
-                  {c.name}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

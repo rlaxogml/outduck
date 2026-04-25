@@ -19,7 +19,7 @@ type Event = {
   imageColor: string;
   imageUrl?: string;
   reservationType: "자유입장" | "예약필수" | "예약우대" | undefined;
-  channels: { name: string; image_url: string }[];
+  channels: { id: number; name: string; image_url: string }[];
 };
 
 export default function Home() {
@@ -54,6 +54,7 @@ export default function Home() {
           reservation_type,
           event_channels (
             channels (
+              id,
               name,
               type,
               image_url
@@ -66,11 +67,11 @@ export default function Home() {
         const formatted = offlineData.map((event, index) => {
           const channels = (event.event_channels || [])
             .map((ec: any) => ec.channels)
-            .filter(Boolean) as { name: string; type: string; image_url: string }[];
+            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[]
           const channel = channels[0];
           const date = event.end_date
             ? `${event.start_date.replaceAll("-", ".")} - ${event.end_date.replaceAll("-", ".")}`
-            : event.start_date.replaceAll("-", ".");
+            : event.start_date?.replaceAll("-", ".") ?? "상시";
           return {
             id: event.id,
             title: event.title,
@@ -80,7 +81,7 @@ export default function Home() {
             imageColor: imageColors[index % imageColors.length],
             imageUrl: event.image_url,
             reservationType: event.reservation_type as Event["reservationType"],
-            channels: channels.map(c => ({ name: c.name, image_url: c.image_url || "" })),
+            channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
           };
         });
         setOfflineEvents(formatted);
@@ -97,6 +98,7 @@ export default function Home() {
           image_url,
           online_event_channels (
             channels (
+              id,
               name,
               type,
               image_url
@@ -109,11 +111,11 @@ export default function Home() {
         const formatted = onlineData.map((event, index) => {
           const channels = (event.online_event_channels || [])
             .map((ec: any) => ec.channels)
-            .filter(Boolean) as { name: string; type: string; image_url: string }[];
+            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[]
           const channel = channels[0];
           const date = event.end_date
             ? `${event.start_date.replaceAll("-", ".")} - ${event.end_date.replaceAll("-", ".")}`
-            : event.start_date?.replaceAll("-", ".") ?? "";
+            : event.start_date?.replaceAll("-", ".") ?? "상시";
           return {
             id: event.id,
             title: event.title,
@@ -123,7 +125,7 @@ export default function Home() {
             imageColor: imageColors[index % imageColors.length],
             imageUrl: event.image_url,
             reservationType: undefined,
-            channels: channels.map(c => ({ name: c.name, image_url: c.image_url || "" })),
+            channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
           };
         });
         setOnlineEvents(formatted);

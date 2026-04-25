@@ -18,7 +18,7 @@ type OfflineEvent = {
   imageColor: string;
   imageUrl?: string;
   reservationType: "자유입장" | "예약필수" | "예약우대" | undefined;
-  channels: { name: string; image_url: string }[];
+  channels: { id: number; name: string; image_url: string }[];
 };
 
 type ChannelType = "game" | "youtuber" | "vtuber";
@@ -182,7 +182,7 @@ export default function ChannelProfilePage() {
               imageColor: imageColors[index % imageColors.length],
               imageUrl: event.image_url,
               reservationType: event.reservation_type as OfflineEvent["reservationType"],
-              channels: sorted.map(c => ({ name: c.name, image_url: c.image_url || "" })),
+              channels: sorted.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
             };
           });
         setOfflineEvents(formatted);
@@ -292,8 +292,8 @@ export default function ChannelProfilePage() {
               }}
               disabled={isLoadingSubscribe}
               className={`flex items-center justify-center rounded-full h-11 font-semibold transition-all duration-500 hover:scale-105 active:scale-95 shadow-sm disabled:opacity-90 disabled:pointer-events-none ${isSubscribed
-                  ? "px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40"
-                  : "px-6 bg-muted text-muted-foreground border border-border hover:bg-muted/80"
+                ? "px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40"
+                : "px-6 bg-muted text-muted-foreground border border-border hover:bg-muted/80"
                 }`}
             >
               <Star className={`h-5 w-5 transition-all duration-300 ${isSubscribed ? "fill-white text-white" : "text-muted-foreground"}`} />
