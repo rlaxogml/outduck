@@ -239,12 +239,16 @@ export function Header() {
     <header className="border-b border-border bg-background">
       {/* Top bar: Logo and Login */}
       <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
+        <div
+          className="flex items-center gap-3 cursor-pointer"
+          onClick={() => router.push("/")}
+        >
           <div className="flex h-12 w-12 items-center justify-center rounded-full border-[2.5px] border-foreground">
             <Star className="h-6 w-6" />
           </div>
           <span className="text-2xl font-extrabold tracking-tight">아이콘</span>
         </div>
+
         {user ? (
           <Avatar className="size-11 border border-border">
             <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />

@@ -153,17 +153,17 @@ export default function ChannelProfilePage() {
         .from("offline_events")
         .select(`
           id, title, start_date, end_date, location, image_url, reservation_type,
-          event_channels ( channels ( id, name, type, image_url ) )
+          offline_event_channels ( channels ( id, name, type, image_url ) )
         `)
         .order("start_date", { ascending: true });
 
       if (offlineData) {
         const formatted = offlineData
           .filter(event =>
-            event.event_channels?.some((ec: any) => ec.channels?.id === channelId)
+            event.offline_event_channels?.some((ec: any) => ec.channels?.id === channelId)
           )
           .map((event, index) => {
-            const allChannels = (event.event_channels || [])
+            const allChannels = (event.offline_event_channels || [])
               .map((ec: any) => ec.channels)
               .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
             const sorted = [

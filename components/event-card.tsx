@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 type ReservationType = "예약필수" | "예약우대" | "자유입장" | "티켓팅";
 
@@ -18,6 +20,7 @@ interface EventCardProps {
   imageUrl?: string;
   reservationType?: ReservationType;
   channels?: { id: number; name: string; image_url: string }[];
+  user: User | null;
 }
 
 const reservationBadgeColors: Record<ReservationType, string> = {
@@ -27,7 +30,14 @@ const reservationBadgeColors: Record<ReservationType, string> = {
   "티켓팅": "bg-purple-500 text-white",
 };
 
+const categoryBadgeColors: Record<string, string> = {
+  "게임": "bg-blue-500/80 text-white",
+  "버튜버": "bg-purple-500/80 text-white",
+  "유튜버": "bg-red-500/80 text-white",
+};
+
 export function EventCard({
+  id,
   title,
   date,
   location,
@@ -36,10 +46,28 @@ export function EventCard({
   imageUrl,
   reservationType,
   channels,
+  user,
 }: EventCardProps) {
   const [showChannels, setShowChannels] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [heartAnim, setHeartAnim] = useState(false);
   const router = useRouter();
   const popupRef = useRef<HTMLDivElement>(null);
+
+  // 북마크 여부 확인
+  useEffect(() => {
+    if (!user) return;
+    const checkBookmark = async () => {
+      const { data } = await supabase
+        .from("event_bookmarks")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("offline_event_id", id)
+        .maybeSingle();
+      setIsBookmarked(!!data);
+    };
+    checkBookmark();
+  }, [user, id]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -53,6 +81,30 @@ export function EventCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showChannels]);
 
+  const handleBookmark = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) return;
+
+    // 애니메이션
+    setHeartAnim(true);
+    setTimeout(() => setHeartAnim(false), 300);
+
+    if (isBookmarked) {
+      await supabase
+        .from("event_bookmarks")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("offline_event_id", id);
+      setIsBookmarked(false);
+    } else {
+      await supabase
+        .from("event_bookmarks")
+        .insert({ user_id: user.id, offline_event_id: id });
+      setIsBookmarked(true);
+    }
+  };
+
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <div className={`aspect-[5/3] ${!imageUrl ? imageColor : 'bg-muted'} relative`}>
@@ -65,15 +117,28 @@ export function EventCard({
             </div>
           </div>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-2 right-2 h-8 w-8 bg-background/80 hover:bg-background rounded-full"
-        >
-          <Heart className="h-4 w-4" />
-          <span className="sr-only">찜하기</span>
-        </Button>
-        <span className="absolute top-2 left-2 px-2 py-1 bg-background/80 rounded text-sm font-medium">
+
+        {/* 하트 버튼 - 로그인한 경우만 표시 */}
+        {user && (
+          <button
+            onClick={handleBookmark}
+            className={`absolute top-2 right-2 h-8 w-8 rounded-full flex items-center justify-center transition-all duration-200
+              ${isBookmarked
+                ? "bg-gradient-to-br from-pink-400 to-rose-500"
+                : "bg-background/80 hover:bg-background"
+              }
+              ${heartAnim ? "scale-125" : "scale-100"}
+            `}
+          >
+            <Heart
+              className={`h-4 w-4 transition-colors ${isBookmarked ? "fill-white text-white" : "text-foreground"}`}
+            />
+          </button>
+        )}
+
+        {/* 카테고리 뱃지 */}
+        <span className={`absolute top-2 left-2 px-2 py-1 rounded text-sm font-medium
+          ${categoryBadgeColors[category] ?? "bg-background/80 text-foreground"}`}>
           {category}
         </span>
 

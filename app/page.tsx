@@ -9,6 +9,7 @@ import { EventCard } from "@/components/event-card";
 import { GoogleAd } from "@/components/google-ad";
 import { FavoriteChannels } from "@/components/favorite-channels";
 import { supabase } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 type Event = {
   id: number;
@@ -29,6 +30,7 @@ export default function Home() {
   const [offlineEvents, setOfflineEvents] = useState<Event[]>([]);
   const [onlineEvents, setOnlineEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
 
   const imageColors = [
     "bg-gradient-to-br from-indigo-400 to-indigo-600",
@@ -38,6 +40,20 @@ export default function Home() {
     "bg-gradient-to-br from-purple-400 to-purple-600",
     "bg-gradient-to-br from-red-400 to-red-600",
   ];
+
+  useEffect(() => {
+    const syncSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+    };
+    syncSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -198,6 +214,7 @@ export default function Home() {
                     imageUrl={event.imageUrl}
                     reservationType={event.reservationType}
                     channels={event.channels}
+                    user={user}
                   />
                 ))}
               </div>
