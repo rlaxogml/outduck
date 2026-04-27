@@ -326,26 +326,12 @@ export function Header() {
                         onClick={() => handleChannelSelect(channel)}
                         className="w-full rounded-xl border border-border p-3 text-center hover:bg-muted"
                       >
-                        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-border">
-                          <img
-                            src={channel.image_url ?? undefined}
-                            alt={`${channel.name} 프로필`}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                            onError={(event) => {
-                              const target = event.currentTarget;
-                              target.style.display = "none";
-                              const fallbackElement =
-                                target.nextElementSibling as HTMLSpanElement | null;
-                              if (fallbackElement) {
-                                fallbackElement.style.display = "flex";
-                              }
-                            }}
-                          />
-                          <span className="hidden h-full w-full items-center justify-center bg-muted text-sm font-semibold text-foreground">
+                        <Avatar className="mx-auto mb-2 h-12 w-12 border border-border">
+                          <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
+                          <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
                             {getChannelInitial(channel.name)}
-                          </span>
-                        </div>
+                          </AvatarFallback>
+                        </Avatar>
                         <div className="truncate text-sm font-medium">
                           {channel.name}
                         </div>

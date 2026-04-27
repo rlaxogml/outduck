@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Star, Calendar, ShoppingBag } from "lucide-react";
@@ -103,59 +104,64 @@ export default function ChannelProfilePage() {
       const currentChannel = channelData as Channel;
       setChannel(currentChannel);
 
-      if (!currentChannel.is_team && currentChannel.team_id) {
-        const { data: teamData } = await supabase
-          .from("channels")
-          .select("id, name, type, image_url, team_id, is_team")
-          .eq("id", currentChannel.team_id)
-          .maybeSingle();
-        setTeamChannel((teamData as Channel | null) ?? null);
-      } else {
-        setTeamChannel(null);
-      }
+      const teamDataPromise = (!currentChannel.is_team && currentChannel.team_id)
+        ? supabase
+            .from("channels")
+            .select("id, name, type, image_url, team_id, is_team")
+            .eq("id", currentChannel.team_id)
+            .maybeSingle()
+            .then(res => res.data)
+        : Promise.resolve(null);
 
-      if (currentChannel.is_team) {
-        const { data: membersData } = await supabase
-          .from("channels")
-          .select("id, name, type, image_url, team_id, is_team")
-          .eq("team_id", currentChannel.id)
-          .eq("is_team", false)
-          .order("name", { ascending: true });
-        setMemberChannels((membersData as Channel[] | null) ?? []);
-      } else {
-        setMemberChannels([]);
-      }
+      const membersDataPromise = currentChannel.is_team
+        ? supabase
+            .from("channels")
+            .select("id, name, type, image_url, team_id, is_team")
+            .eq("team_id", currentChannel.id)
+            .eq("is_team", false)
+            .order("name", { ascending: true })
+            .then(res => res.data)
+        : Promise.resolve([]);
 
-      // 찜 수 가져오기
-      const { count } = await supabase
+      const favoriteCountPromise = supabase
         .from("favorites")
         .select("*", { count: "exact", head: true })
-        .eq("channel_id", channelId);
-      setFavoriteCount(count ?? 0);
+        .eq("channel_id", channelId)
+        .then(res => res.count ?? 0);
 
-      // 현재 유저 가져오기
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      setUser(currentUser);
-
-      // 찜 여부 확인
-      if (currentUser) {
+      const userAndFavPromise = supabase.auth.getUser().then(async ({ data: { user: currentUser } }) => {
+        if (!currentUser) return { user: null, isSubscribed: false };
         const { data: favData } = await supabase
           .from("favorites")
           .select("id")
           .eq("channel_id", channelId)
           .eq("user_id", currentUser.id)
           .maybeSingle();
-        setIsSubscribed(!!favData);
-      }
+        return { user: currentUser, isSubscribed: !!favData };
+      });
 
-      // 오프라인 행사 가져오기
-      const { data: offlineData } = await supabase
+      const offlineEventsPromise = supabase
         .from("offline_events")
         .select(`
           id, title, start_date, end_date, location, image_url, reservation_type,
           offline_event_channels ( channels ( id, name, type, image_url ) )
         `)
-        .order("start_date", { ascending: true });
+        .order("start_date", { ascending: true })
+        .then(res => res.data);
+
+      const [teamData, membersData, favCount, { user: currentUser, isSubscribed }, offlineData] = await Promise.all([
+        teamDataPromise,
+        membersDataPromise,
+        favoriteCountPromise,
+        userAndFavPromise,
+        offlineEventsPromise,
+      ]);
+
+      setTeamChannel(teamData as Channel | null);
+      setMemberChannels(membersData as Channel[] | null ?? []);
+      setFavoriteCount(favCount);
+      setUser(currentUser);
+      setIsSubscribed(isSubscribed);
 
       if (offlineData) {
         const formatted = offlineData
@@ -172,7 +178,7 @@ export default function ChannelProfilePage() {
             ];
             const date = event.end_date
               ? `${event.start_date.replaceAll("-", ".")} - ${event.end_date.replaceAll("-", ".")}`
-              : event.start_date.replaceAll("-", ".");
+              : event.start_date?.replaceAll("-", ".") ?? "상시";
             return {
               id: event.id,
               title: event.title,
@@ -219,26 +225,12 @@ export default function ChannelProfilePage() {
         <section className="rounded-2xl border border-border bg-card p-6">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
-                {channel.image_url ? (
-                  <img
-                    src={channel.image_url}
-                    alt={`${channel.name} 프로필`}
-                    className="h-full w-full object-cover"
-                    onError={(event) => {
-                      event.currentTarget.style.display = "none";
-                      const fallback = event.currentTarget.nextElementSibling as HTMLSpanElement;
-                      if (fallback) fallback.style.display = "flex";
-                    }}
-                  />
-                ) : null}
-                <span
-                  className="text-2xl font-bold text-foreground"
-                  style={{ display: channel.image_url ? "none" : "flex" }}
-                >
+              <Avatar className="h-24 w-24 border border-border">
+                <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
+                <AvatarFallback className="bg-muted text-2xl font-bold text-foreground">
                   {getInitialText(channel.name)}
-                </span>
-              </div>
+                </AvatarFallback>
+              </Avatar>
 
               <div className="space-y-2">
                 <h1 className="text-3xl font-extrabold tracking-tight">{channel.name}</h1>
@@ -256,13 +248,12 @@ export default function ChannelProfilePage() {
                     href={`/channels/${teamChannel.id}`}
                     className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
                   >
-                    <span className="inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-border">
-                      {teamChannel.image_url ? (
-                        <img src={teamChannel.image_url} alt={`${teamChannel.name} 팀 이미지`} className="h-full w-full object-cover" />
-                      ) : (
-                        <span>{getInitialText(teamChannel.name)}</span>
-                      )}
-                    </span>
+                    <Avatar className="h-5 w-5 border border-border">
+                      <AvatarImage src={teamChannel.image_url ?? undefined} alt={`${teamChannel.name} 팀 이미지`} className="object-cover" />
+                      <AvatarFallback className="bg-muted text-[10px]">
+                        {getInitialText(teamChannel.name)}
+                      </AvatarFallback>
+                    </Avatar>
                     소속팀: {teamChannel.name}
                   </Link>
                 )}
@@ -313,17 +304,16 @@ export default function ChannelProfilePage() {
               >
                 <div className="flex items-center">
                   {memberChannels.slice(0, 4).map((member, index) => (
-                    <span
+                    <Avatar
                       key={member.id}
-                      className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-background bg-muted text-xs font-semibold"
+                      className="relative h-8 w-8 border border-background"
                       style={{ marginLeft: index === 0 ? 0 : -10 }}
                     >
-                      {member.image_url ? (
-                        <img src={member.image_url} alt={`${member.name} 프로필`} className="h-full w-full object-cover" />
-                      ) : (
-                        getInitialText(member.name)
-                      )}
-                    </span>
+                      <AvatarImage src={member.image_url ?? undefined} alt={`${member.name} 프로필`} className="object-cover" />
+                      <AvatarFallback className="bg-muted text-xs font-semibold">
+                        {getInitialText(member.name)}
+                      </AvatarFallback>
+                    </Avatar>
                   ))}
                 </div>
                 <span className="text-sm font-medium">
@@ -339,13 +329,12 @@ export default function ChannelProfilePage() {
                         href={`/channels/${member.id}`}
                         className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 hover:bg-muted"
                       >
-                        <span className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-xs font-semibold">
-                          {member.image_url ? (
-                            <img src={member.image_url} alt={`${member.name} 프로필`} className="h-full w-full object-cover" />
-                          ) : (
-                            getInitialText(member.name)
-                          )}
-                        </span>
+                        <Avatar className="h-9 w-9 border border-border">
+                          <AvatarImage src={member.image_url ?? undefined} alt={`${member.name} 프로필`} className="object-cover" />
+                          <AvatarFallback className="bg-muted text-xs font-semibold">
+                            {getInitialText(member.name)}
+                          </AvatarFallback>
+                        </Avatar>
                         <span className="flex flex-col">
                           <span className="text-sm font-medium">{member.name}</span>
                           <span className="text-xs text-muted-foreground">{getChannelTypeText(member.type)}</span>
@@ -404,6 +393,8 @@ export default function ChannelProfilePage() {
                     imageUrl={event.imageUrl}
                     reservationType={event.reservationType}
                     channels={event.channels}
+                    user={user}
+                    eventType="offline"
                   />
                 ))}
               </div>

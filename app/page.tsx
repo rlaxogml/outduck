@@ -57,8 +57,7 @@ export default function Home() {
 
   useEffect(() => {
     const fetchEvents = async () => {
-      // 오프라인 행사 가져오기
-      const { data: offlineData } = await supabase
+      const offlineQuery = supabase
         .from("offline_events")
         .select(`
           id,
@@ -79,32 +78,7 @@ export default function Home() {
         `)
         .order("start_date", { ascending: true });
 
-      if (offlineData) {
-        const formatted = offlineData.map((event, index) => {
-          const channels = (event.offline_event_channels || [])
-            .map((ec: any) => ec.channels)
-            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[]
-          const channel = channels[0];
-          const date = event.end_date
-            ? `${event.start_date.replaceAll("-", ".")} - ${event.end_date.replaceAll("-", ".")}`
-            : event.start_date?.replaceAll("-", ".") ?? "상시";
-          return {
-            id: event.id,
-            title: event.title,
-            date,
-            location: event.location,
-            category: channel?.type === "game" ? "게임" : channel?.type === "vtuber" ? "버튜버" : "유튜버",
-            imageColor: imageColors[index % imageColors.length],
-            imageUrl: event.image_url,
-            reservationType: event.reservation_type as Event["reservationType"],
-            channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
-          };
-        });
-        setOfflineEvents(formatted);
-      }
-
-      // 온라인 행사 가져오기
-      const { data: onlineData } = await supabase
+      const onlineQuery = supabase
         .from("online_events")
         .select(`
           id,
@@ -123,21 +97,54 @@ export default function Home() {
         `)
         .order("start_date", { ascending: true });
 
-      if (onlineData) {
-        const formatted = onlineData.map((event, index) => {
-          const channels = (event.online_event_channels || [])
-            .map((ec: any) => ec.channels)
-            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[]
-          const channel = channels[0];
-          const date = event.end_date
-            ? `${event.start_date.replaceAll("-", ".")} - ${event.end_date.replaceAll("-", ".")}`
-            : event.start_date?.replaceAll("-", ".") ?? "상시";
+      const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
+        offlineQuery,
+        onlineQuery,
+      ]);
+
+      const formatEventDate = (start: string, end: string | null) => {
+        return end
+          ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
+          : start?.replaceAll("-", ".") ?? "상시";
+      };
+
+      const extractChannels = (eventChannels: any[]) => {
+        return (eventChannels || [])
+          .map((ec: any) => ec.channels)
+          .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
+      };
+
+      const getCategory = (type?: string) => {
+        return type === "game" ? "게임" : type === "vtuber" ? "버튜버" : "유튜버";
+      };
+
+      if (offlineData) {
+        const formatted = offlineData.map((event, index) => {
+          const channels = extractChannels(event.offline_event_channels);
           return {
             id: event.id,
             title: event.title,
-            date,
+            date: formatEventDate(event.start_date, event.end_date),
+            location: event.location,
+            category: getCategory(channels[0]?.type),
+            imageColor: imageColors[index % imageColors.length],
+            imageUrl: event.image_url,
+            reservationType: event.reservation_type as Event["reservationType"],
+            channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+          };
+        });
+        setOfflineEvents(formatted);
+      }
+
+      if (onlineData) {
+        const formatted = onlineData.map((event, index) => {
+          const channels = extractChannels(event.online_event_channels);
+          return {
+            id: event.id,
+            title: event.title,
+            date: formatEventDate(event.start_date, event.end_date),
             location: "온라인",
-            category: channel?.type === "game" ? "게임" : channel?.type === "vtuber" ? "버튜버" : "유튜버",
+            category: getCategory(channels[0]?.type),
             imageColor: imageColors[index % imageColors.length],
             imageUrl: event.image_url,
             reservationType: undefined,
@@ -151,7 +158,6 @@ export default function Home() {
     };
 
     fetchEvents();
-
   }, []);
 
   const events = activeTab === "offline" ? offlineEvents : onlineEvents;
@@ -215,6 +221,7 @@ export default function Home() {
                     reservationType={event.reservationType}
                     channels={event.channels}
                     user={user}
+                    eventType={activeTab}
                   />
                 ))}
               </div>

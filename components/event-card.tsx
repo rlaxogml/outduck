@@ -3,7 +3,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
@@ -21,6 +23,7 @@ interface EventCardProps {
   reservationType?: ReservationType;
   channels?: { id: number; name: string; image_url: string }[];
   user: User | null;
+  eventType: "offline" | "online";
 }
 
 const reservationBadgeColors: Record<ReservationType, string> = {
@@ -47,12 +50,15 @@ export function EventCard({
   reservationType,
   channels,
   user,
+  eventType,
 }: EventCardProps) {
   const [showChannels, setShowChannels] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [heartAnim, setHeartAnim] = useState(false);
   const router = useRouter();
   const popupRef = useRef<HTMLDivElement>(null);
+
+  const eventColumn = eventType === "offline" ? "offline_event_id" : "online_event_id";
 
   // 북마크 여부 확인
   useEffect(() => {
@@ -62,12 +68,12 @@ export function EventCard({
         .from("event_bookmarks")
         .select("id")
         .eq("user_id", user.id)
-        .eq("offline_event_id", id)
+        .eq(eventColumn, id)
         .maybeSingle();
       setIsBookmarked(!!data);
     };
     checkBookmark();
-  }, [user, id]);
+  }, [user, id, eventColumn]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -95,13 +101,15 @@ export function EventCard({
         .from("event_bookmarks")
         .delete()
         .eq("user_id", user.id)
-        .eq("offline_event_id", id);
+        .eq(eventColumn, id);
       setIsBookmarked(false);
+      toast("관심 행사가 해제되었습니다");
     } else {
       await supabase
         .from("event_bookmarks")
-        .insert({ user_id: user.id, offline_event_id: id });
+        .insert({ user_id: user.id, [eventColumn]: id });
       setIsBookmarked(true);
+      toast("관심 행사가 저장되었습니다");
     }
   };
 
@@ -157,21 +165,16 @@ export function EventCard({
               className="flex items-center -space-x-9 transition-transform hover:scale-105 active:scale-95"
             >
               {channels.slice(0, 3).map((channel, i) => (
-                <div
+                <Avatar
                   key={i}
-                  className="relative w-18 h-18 rounded-full border-2 border-black/60 overflow-hidden bg-muted"
+                  className="relative w-18 h-18 border-2 border-black/60 bg-muted"
                   style={{ zIndex: 10 - i }}
                 >
-                  {channel.image_url ? (
-                    <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-xs font-bold text-muted-foreground">
-                        {channel.name.charAt(0)}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                  <AvatarImage src={channel.image_url || undefined} alt={channel.name} className="object-cover" />
+                  <AvatarFallback className="text-xs font-bold text-muted-foreground bg-muted">
+                    {channel.name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
               ))}
               {channels.length > 3 && (
                 <div
@@ -192,17 +195,12 @@ export function EventCard({
                 <div className="flex flex-row gap-3">
                   {channels.map((c, i) => (
                     <div key={i} className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => router.push(`/channels/${c.id}`)}>
-                      <div className="w-14 h-14 rounded-full border border-border overflow-hidden bg-muted flex-shrink-0">
-                        {c.image_url ? (
-                          <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-xs font-bold text-muted-foreground">
-                              {c.name.charAt(0)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      <Avatar className="w-14 h-14 border border-border bg-muted flex-shrink-0">
+                        <AvatarImage src={c.image_url || undefined} alt={c.name} className="object-cover" />
+                        <AvatarFallback className="text-xs font-bold text-muted-foreground bg-muted">
+                          {c.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
                       <span className="text-xs font-medium text-center break-keep w-full">{c.name}</span>
                     </div>
                   ))}
