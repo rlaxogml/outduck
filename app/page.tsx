@@ -83,8 +83,8 @@ export default function Home() {
         .select(`
           id,
           title,
-          start_date,
-          end_date,
+          start_at,
+          end_at,
           image_url,
           online_event_channels(
             channels(
@@ -95,7 +95,7 @@ export default function Home() {
             )
           )
         `)
-        .order("start_date", { ascending: true });
+        .order("start_at", { ascending: true });
 
       const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
         offlineQuery,
@@ -106,6 +106,24 @@ export default function Home() {
         return end
           ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
           : start?.replaceAll("-", ".") ?? "상시";
+      };
+
+      const formatOnlineEventDate = (start: string | null, end: string | null) => {
+        if (!start) return "상시";
+        
+        const formatDate = (dateStr: string) => {
+          const d = new Date(dateStr);
+          if (isNaN(d.getTime())) return "";
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${month}.${day}`;
+        };
+
+        const startFormatted = formatDate(start);
+        if (!end) return startFormatted;
+        
+        const endFormatted = formatDate(end);
+        return `${startFormatted} ~ ${endFormatted}`;
       };
 
       const extractChannels = (eventChannels: any[]) => {
@@ -142,7 +160,7 @@ export default function Home() {
           return {
             id: event.id,
             title: event.title,
-            date: formatEventDate(event.start_date, event.end_date),
+            date: formatOnlineEventDate(event.start_at, event.end_at),
             location: "온라인",
             category: getCategory(channels[0]?.type),
             imageColor: imageColors[index % imageColors.length],

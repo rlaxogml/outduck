@@ -114,7 +114,10 @@ export function EventCard({
   };
 
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+    <Card 
+      onClick={() => router.push(eventType === "online" ? `/online-events/${id}` : `/events/${id}`)}
+      className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+    >
       <div className={`aspect-[5/3] ${!imageUrl ? imageColor : 'bg-muted'} relative`}>
         {imageUrl ? (
           <img src={imageUrl} alt={title} className="absolute inset-0 w-full h-full object-cover" />
