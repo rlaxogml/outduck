@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { Calendar, Heart, MapPinned, Star, Search } from "lucide-react";
+import { Calendar, Heart, MapPinned, Star, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
@@ -191,6 +191,24 @@ export function Header() {
     );
   };
 
+  const clearRecentChannels = () => {
+    setRecentChannels([]);
+    window.localStorage.removeItem(RECENT_CHANNELS_STORAGE_KEY);
+  };
+
+  const removeRecentChannel = (id: number) => {
+    const updatedChannels = recentChannels.filter((c) => c.id !== id);
+    setRecentChannels(updatedChannels);
+    if (updatedChannels.length > 0) {
+      window.localStorage.setItem(
+        RECENT_CHANNELS_STORAGE_KEY,
+        JSON.stringify(updatedChannels)
+      );
+    } else {
+      window.localStorage.removeItem(RECENT_CHANNELS_STORAGE_KEY);
+    }
+  };
+
   const handleChannelSelect = (channel: ChannelSearchItem) => {
     saveRecentChannel(channel);
     setIsSearchFocused(false);
@@ -314,34 +332,62 @@ export function Header() {
                     : "최근 검색한 채널이 없습니다."}
                 </div>
               ) : (
-                <ul className="flex gap-3 overflow-x-auto p-1">
-                  {displayedChannels.map((channel) => (
-                    <li
-                      key={channel.id}
-                      className="min-w-28 flex-shrink-0"
-                    >
+                <div className="flex flex-col gap-1">
+                  {!hasTypedInput && displayedChannels.length > 0 && (
+                    <div className="flex items-center justify-between px-3 pt-1 pb-2">
+                      <span className="text-sm font-semibold">최근 검색</span>
                       <button
                         type="button"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => handleChannelSelect(channel)}
-                        className="w-full rounded-xl border border-border p-3 text-center hover:bg-muted"
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={clearRecentChannels}
                       >
-                        <Avatar className="mx-auto mb-2 h-12 w-12 border border-border">
-                          <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
-                          <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
-                            {getChannelInitial(channel.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="truncate text-sm font-medium">
-                          {channel.name}
-                        </div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          {renderChannelType(channel.type)}
-                        </div>
+                        전체 삭제
                       </button>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                  )}
+                  <ul className="flex gap-3 overflow-x-auto p-1 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {displayedChannels.map((channel) => (
+                      <li
+                        key={channel.id}
+                        className="relative min-w-28 flex-shrink-0 group"
+                      >
+                        {!hasTypedInput && (
+                          <button
+                            type="button"
+                            className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-background hover:text-foreground group-hover:opacity-100"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeRecentChannel(channel.id);
+                            }}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handleChannelSelect(channel)}
+                          className="w-full rounded-xl border border-border p-3 text-center hover:bg-muted transition-colors"
+                        >
+                          <Avatar className="mx-auto mb-2 h-12 w-12 border border-border">
+                            <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
+                            <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
+                              {getChannelInitial(channel.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="truncate text-sm font-medium">
+                            {channel.name}
+                          </div>
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            {renderChannelType(channel.type)}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )}

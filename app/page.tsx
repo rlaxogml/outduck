@@ -133,7 +133,12 @@ export default function Home() {
       };
 
       const getCategory = (type?: string) => {
-        return type === "game" ? "게임" : type === "vtuber" ? "버튜버" : "유튜버";
+        if (!type) return "기타";
+        const t = type.trim().toLowerCase();
+        if (t === "game") return "게임";
+        if (t === "vtuber") return "버튜버";
+        if (t === "youtuber") return "유튜버";
+        return "기타";
       };
 
       if (offlineData) {

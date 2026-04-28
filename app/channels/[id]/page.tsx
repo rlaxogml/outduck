@@ -39,9 +39,10 @@ const channelTypeLabel: Record<ChannelType, string> = {
   vtuber: "버튜버",
 };
 
-function getChannelTypeText(type: ChannelType | null) {
-  if (!type || !(type in channelTypeLabel)) return "기타";
-  return channelTypeLabel[type];
+function getChannelTypeText(type: string | null) {
+  if (!type) return "기타";
+  const normalized = type.trim().toLowerCase();
+  return channelTypeLabel[normalized as ChannelType] || "기타";
 }
 
 function getInitialText(name: string) {
@@ -129,7 +130,8 @@ export default function ChannelProfilePage() {
         .eq("channel_id", channelId)
         .then(res => res.count ?? 0);
 
-      const userAndFavPromise = supabase.auth.getUser().then(async ({ data: { user: currentUser } }) => {
+      const userAndFavPromise = supabase.auth.getSession().then(async ({ data: { session } }) => {
+        const currentUser = session?.user ?? null;
         if (!currentUser) return { user: null, isSubscribed: false };
         const { data: favData } = await supabase
           .from("favorites")
@@ -138,6 +140,9 @@ export default function ChannelProfilePage() {
           .eq("user_id", currentUser.id)
           .maybeSingle();
         return { user: currentUser, isSubscribed: !!favData };
+      }).catch((e) => {
+        console.error("Auth session fetch error:", e);
+        return { user: null, isSubscribed: false };
       });
 
       const offlineEventsPromise = supabase
@@ -184,7 +189,7 @@ export default function ChannelProfilePage() {
               title: event.title,
               date,
               location: event.location,
-              category: sorted[0]?.type === "game" ? "게임" : sorted[0]?.type === "vtuber" ? "버튜버" : "유튜버",
+              category: getChannelTypeText(sorted[0]?.type),
               imageColor: imageColors[index % imageColors.length],
               imageUrl: event.image_url,
               reservationType: event.reservation_type as OfflineEvent["reservationType"],

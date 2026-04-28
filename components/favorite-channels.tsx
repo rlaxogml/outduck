@@ -31,24 +31,30 @@ export function FavoriteChannels() {
 
   useEffect(() => {
     const fetchFavorites = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      setUser(currentUser);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
 
-      if (currentUser) {
-        const { data, error } = await supabase
-          .from("favorites")
-          .select("channel_id, created_at, channels(id, name, type, image_url)")
-          .eq("user_id", currentUser.id)
-          .order("created_at", { ascending: false });
+        if (currentUser) {
+          const { data, error } = await supabase
+            .from("favorites")
+            .select("channel_id, created_at, channels(id, name, type, image_url)")
+            .eq("user_id", currentUser.id)
+            .order("created_at", { ascending: false });
 
-        if (!error && data) {
-          const favoriteChannels = data
-            .map((f: any) => f.channels)
-            .filter(Boolean) as Channel[];
-          setChannels(favoriteChannels);
+          if (!error && data) {
+            const favoriteChannels = data
+              .map((f: any) => f.channels)
+              .filter(Boolean) as Channel[];
+            setChannels(favoriteChannels);
+          }
         }
+      } catch (error) {
+        console.error("Failed to fetch user or favorites:", error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     fetchFavorites();
