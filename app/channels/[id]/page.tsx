@@ -178,10 +178,16 @@ export default function ChannelProfilePage() {
       setUser(currentUser);
       setIsSubscribed(isSubscribed);
 
+      const relatedChannelIds = [
+        channelId,
+        ...(teamData ? [(teamData as Channel).id] : []),
+        ...((membersData as Channel[])?.map(m => m.id) || [])
+      ];
+
       if (offlineData) {
         const formatted = offlineData
           .filter(event =>
-            event.offline_event_channels?.some((ec: any) => ec.channels?.id === channelId)
+            event.offline_event_channels?.some((ec: any) => relatedChannelIds.includes(ec.channels?.id))
           )
           .map((event, index) => {
             const allChannels = (event.offline_event_channels || [])
@@ -212,7 +218,7 @@ export default function ChannelProfilePage() {
       if (onlineData) {
         const formatted = onlineData
           .filter(event =>
-            event.online_event_channels?.some((ec: any) => ec.channels?.id === channelId)
+            event.online_event_channels?.some((ec: any) => relatedChannelIds.includes(ec.channels?.id))
           )
           .map((event, index) => {
             const allChannels = (event.online_event_channels || [])
