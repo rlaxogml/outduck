@@ -154,12 +154,22 @@ export default function ChannelProfilePage() {
         .order("start_date", { ascending: true })
         .then(res => res.data);
 
-      const [teamData, membersData, favCount, { user: currentUser, isSubscribed }, offlineData] = await Promise.all([
+      const onlineEventsPromise = supabase
+        .from("online_events")
+        .select(`
+          id, title, start_at, end_at, image_url,
+          online_event_channels ( channels ( id, name, type, image_url ) )
+        `)
+        .order("start_at", { ascending: true })
+        .then(res => res.data);
+
+      const [teamData, membersData, favCount, { user: currentUser, isSubscribed }, offlineData, onlineData] = await Promise.all([
         teamDataPromise,
         membersDataPromise,
         favoriteCountPromise,
         userAndFavPromise,
         offlineEventsPromise,
+        onlineEventsPromise,
       ]);
 
       setTeamChannel(teamData as Channel | null);
@@ -197,6 +207,37 @@ export default function ChannelProfilePage() {
             };
           });
         setOfflineEvents(formatted);
+      }
+
+      if (onlineData) {
+        const formatted = onlineData
+          .filter(event =>
+            event.online_event_channels?.some((ec: any) => ec.channels?.id === channelId)
+          )
+          .map((event, index) => {
+            const allChannels = (event.online_event_channels || [])
+              .map((ec: any) => ec.channels)
+              .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
+            const sorted = [
+              ...allChannels.filter(c => c.id === channelId),
+              ...allChannels.filter(c => c.id !== channelId),
+            ];
+            const date = event.end_at
+              ? `${event.start_at.replaceAll("-", ".").slice(0, 10)} - ${event.end_at.replaceAll("-", ".").slice(0, 10)}`
+              : event.start_at?.replaceAll("-", ".").slice(0, 10) ?? "상시";
+            return {
+              id: event.id,
+              title: event.title,
+              date,
+              location: "온라인",
+              category: getChannelTypeText(sorted[0]?.type),
+              imageColor: imageColors[index % imageColors.length],
+              imageUrl: event.image_url,
+              reservationType: undefined,
+              channels: sorted.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+            };
+          });
+        setOnlineEvents(formatted);
       }
 
       setIsLoading(false);
@@ -405,15 +446,36 @@ export default function ChannelProfilePage() {
               </div>
             )
           ) : (
-            <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
-                <ShoppingBag className="h-10 w-10 text-muted-foreground/60" />
+            onlineEvents.length === 0 ? (
+              <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
+                  <ShoppingBag className="h-10 w-10 text-muted-foreground/60" />
+                </div>
+                <div className="text-center space-y-1.5">
+                  <h3 className="text-lg font-semibold text-foreground">등록된 온라인 일정이 없어요</h3>
+                  <p className="text-sm text-muted-foreground">새로운 일정이 추가되면 이곳에서 확인하실 수 있습니다.</p>
+                </div>
               </div>
-              <div className="text-center space-y-1.5">
-                <h3 className="text-lg font-semibold text-foreground">등록된 온라인 일정이 없어요</h3>
-                <p className="text-sm text-muted-foreground">새로운 일정이 추가되면 이곳에서 확인하실 수 있습니다.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {onlineEvents.map(event => (
+                  <EventCard
+                    key={event.id}
+                    id={event.id}
+                    title={event.title}
+                    date={event.date}
+                    location={event.location}
+                    category={event.category}
+                    imageColor={event.imageColor}
+                    imageUrl={event.imageUrl}
+                    reservationType={event.reservationType}
+                    channels={event.channels}
+                    user={user}
+                    eventType="online"
+                  />
+                ))}
               </div>
-            </div>
+            )
           )}
         </section>
       </main>

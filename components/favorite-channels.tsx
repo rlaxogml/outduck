@@ -9,6 +9,7 @@ type Channel = {
   name: string;
   type: string | null;
   image_url: string | null;
+  activeEventCount?: number;
 };
 
 const channelTypeLabel: Record<string, string> = {
@@ -39,13 +40,49 @@ export function FavoriteChannels() {
         if (currentUser) {
           const { data, error } = await supabase
             .from("favorites")
-            .select("channel_id, created_at, channels(id, name, type, image_url)")
+            .select("channel_id, created_at, channels(id, name, type, image_url, offline_event_channels(offline_events(id, end_date)), online_event_channels(online_events(id, end_at)))")
             .eq("user_id", currentUser.id)
             .order("created_at", { ascending: false });
 
           if (!error && data) {
+            const today = new Date().toISOString().split("T")[0];
             const favoriteChannels = data
-              .map((f: any) => f.channels)
+              .map((f: any) => {
+                const channel = f.channels;
+                if (!channel) return null;
+                
+                let activeCount = 0;
+                if (channel.offline_event_channels) {
+                  channel.offline_event_channels.forEach((ec: any) => {
+                    const event = ec.offline_events;
+                    if (event) {
+                      if (!event.end_date || event.end_date >= today) {
+                        activeCount++;
+                      }
+                    }
+                  });
+                }
+                
+                if (channel.online_event_channels) {
+                  channel.online_event_channels.forEach((ec: any) => {
+                    const event = ec.online_events;
+                    if (event) {
+                      // end_at includes time, so we just compare string lexicographically or check if it's not strictly less than today
+                      if (!event.end_at || event.end_at >= today) {
+                        activeCount++;
+                      }
+                    }
+                  });
+                }
+                
+                return {
+                  id: channel.id,
+                  name: channel.name,
+                  type: channel.type,
+                  image_url: channel.image_url,
+                  activeEventCount: activeCount,
+                } as Channel;
+              })
               .filter(Boolean) as Channel[];
             setChannels(favoriteChannels);
           }
@@ -80,11 +117,18 @@ export function FavoriteChannels() {
         ) : (
           channels.map((channel) => (
             <Link key={channel.id} href={`/channels/${channel.id}`} className="flex flex-col items-center gap-2 min-w-[80px]">
-              <div className="w-20 h-20 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0">
-                {channel.image_url ? (
-                  <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xl font-bold">{channel.name.slice(0,1).toUpperCase()}</span>
+              <div className="relative w-20 h-20">
+                <div className="w-full h-full rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0">
+                  {channel.image_url ? (
+                    <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xl font-bold">{channel.name.slice(0,1).toUpperCase()}</span>
+                  )}
+                </div>
+                {channel.activeEventCount !== undefined && channel.activeEventCount > 0 && (
+                  <div className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-background min-w-[20px] text-center shadow-sm">
+                    {channel.activeEventCount}
+                  </div>
                 )}
               </div>
               <div className="flex flex-col items-center gap-0.5">

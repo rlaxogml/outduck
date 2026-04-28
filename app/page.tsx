@@ -57,127 +57,131 @@ export default function Home() {
 
   useEffect(() => {
     const fetchEvents = async () => {
-      const offlineQuery = supabase
-        .from("offline_events")
-        .select(`
-          id,
-          title,
-          start_date,
-          end_date,
-          location,
-          image_url,
-          reservation_type,
-          offline_event_channels(
-            channels(
-              id,
-              name,
-              type,
-              image_url
+      try {
+        const offlineQuery = supabase
+          .from("offline_events")
+          .select(`
+            id,
+            title,
+            start_date,
+            end_date,
+            location,
+            image_url,
+            reservation_type,
+            offline_event_channels(
+              channels(
+                id,
+                name,
+                type,
+                image_url
+              )
             )
-          )
-        `)
-        .order("start_date", { ascending: true });
+          `)
+          .order("start_date", { ascending: true });
 
-      const onlineQuery = supabase
-        .from("online_events")
-        .select(`
-          id,
-          title,
-          start_at,
-          end_at,
-          image_url,
-          online_event_channels(
-            channels(
-              id,
-              name,
-              type,
-              image_url
+        const onlineQuery = supabase
+          .from("online_events")
+          .select(`
+            id,
+            title,
+            start_at,
+            end_at,
+            image_url,
+            online_event_channels(
+              channels(
+                id,
+                name,
+                type,
+                image_url
+              )
             )
-          )
-        `)
-        .order("start_at", { ascending: true });
+          `)
+          .order("start_at", { ascending: true });
 
-      const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
-        offlineQuery,
-        onlineQuery,
-      ]);
+        const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
+          offlineQuery,
+          onlineQuery,
+        ]);
 
-      const formatEventDate = (start: string, end: string | null) => {
-        return end
-          ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
-          : start?.replaceAll("-", ".") ?? "상시";
-      };
-
-      const formatOnlineEventDate = (start: string | null, end: string | null) => {
-        if (!start) return "상시";
-        
-        const formatDate = (dateStr: string) => {
-          const d = new Date(dateStr);
-          if (isNaN(d.getTime())) return "";
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          return `${month}.${day}`;
+        const formatEventDate = (start: string, end: string | null) => {
+          return end
+            ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
+            : start?.replaceAll("-", ".") ?? "상시";
         };
 
-        const startFormatted = formatDate(start);
-        if (!end) return startFormatted;
-        
-        const endFormatted = formatDate(end);
-        return `${startFormatted} ~ ${endFormatted}`;
-      };
-
-      const extractChannels = (eventChannels: any[]) => {
-        return (eventChannels || [])
-          .map((ec: any) => ec.channels)
-          .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
-      };
-
-      const getCategory = (type?: string) => {
-        if (!type) return "기타";
-        const t = type.trim().toLowerCase();
-        if (t === "game") return "게임";
-        if (t === "vtuber") return "버튜버";
-        if (t === "youtuber") return "유튜버";
-        return "기타";
-      };
-
-      if (offlineData) {
-        const formatted = offlineData.map((event, index) => {
-          const channels = extractChannels(event.offline_event_channels);
-          return {
-            id: event.id,
-            title: event.title,
-            date: formatEventDate(event.start_date, event.end_date),
-            location: event.location,
-            category: getCategory(channels[0]?.type),
-            imageColor: imageColors[index % imageColors.length],
-            imageUrl: event.image_url,
-            reservationType: event.reservation_type as Event["reservationType"],
-            channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+        const formatOnlineEventDate = (start: string | null, end: string | null) => {
+          if (!start) return "상시";
+          
+          const formatDate = (dateStr: string) => {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return "";
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${month}.${day}`;
           };
-        });
-        setOfflineEvents(formatted);
-      }
 
-      if (onlineData) {
-        const formatted = onlineData.map((event, index) => {
-          const channels = extractChannels(event.online_event_channels);
-          return {
-            id: event.id,
-            title: event.title,
-            date: formatOnlineEventDate(event.start_at, event.end_at),
-            location: "온라인",
-            category: getCategory(channels[0]?.type),
-            imageColor: imageColors[index % imageColors.length],
-            imageUrl: event.image_url,
-            reservationType: undefined,
-            channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
-          };
-        });
-        setOnlineEvents(formatted);
-      }
+          const startFormatted = formatDate(start);
+          if (!end) return startFormatted;
+          
+          const endFormatted = formatDate(end);
+          return `${startFormatted} ~ ${endFormatted}`;
+        };
 
-      setLoading(false);
+        const extractChannels = (eventChannels: any[]) => {
+          return (eventChannels || [])
+            .map((ec: any) => ec.channels)
+            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
+        };
+
+        const getCategory = (type?: string) => {
+          if (!type) return "기타";
+          const t = type.trim().toLowerCase();
+          if (t === "game") return "게임";
+          if (t === "vtuber") return "버튜버";
+          if (t === "youtuber") return "유튜버";
+          return "기타";
+        };
+
+        if (offlineData) {
+          const formatted = offlineData.map((event, index) => {
+            const channels = extractChannels(event.offline_event_channels);
+            return {
+              id: event.id,
+              title: event.title,
+              date: formatEventDate(event.start_date, event.end_date),
+              location: event.location,
+              category: getCategory(channels[0]?.type),
+              imageColor: imageColors[index % imageColors.length],
+              imageUrl: event.image_url,
+              reservationType: event.reservation_type as Event["reservationType"],
+              channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+            };
+          });
+          setOfflineEvents(formatted);
+        }
+
+        if (onlineData) {
+          const formatted = onlineData.map((event, index) => {
+            const channels = extractChannels(event.online_event_channels);
+            return {
+              id: event.id,
+              title: event.title,
+              date: formatOnlineEventDate(event.start_at, event.end_at),
+              location: "온라인",
+              category: getCategory(channels[0]?.type),
+              imageColor: imageColors[index % imageColors.length],
+              imageUrl: event.image_url,
+              reservationType: undefined,
+              channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+            };
+          });
+          setOnlineEvents(formatted);
+        }
+      } catch (error) {
+        console.error("Failed to fetch events:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchEvents();

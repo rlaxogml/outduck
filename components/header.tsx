@@ -6,6 +6,15 @@ import type { User } from "@supabase/supabase-js";
 import { Calendar, Heart, MapPinned, Star, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase/client";
 
 type ChannelType = "game" | "youtuber" | "vtuber";
@@ -65,6 +74,8 @@ export function Header() {
       subscription.unsubscribe();
     };
   }, []);
+
+
 
   useEffect(() => {
     const savedRecentChannels = window.localStorage.getItem(
@@ -171,6 +182,12 @@ export function Header() {
     });
   };
 
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.refresh();
+  };
+
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
   const userName =
     (user?.user_metadata?.name as string | undefined) ??
@@ -268,10 +285,25 @@ export function Header() {
         </div>
 
         {user ? (
-          <Avatar className="size-11 border border-border">
-            <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />
-            <AvatarFallback>{avatarFallbackText}</AvatarFallback>
-          </Avatar>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Avatar className="size-11 border border-border cursor-pointer hover:opacity-80 transition-opacity">
+                <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />
+                <AvatarFallback>{avatarFallbackText}</AvatarFallback>
+              </Avatar>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>{userName}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
+                마이페이지
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10">
+                로그아웃
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <Button
             variant="ghost"

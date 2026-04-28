@@ -21,6 +21,7 @@ type EventDetail = {
   image_url: string | null;
   reservation_type: string | null;
   channels: { id: number; name: string; image_url: string; type: string }[];
+  images: { id: number; image_url: string; order: number }[];
 };
 
 export default function EventDetailPage() {
@@ -36,9 +37,12 @@ export default function EventDetailPage() {
   
   useEffect(() => {
     const syncSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
     };
+
     syncSession();
   }, []);
 
@@ -49,7 +53,8 @@ export default function EventDetailPage() {
         .from("offline_events")
         .select(`
           id, title, description, start_date, end_date, start_time, end_time, location, image_url, reservation_type,
-          offline_event_channels ( channels ( id, name, type, image_url ) )
+          offline_event_channels ( channels ( id, name, type, image_url ) ),
+          offline_event_images ( id, image_url, order )
         `)
         .eq("id", eventId)
         .maybeSingle();
@@ -71,6 +76,7 @@ export default function EventDetailPage() {
           image_url: data.image_url,
           reservation_type: data.reservation_type,
           channels,
+          images: (data.offline_event_images || []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
         });
       }
       setIsLoading(false);
@@ -171,145 +177,230 @@ export default function EventDetailPage() {
   }) : null;
 
   return (
-    <div className="min-h-screen bg-background pb-12">
+    <div className="min-h-screen bg-gray-50/50 dark:bg-background pb-12">
       <div className="mx-auto max-w-5xl px-4 py-3 relative z-10">
         <Header />
       </div>
-      
-      {/* Representative Image (Width max-w-4xl) */}
-      <div className="mx-auto max-w-4xl relative">
-        <div className="w-full aspect-[4/3] md:aspect-[21/9] bg-muted relative md:rounded-b-3xl overflow-hidden shadow-lg border-b md:border border-border/50">
+
+      <div className="mx-auto max-w-2xl bg-background min-h-screen border-x border-border/40 shadow-sm md:rounded-t-3xl overflow-hidden mt-2">
+        {/* Representative Image */}
+        <div className="w-full aspect-[16/9] md:aspect-[21/9] bg-muted relative">
           {event.image_url ? (
             <img src={event.image_url} alt={event.title} className="w-full h-full object-cover" />
           ) : (
              <div className="w-full h-full bg-gradient-to-br from-indigo-500/80 to-purple-600/80" />
           )}
         </div>
-      </div>
-
-      <div className="mx-auto max-w-3xl px-5 md:px-8 border-x border-b border-border/60 pb-12 rounded-b-2xl md:rounded-b-3xl mb-12 shadow-sm bg-background">
-        {/* Channel Profile Images overlapping */}
-        {event.channels.length > 0 && (
-          <div className="relative -mt-10 md:-mt-12 mb-4 z-20 flex items-center -space-x-4 md:-space-x-6">
-            {event.channels.map((channel, i) => (
-              <div 
-                key={channel.id} 
-                className="transition-transform hover:scale-105 hover:z-30 cursor-pointer relative" 
-                style={{ zIndex: 20 - i }}
-                onClick={() => router.push(`/channels/${channel.id}`)}
-              >
-                <Avatar className="w-20 h-20 md:w-24 md:h-24 border-4 border-background shadow-md">
-                  <AvatarImage src={channel.image_url || undefined} className="object-cover bg-muted" />
-                  <AvatarFallback className="bg-muted text-xl font-bold">{channel.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Title and Bookmark */}
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight break-keep leading-tight">
-            {event.title}
-          </h1>
-          
-          <button
-            onClick={handleBookmark}
-            className={`shrink-0 flex items-center justify-center w-12 h-12 rounded-full border shadow-sm transition-all duration-300
-              ${isBookmarked ? "bg-gradient-to-br from-pink-400 to-rose-500 border-transparent shadow-pink-500/30" : "bg-card border-border hover:bg-muted"}
-              ${heartAnim ? "scale-110" : "scale-100"}
-            `}
-          >
-            <Heart className={`w-5 h-5 transition-colors ${isBookmarked ? "fill-white text-white" : "text-muted-foreground"}`} />
-          </button>
-        </div>
-        
-        {/* Organizer Info */}
-        {event.channels.length > 0 && (
-          <div className="mb-8">
-            <p className="text-sm font-semibold text-muted-foreground mb-3">주최자</p>
-            <div className="flex flex-wrap gap-3">
-              {event.channels.map(channel => (
-                <button 
+        <div className="px-5 pt-0 pb-6">
+          {/* Overlapping Channel Images */}
+          {event.channels.length > 0 && (
+            <div className="relative -mt-10 md:-mt-12 mb-5 z-20 flex items-center -space-x-4 md:-space-x-5">
+              {event.channels.map((channel, i) => (
+                <div 
                   key={channel.id} 
+                  className="transition-transform hover:scale-105 hover:z-30 cursor-pointer relative" 
+                  style={{ zIndex: 20 - i }}
                   onClick={() => router.push(`/channels/${channel.id}`)}
-                  className="flex items-center gap-2 bg-secondary/50 rounded-full pr-4 p-1 border border-border/50 hover:bg-secondary transition-colors"
                 >
-                  <Avatar className="w-8 h-8 border border-background shadow-sm">
-                    <AvatarImage src={channel.image_url || undefined} className="object-cover bg-muted" />
-                    <AvatarFallback className="bg-muted text-xs font-bold">{channel.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm font-medium">{channel.name}</span>
-                </button>
+                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-background shadow-md overflow-hidden bg-muted flex items-center justify-center">
+                    {channel.image_url ? (
+                      <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xl font-bold text-muted-foreground">{channel.name.charAt(0)}</span>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-          <div className="flex items-center gap-4 bg-card rounded-2xl p-4 border border-border/60 shadow-sm transition-shadow hover:shadow-md">
-            <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
-              <Calendar className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium mb-1">날짜</p>
-              <p className="font-semibold text-[15px]">{formatEventDate(event.start_date, event.end_date)}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 bg-card rounded-2xl p-4 border border-border/60 shadow-sm transition-shadow hover:shadow-md">
-            <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center shrink-0">
-              <MapPin className="w-5 h-5 text-rose-500" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium mb-1">장소</p>
-              <p className="font-semibold text-[15px]">{event.location}</p>
-            </div>
-          </div>
-
-          {(event.start_time || event.end_time) && (
-            <div className="flex items-center gap-4 bg-card rounded-2xl p-4 border border-border/60 shadow-sm transition-shadow hover:shadow-md">
-              <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-                <Clock className="w-5 h-5 text-amber-500" />
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <h1 className="text-2xl font-bold tracking-tight break-keep leading-tight text-foreground">
+                  {event.title}
+                </h1>
+                <span className="text-[14px] text-muted-foreground font-medium shrink-0 whitespace-nowrap mt-1">
+                  {event.channels.length > 0 ? event.channels[0].name : "오프라인 행사"}
+                </span>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium mb-1">시간</p>
-                <p className="font-semibold text-[15px]">
+              <p className="text-[13px] text-muted-foreground flex items-center gap-1">
+                행사 세부 정보를 확인해보세요
+              </p>
+            </div>
+            
+            <button
+              onClick={handleBookmark}
+              className={`shrink-0 flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-all duration-300
+                ${isBookmarked ? "border-pink-500 text-pink-500 bg-pink-50/50 dark:bg-pink-950/30" : "border-border text-foreground hover:bg-muted"}
+                ${heartAnim ? "scale-105" : "scale-100"}
+              `}
+            >
+              <Heart className={`w-3.5 h-3.5 ${isBookmarked ? "fill-pink-500 text-pink-500" : "text-muted-foreground"}`} />
+              <span>{isBookmarked ? "관심저장" : "알림받기"}</span>
+            </button>
+          </div>
+
+          {/* Action Icons Row */}
+          <div className="flex justify-around items-center mt-6 pt-5 border-t border-border/40">
+            <button onClick={handleBookmark} className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <div className="w-10 h-10 flex items-center justify-center">
+                <Heart className={`w-6 h-6 ${isBookmarked ? "fill-pink-500 text-pink-500" : ""}`} />
+              </div>
+              <span className="text-[12px] font-medium">저장</span>
+            </button>
+            <button className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors cursor-default">
+              <div className="w-10 h-10 flex items-center justify-center">
+                <MapPin className="w-6 h-6" />
+              </div>
+              <span className="text-[12px] font-medium">위치보기</span>
+            </button>
+            <button className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors cursor-default">
+              <div className="w-10 h-10 flex items-center justify-center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <span className="text-[12px] font-medium">공유</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Gray Divider */}
+        <div className="w-full h-2 bg-gray-100 dark:bg-white/5" />
+
+        {/* Tabs (Visual only) */}
+        <div className="flex items-center border-b border-border/40 sticky top-0 z-20 bg-background/80 backdrop-blur-md">
+          <div className="flex-1 text-center py-3.5 border-b-2 border-foreground font-bold text-[15px] text-foreground">
+            홈
+          </div>
+          <div className="flex-1 text-center py-3.5 text-muted-foreground font-medium text-[15px]">
+            소식
+          </div>
+          <div className="flex-1 text-center py-3.5 text-muted-foreground font-medium text-[15px]">
+            리뷰
+          </div>
+          <div className="flex-1 text-center py-3.5 text-muted-foreground font-medium text-[15px]">
+            정보
+          </div>
+        </div>
+
+        {/* Info List */}
+        <div className="px-5">
+          <div className="py-4 flex items-start gap-3">
+            <MapPin className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[15px] text-foreground font-medium leading-snug">{event.location}</p>
+              <p className="text-[13px] text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400">오프라인</span> 
+                행사장 위치를 확인해주세요
+              </p>
+            </div>
+          </div>
+
+          <div className="py-4 flex items-start gap-3 border-t border-border/40">
+            <Clock className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[15px] text-foreground leading-snug">
+                <span className="font-bold mr-2">행사 기간</span>
+                {formatEventDate(event.start_date, event.end_date)}
+              </p>
+              {(event.start_time || event.end_time) && (
+                <p className="text-[14px] text-muted-foreground mt-1.5">
+                  <span className="font-bold mr-2 text-foreground/80">이용 시간</span>
                   {event.start_time ? formatTime(event.start_time) : ""}
                   {event.start_time && event.end_time ? " - " : ""}
                   {event.end_time ? formatTime(event.end_time) : ""}
                 </p>
-              </div>
+              )}
+            </div>
+          </div>
+
+          {event.reservation_type && (
+            <div className="py-4 flex items-start gap-3 border-t border-border/40">
+              <Info className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+              <p className="text-[15px] text-foreground leading-snug pt-0.5">
+                <span className="font-bold mr-2">입장 방식</span>
+                {event.reservation_type}
+              </p>
             </div>
           )}
 
-          {event.reservation_type && (
-            <div className="flex items-center gap-4 bg-card rounded-2xl p-4 border border-border/60 shadow-sm transition-shadow hover:shadow-md">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
-                <Info className="w-5 h-5 text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium mb-1">입장 방식</p>
-                <p className="font-semibold text-[15px]">{event.reservation_type}</p>
-              </div>
+          {event.channels.length > 0 && (
+            <div className="py-4 flex items-start gap-3 border-t border-border/40">
+               <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5 overflow-hidden border border-border">
+                  {event.channels[0].image_url ? (
+                    <img src={event.channels[0].image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] font-bold">{event.channels[0].name.charAt(0)}</span>
+                  )}
+               </div>
+               <div className="flex-1">
+                  <p className="text-[15px] text-foreground leading-snug pt-0.5">
+                    <span className="font-bold mr-2">주최자</span>
+                    {event.channels.map(c => c.name).join(", ")}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {event.channels.map(channel => (
+                      <button 
+                        key={channel.id} 
+                        onClick={() => router.push(`/channels/${channel.id}`)}
+                        className="flex items-center gap-1.5 bg-secondary/30 rounded-lg px-3 py-1.5 border border-border/50 hover:bg-secondary/50 transition-colors"
+                      >
+                        <span className="text-[13px] font-medium text-foreground/80">{channel.name} 홈</span>
+                        <span className="text-muted-foreground text-[10px]">&gt;</span>
+                      </button>
+                    ))}
+                  </div>
+               </div>
             </div>
           )}
         </div>
 
-        {/* Description */}
+        {/* Gray Divider */}
+        <div className="w-full h-2 bg-gray-100 dark:bg-white/5" />
+
+        {/* Description Section */}
         {event.description && (
-          <div className="bg-card rounded-3xl p-6 md:p-8 border border-border/60 shadow-sm mb-12 relative overflow-hidden">
-            {/* Decoration */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-0" />
-            
-            <h2 className="text-xl font-bold mb-5 relative z-10">행사 소개</h2>
-            <div className="relative z-10 prose prose-base md:prose-lg dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-foreground font-medium">
+          <div className="px-5 py-6 mb-2">
+            <h2 className="text-[17px] font-bold mb-4 text-foreground flex items-center gap-2">
+              <span className="w-1 h-4 bg-primary rounded-full inline-block"></span>
+              행사 정보
+            </h2>
+            <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-foreground/90">
               {descriptionWithLinks}
             </div>
           </div>
         )}
-        
+
+        {/* Gray Divider */}
+        {(event.images && event.images.length > 0) && (
+          <div className="w-full h-2 bg-gray-100 dark:bg-white/5" />
+        )}
+
+        {/* Additional Images Grid */}
+        {event.images && event.images.length > 0 && (
+          <div className="py-6 mb-12">
+            <h2 className="text-[17px] font-bold mb-4 px-5 text-foreground flex items-center gap-2">
+              <span className="w-1 h-4 bg-primary rounded-full inline-block"></span>
+              행사 사진
+            </h2>
+            <div className="flex flex-nowrap overflow-x-auto pb-4 snap-x">
+              {event.images.map((img, i) => (
+                <div 
+                  key={img.id} 
+                  className={`shrink-0 snap-start ${i === 0 ? 'pl-5' : 'pl-4'} ${i === event.images.length - 1 ? 'pr-5' : ''}`}
+                >
+                  <div className="w-56 md:w-72 aspect-square bg-muted rounded-2xl overflow-hidden shadow-sm border border-border/40">
+                    <img src={img.image_url} alt="행사 이미지" className="w-full h-full object-cover transition-transform hover:scale-105 cursor-pointer" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
