@@ -154,7 +154,7 @@ export function EventCard({
         </span>
 
         {channels && channels.length > 0 && (
-          <div className="absolute -bottom-6 left-3" ref={popupRef}>
+          <div className="absolute -bottom-6 left-8" ref={popupRef}>
             <button
               onClick={(e) => {
                 e.preventDefault();

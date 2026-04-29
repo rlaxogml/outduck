@@ -21,11 +21,15 @@ type Event = {
   imageUrl?: string;
   reservationType: "자유입장" | "예약필수" | "예약우대" | "티켓팅" | undefined;
   channels: { id: number; name: string; image_url: string }[];
+  isAlways: boolean;
+  createdAt: string;
+  startDateValue: string | null;
 };
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
   const [activeCategory, setActiveCategory] = useState("all");
+  const [sortType, setSortType] = useState<"recent" | "upcoming">("upcoming");
 
   const [offlineEvents, setOfflineEvents] = useState<Event[]>([]);
   const [onlineEvents, setOnlineEvents] = useState<Event[]>([]);
@@ -68,6 +72,7 @@ export default function Home() {
             location,
             image_url,
             reservation_type,
+            created_at,
             offline_event_channels(
               channels(
                 id,
@@ -87,6 +92,7 @@ export default function Home() {
             start_at,
             end_at,
             image_url,
+            created_at,
             online_event_channels(
               channels(
                 id,
@@ -155,6 +161,9 @@ export default function Home() {
               imageUrl: event.image_url,
               reservationType: event.reservation_type as Event["reservationType"],
               channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+              isAlways: !event.start_date,
+              createdAt: event.created_at,
+              startDateValue: event.start_date,
             };
           });
           setOfflineEvents(formatted);
@@ -173,6 +182,9 @@ export default function Home() {
               imageUrl: event.image_url,
               reservationType: undefined,
               channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+              isAlways: !event.start_at,
+              createdAt: event.created_at,
+              startDateValue: event.start_at,
             };
           });
           setOnlineEvents(formatted);
@@ -187,15 +199,45 @@ export default function Home() {
     fetchEvents();
   }, []);
 
-  const events = activeTab === "offline" ? offlineEvents : onlineEvents;
+  const filteredEvents = (() => {
+    let result = activeTab === "offline" ? offlineEvents : onlineEvents;
 
-  const filteredEvents =
-    activeCategory === "all"
-      ? events
-      : events.filter(
-        (event) =>
-          event.category === (activeCategory === "game" ? "게임" : activeCategory === "vtuber" ? "버튜버" : "유튜버")
-      );
+    // 1. Category Filter
+    if (activeCategory === "always") {
+      result = result.filter(e => e.isAlways);
+    } else if (activeCategory !== "all") {
+      if (activeCategory === "youtuber") {
+        result = result.filter(e => e.category === "유튜버" || e.category === "버튜버");
+      } else {
+        const catMap: Record<string, string> = {
+          game: "게임",
+        };
+        result = result.filter(e => e.category === catMap[activeCategory]);
+      }
+    }
+
+    // 2. Schedule Filter (Exclude "Always" from "Upcoming" unless specifically in "Always" category)
+    if (sortType === "upcoming" && activeCategory !== "always") {
+      result = result.filter(e => !e.isAlways);
+    }
+
+    // 3. Sorting
+    if (sortType === "recent") {
+      result = [...result].sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    } else {
+      // Upcoming sort
+      result = [...result].sort((a, b) => {
+        if (a.isAlways && !b.isAlways) return 1;
+        if (!a.isAlways && b.isAlways) return -1;
+        if (!a.startDateValue || !b.startDateValue) return 0;
+        return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
+      });
+    }
+
+    return result;
+  })();
 
   return (
     <div className="min-h-screen bg-background">
@@ -225,6 +267,8 @@ export default function Home() {
           <CategoryFilter
             activeCategory={activeCategory}
             onCategoryChange={setActiveCategory}
+            sortType={sortType}
+            onSortChange={setSortType}
           />
 
           {/* Event Grid */}

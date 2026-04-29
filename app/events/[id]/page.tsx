@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MapPin, Calendar, Clock, Info } from "lucide-react";
+import { Heart, MapPin, Calendar, Clock, Info, User as UserIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 
@@ -34,6 +34,7 @@ export default function EventDetailPage() {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [heartAnim, setHeartAnim] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   useEffect(() => {
     const syncSession = async () => {
@@ -98,6 +99,14 @@ export default function EventDetailPage() {
     };
     checkBookmark();
   }, [user, eventId]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedImage(null);
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
 
   const handleBookmark = async () => {
     if (!user) {
@@ -186,7 +195,12 @@ export default function EventDetailPage() {
         {/* Representative Image */}
         <div className="w-full aspect-[16/9] md:aspect-[21/9] bg-muted relative">
           {event.image_url ? (
-            <img src={event.image_url} alt={event.title} className="w-full h-full object-cover" />
+            <img 
+              src={event.image_url} 
+              alt={event.title} 
+              className="w-full h-full object-cover cursor-pointer" 
+              onClick={() => setSelectedImage(event.image_url)}
+            />
           ) : (
              <div className="w-full h-full bg-gradient-to-br from-indigo-500/80 to-purple-600/80" />
           )}
@@ -271,21 +285,7 @@ export default function EventDetailPage() {
         {/* Gray Divider */}
         <div className="w-full h-2 bg-gray-100 dark:bg-white/5" />
 
-        {/* Tabs (Visual only) */}
-        <div className="flex items-center border-b border-border/40 sticky top-0 z-20 bg-background/80 backdrop-blur-md">
-          <div className="flex-1 text-center py-3.5 border-b-2 border-foreground font-bold text-[15px] text-foreground">
-            홈
-          </div>
-          <div className="flex-1 text-center py-3.5 text-muted-foreground font-medium text-[15px]">
-            소식
-          </div>
-          <div className="flex-1 text-center py-3.5 text-muted-foreground font-medium text-[15px]">
-            리뷰
-          </div>
-          <div className="flex-1 text-center py-3.5 text-muted-foreground font-medium text-[15px]">
-            정보
-          </div>
-        </div>
+
 
         {/* Info List */}
         <div className="px-5">
@@ -301,22 +301,28 @@ export default function EventDetailPage() {
           </div>
 
           <div className="py-4 flex items-start gap-3 border-t border-border/40">
-            <Clock className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+            <Calendar className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
             <div>
               <p className="text-[15px] text-foreground leading-snug">
                 <span className="font-bold mr-2">행사 기간</span>
                 {formatEventDate(event.start_date, event.end_date)}
               </p>
-              {(event.start_time || event.end_time) && (
-                <p className="text-[14px] text-muted-foreground mt-1.5">
-                  <span className="font-bold mr-2 text-foreground/80">이용 시간</span>
+            </div>
+          </div>
+
+          {(event.start_time || event.end_time) && (
+            <div className="py-4 flex items-start gap-3 border-t border-border/40">
+              <Clock className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[15px] text-foreground leading-snug">
+                  <span className="font-bold mr-2">이용 시간</span>
                   {event.start_time ? formatTime(event.start_time) : ""}
                   {event.start_time && event.end_time ? " - " : ""}
                   {event.end_time ? formatTime(event.end_time) : ""}
                 </p>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
           {event.reservation_type && (
             <div className="py-4 flex items-start gap-3 border-t border-border/40">
@@ -330,27 +336,23 @@ export default function EventDetailPage() {
 
           {event.channels.length > 0 && (
             <div className="py-4 flex items-start gap-3 border-t border-border/40">
-               <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5 overflow-hidden border border-border">
-                  {event.channels[0].image_url ? (
-                    <img src={event.channels[0].image_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[10px] font-bold">{event.channels[0].name.charAt(0)}</span>
-                  )}
-               </div>
+               <UserIcon className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
                <div className="flex-1">
-                  <p className="text-[15px] text-foreground leading-snug pt-0.5">
+                  <p className="text-[15px] text-foreground leading-snug pt-0.5 mb-2">
                     <span className="font-bold mr-2">주최자</span>
-                    {event.channels.map(c => c.name).join(", ")}
                   </p>
-                  <div className="flex flex-wrap gap-2 mt-3">
+                  <div className="flex flex-wrap gap-3">
                     {event.channels.map(channel => (
                       <button 
                         key={channel.id} 
                         onClick={() => router.push(`/channels/${channel.id}`)}
-                        className="flex items-center gap-1.5 bg-secondary/30 rounded-lg px-3 py-1.5 border border-border/50 hover:bg-secondary/50 transition-colors"
+                        className="flex items-center gap-2 bg-secondary/50 rounded-full pr-4 p-1 border border-border/50 hover:bg-secondary transition-colors"
                       >
-                        <span className="text-[13px] font-medium text-foreground/80">{channel.name} 홈</span>
-                        <span className="text-muted-foreground text-[10px]">&gt;</span>
+                        <Avatar className="w-8 h-8 border border-background shadow-sm">
+                          <AvatarImage src={channel.image_url || undefined} className="object-cover bg-muted" />
+                          <AvatarFallback className="bg-muted text-xs font-bold">{channel.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium">{channel.name}</span>
                       </button>
                     ))}
                   </div>
@@ -394,7 +396,12 @@ export default function EventDetailPage() {
                   className={`shrink-0 snap-start ${i === 0 ? 'pl-5' : 'pl-4'} ${i === event.images.length - 1 ? 'pr-5' : ''}`}
                 >
                   <div className="w-56 md:w-72 aspect-square bg-muted rounded-2xl overflow-hidden shadow-sm border border-border/40">
-                    <img src={img.image_url} alt="행사 이미지" className="w-full h-full object-cover transition-transform hover:scale-105 cursor-pointer" />
+                    <img 
+                      src={img.image_url} 
+                      alt="행사 이미지" 
+                      className="w-full h-full object-cover transition-transform hover:scale-105 cursor-pointer" 
+                      onClick={() => setSelectedImage(img.image_url)}
+                    />
                   </div>
                 </div>
               ))}
@@ -402,6 +409,29 @@ export default function EventDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Image Lightbox */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200"
+          onClick={() => setSelectedImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 md:top-8 md:right-8 text-white/70 hover:text-white transition-colors"
+            onClick={() => setSelectedImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <div className="relative w-full h-full flex items-center justify-center">
+            <img 
+              src={selectedImage} 
+              alt="확대 이미지" 
+              className="max-w-full max-h-full object-contain shadow-2xl animate-in zoom-in-95 duration-300"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
