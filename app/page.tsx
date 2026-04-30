@@ -29,7 +29,7 @@ type Event = {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [sortType, setSortType] = useState<"recent" | "upcoming">("upcoming");
+  const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
 
   const [offlineEvents, setOfflineEvents] = useState<Event[]>([]);
   const [onlineEvents, setOnlineEvents] = useState<Event[]>([]);
