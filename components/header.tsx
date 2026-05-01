@@ -353,7 +353,10 @@ export function Header() {
           <span style={getNavStyle("/").text}>홈</span>
         </button>
         <span className="text-border">|</span>
-        <button className={getNavStyle("/calendar").button}>
+        <button 
+          onClick={() => router.push("/calendar")}
+          className={getNavStyle("/calendar").button}
+        >
           <Calendar className={getNavStyle("/calendar").icon} />
           <span style={getNavStyle("/calendar").text}>캘린더</span>
         </button>
@@ -364,19 +367,19 @@ export function Header() {
         </button>
         <span className="text-border">|</span>
         <button 
-          onClick={() => router.push("/bookmarks")}
-          className={getNavStyle("/bookmarks").button}
-        >
-          <Heart className={getNavStyle("/bookmarks").icon} />
-          <span style={getNavStyle("/bookmarks").text}>찜한 행사</span>
-        </button>
-        <span className="text-border">|</span>
-        <button 
           onClick={() => router.push("/subscriptions")}
           className={getNavStyle("/subscriptions").button}
         >
           <Star className={getNavStyle("/subscriptions").icon} />
           <span style={getNavStyle("/subscriptions").text}>구독 행사</span>
+        </button>
+        <span className="text-border">|</span>
+        <button 
+          onClick={() => router.push("/bookmarks")}
+          className={getNavStyle("/bookmarks").button}
+        >
+          <Heart className={getNavStyle("/bookmarks").icon} />
+          <span style={getNavStyle("/bookmarks").text}>찜한 행사</span>
         </button>
       </nav>
 

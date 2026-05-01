@@ -300,7 +300,10 @@ export default function EventDetailPage() {
             </div>
           </div>
 
-          <div className="py-4 flex items-start gap-3 border-t border-border/40">
+          <div 
+            onClick={() => router.push(`/calendar?event=${event.id}`)}
+            className="py-4 flex items-start gap-3 border-t border-border/40 cursor-pointer hover:bg-muted/30 transition-colors"
+          >
             <Calendar className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
             <div>
               <p className="text-[15px] text-foreground leading-snug">
