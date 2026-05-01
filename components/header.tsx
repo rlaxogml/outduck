@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { Calendar, Heart, MapPinned, Star, Search, X } from "lucide-react";
+import { Calendar, Heart, MapPinned, Star, Search, X, House } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -40,6 +40,34 @@ const sanitizeSearchText = (value: string) => {
 
 export function Header() {
   const router = useRouter();
+  const pathname = usePathname();
+
+  // 색상은 여기서 쉽게 변경할 수 있습니다.
+  const activeGradientStyle = {
+    background: "linear-gradient(to right, #3b82f6, #a855f7)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    fontWeight: "bold"
+  } as const;
+
+  const getNavStyle = (path: string) => {
+    const isActive = pathname === path;
+    if (isActive) {
+      return {
+        isActive,
+        button: "flex items-center gap-1.5 text-sm font-bold transition-colors",
+        icon: "h-4 w-4 text-blue-500 flex-shrink-0",
+        text: activeGradientStyle,
+      };
+    }
+    return {
+      isActive,
+      button: "flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors",
+      icon: "h-4 w-4 text-muted-foreground flex-shrink-0",
+      text: {}
+    };
+  };
+
   const [user, setUser] = useState<User | null>(null);
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState<ChannelSearchItem[]>([]);
@@ -316,20 +344,39 @@ export function Header() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex items-center justify-center gap-6 border-t border-border px-4 py-3">
-        <button className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-          <Calendar className="h-4 w-4" />
-          캘린더
+      <nav className="flex items-center justify-center gap-4 sm:gap-6 border-t border-border px-4 py-3 flex-wrap">
+        <button 
+          onClick={() => router.push("/")}
+          className={getNavStyle("/").button}
+        >
+          <House className={getNavStyle("/").icon} />
+          <span style={getNavStyle("/").text}>홈</span>
         </button>
         <span className="text-border">|</span>
-        <button className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-          <MapPinned className="h-4 w-4" />
-          지도
+        <button className={getNavStyle("/calendar").button}>
+          <Calendar className={getNavStyle("/calendar").icon} />
+          <span style={getNavStyle("/calendar").text}>캘린더</span>
         </button>
         <span className="text-border">|</span>
-        <button className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-          <Heart className="h-4 w-4" />
-          찜한 행사
+        <button className={getNavStyle("/map").button}>
+          <MapPinned className={getNavStyle("/map").icon} />
+          <span style={getNavStyle("/map").text}>지도</span>
+        </button>
+        <span className="text-border">|</span>
+        <button 
+          onClick={() => router.push("/bookmarks")}
+          className={getNavStyle("/bookmarks").button}
+        >
+          <Heart className={getNavStyle("/bookmarks").icon} />
+          <span style={getNavStyle("/bookmarks").text}>찜한 행사</span>
+        </button>
+        <span className="text-border">|</span>
+        <button 
+          onClick={() => router.push("/subscriptions")}
+          className={getNavStyle("/subscriptions").button}
+        >
+          <Star className={getNavStyle("/subscriptions").icon} />
+          <span style={getNavStyle("/subscriptions").text}>구독 행사</span>
         </button>
       </nav>
 
