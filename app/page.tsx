@@ -10,6 +10,7 @@ import { GoogleAd } from "@/components/google-ad";
 import { FavoriteChannels } from "@/components/favorite-channels";
 import { supabase } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import { Card, CardContent } from "@/components/ui/card";
 
 type Event = {
   id: number;
@@ -274,8 +275,28 @@ export default function Home() {
           {/* Event Grid */}
           <section className="p-4">
             {loading ? (
-              <div className="text-center py-12 text-muted-foreground">
-                불러오는 중...
+              <div className="grid grid-cols-2 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i} className="relative overflow-hidden animate-pulse">
+                    <div className="aspect-[5/3] bg-muted-foreground/30 relative">
+                      <div className="absolute top-2 left-2 w-16 h-6 bg-muted-foreground/30 rounded" />
+                      <div className="absolute -bottom-6 left-8">
+                        <div className="w-18 h-18 rounded-full border-2 border-black/60 bg-muted" />
+                      </div>
+                    </div>
+                    <CardContent className="py-3 px-6">
+                      <div className="flex justify-between items-start gap-4 mb-2">
+                        <div className="space-y-2 w-2/3">
+                          <div className="h-7 bg-muted-foreground/30 rounded" />
+                          <div className="h-7 bg-muted-foreground/30 rounded w-1/2" />
+                        </div>
+                        <div className="h-8 bg-muted-foreground/30 rounded w-1/4 mt-1" />
+                      </div>
+                      <div className="h-6 bg-muted-foreground/20 rounded w-1/2 mb-1" />
+                      <div className="h-6 bg-muted-foreground/20 rounded w-1/3" />
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">

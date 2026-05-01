@@ -97,7 +97,31 @@ export function FavoriteChannels() {
     fetchFavorites();
   }, []);
 
-  if (isLoading || !user) return null;
+  if (isLoading) {
+    return (
+      <div className="bg-white mb-4 border-y border-border animate-pulse">
+        <div className="flex items-center p-3 border-b border-border">
+          <div className="h-4 bg-muted-foreground/30 rounded w-24" />
+        </div>
+        
+        <div className="p-4 pt-4 flex gap-4 overflow-x-auto no-scrollbar">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex flex-col items-center gap-2 min-w-[80px]">
+              <div className="relative w-20 h-20">
+                <div className="w-full h-full rounded-full bg-muted-foreground/30 shrink-0" />
+              </div>
+              <div className="flex flex-col items-center gap-1.5 mt-0.5">
+                <div className="h-3 bg-muted-foreground/20 rounded w-16" />
+                <div className="h-2.5 bg-muted-foreground/20 rounded w-10" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="bg-white mb-4 border-y border-border">

@@ -55,6 +55,7 @@ export function EventCard({
   const [showChannels, setShowChannels] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [heartAnim, setHeartAnim] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
   const router = useRouter();
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -115,9 +116,18 @@ export function EventCard({
 
   return (
     <Card 
-      onClick={() => router.push(eventType === "online" ? `/online-events/${id}` : `/events/${id}`)}
-      className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      onClick={() => {
+        setIsNavigating(true);
+        router.push(eventType === "online" ? `/online-events/${id}` : `/events/${id}`);
+      }}
+      className="relative overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
     >
+      {isNavigating && (
+        <div className="absolute inset-0 bg-background/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200">
+          <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-sm font-medium text-foreground">불러오는 중...</p>
+        </div>
+      )}
       <div className={`aspect-[5/3] ${!imageUrl ? imageColor : 'bg-muted'} relative`}>
         {imageUrl ? (
           <img src={imageUrl} alt={title} className="absolute inset-0 w-full h-full object-cover" />
