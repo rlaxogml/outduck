@@ -5,7 +5,8 @@ import Script from "next/script";
 import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/header";
 import { supabase } from "@/lib/supabase/client";
-import { MapPin, Search } from "lucide-react";
+import { MapPin, Search, Filter } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 declare global {
   interface Window {
@@ -30,11 +31,63 @@ function MapContent() {
   });
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const mapRef = useRef<any>(null);
+  const [user, setUser] = useState<any>(null);
+  const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>([]);
+  const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
+  const [activeFilters, setActiveFilters] = useState<string[]>(["all"]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+  const mapRef = useRef<any>(null);
   const cleanKey = (process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || "").trim();
 
-  // 1. Fetch events from Supabase and pre-generate marker base64 images
+  // 1. Sync User Session and Fetch favorites & bookmarks
+  useEffect(() => {
+    const syncSessionAndData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
+        const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
+          supabase.from("event_bookmarks").select("offline_event_id").eq("user_id", currentUser.id),
+          supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id),
+        ]);
+
+        if (bookmarksData) {
+          setUserBookmarkedEventIds(bookmarksData.map(b => b.offline_event_id).filter(Boolean));
+        }
+        if (favoritesData) {
+          setUserSubscribedChannelIds(favoritesData.map(f => f.channel_id).filter(Boolean));
+        }
+      }
+    };
+    syncSessionAndData();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
+          supabase.from("event_bookmarks").select("offline_event_id").eq("user_id", currentUser.id),
+          supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id),
+        ]);
+
+        if (bookmarksData) {
+          setUserBookmarkedEventIds(bookmarksData.map(b => b.offline_event_id).filter(Boolean));
+        }
+        if (favoritesData) {
+          setUserSubscribedChannelIds(favoritesData.map(f => f.channel_id).filter(Boolean));
+        }
+      } else {
+        setUserBookmarkedEventIds([]);
+        setUserSubscribedChannelIds([]);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // 2. Fetch events from Supabase and pre-generate marker base64 images
   useEffect(() => {
     const fetchEvents = async () => {
       try {
@@ -52,6 +105,7 @@ function MapContent() {
               channels(
                 id,
                 name,
+                type,
                 image_url
               )
             )
@@ -61,7 +115,13 @@ function MapContent() {
         if (error) throw error;
 
         if (data) {
-          const formatted = data.map((item: any) => {
+          const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+          const filteredData = data.filter((item: any) => {
+            if (item.end_date && item.end_date < todayStr) return false;
+            return true;
+          });
+
+          const formatted = filteredData.map((item: any) => {
             const channels = item.offline_event_channels
               ?.map((ec: any) => ec.channels)
               .filter(Boolean) || [];
@@ -81,6 +141,8 @@ function MapContent() {
               location: item.location,
               channelName: channel?.name || "기타",
               channelImage: channel?.image_url || null,
+              channelType: channel?.type || null,
+              channels,
             };
           });
 
@@ -96,11 +158,11 @@ function MapContent() {
                 }
 
                 const fallbackSvg = `
-                  <svg xmlns="http://www.w3.org/2000/svg" width="56" height="63" viewBox="0 0 56 63">
-                    <polygon points="28,63 18,47 38,47" fill="#FBBF24" stroke="#D97706" stroke-width="2" />
-                    <circle cx="28" cy="28" r="25" fill="#FBBF24" stroke="#D97706" stroke-width="2.5" />
-                    <circle cx="28" cy="28" r="22" fill="#FEF3C7" />
-                    <text x="28" y="34" font-family="sans-serif" font-size="18" font-weight="bold" fill="#B45309" text-anchor="middle">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="68" height="76" viewBox="0 0 68 76">
+                    <polygon points="34,76 24,56 44,56" fill="#FBBF24" stroke="#D97706" stroke-width="2.5" />
+                    <circle cx="34" cy="34" r="30" fill="#FBBF24" stroke="#D97706" stroke-width="3" />
+                    <circle cx="34" cy="34" r="26" fill="#FEF3C7" />
+                    <text x="34" y="41" font-family="sans-serif" font-size="22" font-weight="bold" fill="#B45309" text-anchor="middle">
                       ${ev.channelName.slice(0, 1)}
                     </text>
                   </svg>
@@ -108,8 +170,8 @@ function MapContent() {
 
                 img.onload = () => {
                   const canvas = document.createElement("canvas");
-                  canvas.width = 64;
-                  canvas.height = 72;
+                  canvas.width = 88;
+                  canvas.height = 98;
                   const ctx = canvas.getContext("2d");
                   if (!ctx) {
                     resolve("data:image/svg+xml;charset=UTF-8," + encodeURIComponent(fallbackSvg));
@@ -118,33 +180,33 @@ function MapContent() {
 
                   // 1. Draw bottom arrow
                   ctx.beginPath();
-                  ctx.moveTo(32, 72);
-                  ctx.lineTo(22, 54);
-                  ctx.lineTo(42, 54);
+                  ctx.moveTo(44, 98);
+                  ctx.lineTo(32, 76);
+                  ctx.lineTo(56, 76);
                   ctx.closePath();
                   ctx.fillStyle = "#FBBF24";
                   ctx.strokeStyle = "#D97706";
-                  ctx.lineWidth = 2;
+                  ctx.lineWidth = 2.5;
                   ctx.fill();
                   ctx.stroke();
 
                   // 2. Draw yellow circle border
                   ctx.beginPath();
-                  ctx.arc(32, 32, 28, 0, Math.PI * 2);
+                  ctx.arc(44, 44, 40, 0, Math.PI * 2);
                   ctx.closePath();
                   ctx.fillStyle = "#FBBF24";
                   ctx.strokeStyle = "#D97706";
-                  ctx.lineWidth = 3;
+                  ctx.lineWidth = 3.5;
                   ctx.fill();
                   ctx.stroke();
 
                   // 3. Clip and draw image
                   ctx.save();
                   ctx.beginPath();
-                  ctx.arc(32, 32, 25, 0, Math.PI * 2);
+                  ctx.arc(44, 44, 36, 0, Math.PI * 2);
                   ctx.closePath();
                   ctx.clip();
-                  ctx.drawImage(img, 7, 7, 50, 50);
+                  ctx.drawImage(img, 8, 8, 72, 72);
                   ctx.restore();
 
                   try {
@@ -176,7 +238,42 @@ function MapContent() {
     fetchEvents();
   }, []);
 
-  // 2. Initialize Kakao Map and place markers
+  // Filter events
+  const filteredEvents = events.filter((event) => {
+    if (activeFilters.includes("all")) return true;
+
+    const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber" || f === "vtuber");
+    const activeInteractions = activeFilters.filter(f => f === "subscribed" || f === "bookmarks");
+
+    const catMatched = activeCategories.length === 0 || (event.channelType && activeCategories.includes(event.channelType));
+    let intMatched = true;
+
+    if (activeInteractions.length > 0) {
+      intMatched = activeInteractions.some(f => {
+        if (f === "subscribed") return event.channels?.some((c: any) => userSubscribedChannelIds.includes(c.id));
+        if (f === "bookmarks") return userBookmarkedEventIds.includes(event.id);
+        return false;
+      });
+    }
+
+    return catMatched && intMatched;
+  });
+
+  const toggleFilter = (filterId: string) => {
+    setActiveFilters((prev) => {
+      if (filterId === "all") return ["all"];
+      const withoutAll = prev.filter((f) => f !== "all");
+
+      if (withoutAll.includes(filterId)) {
+        const next = withoutAll.filter((f) => f !== filterId);
+        return next.length === 0 ? ["all"] : next;
+      } else {
+        return [...withoutAll, filterId];
+      }
+    });
+  };
+
+  // 3. Initialize Kakao Map and place markers
   useEffect(() => {
     const hasKakao = typeof window !== "undefined" && !!window.kakao && !!window.kakao.maps;
     if (!isScriptLoaded && !hasKakao) return;
@@ -202,8 +299,7 @@ function MapContent() {
           let overlayRevealTimer: number | null = null;
           let userAdjustedMapView = false;
 
-          // Search for any target event right away to center the map immediately
-          const targetEvent = events.find((ev) => String(ev.id) === String(eventIdParam));
+          const targetEvent = filteredEvents.find((ev) => String(ev.id) === String(eventIdParam));
 
           const initializeMapAndPlaceMarkers = (centerCoords: any, level: number) => {
             const options = {
@@ -248,7 +344,7 @@ function MapContent() {
             const targetCoords: any[] = [];
             const targetOverlays: any[] = [];
 
-            events.forEach((event) => {
+            filteredEvents.forEach((event) => {
               const createMarkerAndPopup = (result: any, status: any) => {
                 if (status === kakao.maps.services.Status.OK) {
                   const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
@@ -256,11 +352,10 @@ function MapContent() {
                   bounds.extend(coords);
                   boundsChanged = true;
 
-                  // 1. Native Marker with dynamic Canvas/SVG MarkerImage
                   const markerImage = new kakao.maps.MarkerImage(
                     event.canvasDataUrl,
-                    new kakao.maps.Size(52, 58),
-                    { offset: new kakao.maps.Point(26, 58) }
+                    new kakao.maps.Size(68, 76),
+                    { offset: new kakao.maps.Point(34, 76) }
                   );
 
                   const marker = new kakao.maps.Marker({
@@ -270,7 +365,6 @@ function MapContent() {
                   });
                   marker.setMap(map);
 
-                  // 2. Info bubble popup overlay
                   const infoContent = document.createElement("div");
                   infoContent.className = "relative bg-background border border-border shadow-2xl rounded-2xl p-4 min-w-[260px] max-w-[320px] -translate-y-3 cursor-default select-none z-50 animate-in fade-in duration-200";
                   infoContent.innerHTML = `
@@ -373,7 +467,6 @@ function MapContent() {
           };
 
           if (targetEvent) {
-            // Geocode target event location immediately to center the map without any jumping/flashing
             geocoder.addressSearch(targetEvent.location, (result: any, status: any) => {
               if (status === kakao.maps.services.Status.OK) {
                 const centerCoords = new kakao.maps.LatLng(result[0].y, result[0].x);
@@ -397,7 +490,7 @@ function MapContent() {
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isScriptLoaded, loading, events, eventIdParam]);
+  }, [isScriptLoaded, loading, filteredEvents, eventIdParam]);
 
   if (!process.env.NEXT_PUBLIC_KAKAO_MAP_KEY) {
     return (
@@ -427,14 +520,104 @@ function MapContent() {
         <Header />
 
         <main className="py-6">
-          <div className="flex items-center justify-between gap-4 mb-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
             <div className="space-y-1">
               <h1 className="text-3xl font-extrabold tracking-tight">🗺️ 오프라인 행사 지도</h1>
               <p className="text-sm text-muted-foreground">현재 등록된 오프라인 행사의 진행 위치를 한눈에 확인해보세요.</p>
             </div>
-            <div className="flex items-center gap-2 bg-muted/50 border border-border px-4 py-2 rounded-xl">
-              <span className="flex h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs font-bold text-muted-foreground">행사 위치 <span className="text-foreground">{events.length}</span>곳</span>
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Filter Bubble */}
+              <div className="relative shrink-0">
+                <button
+                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  className={cn(
+                    "flex items-center gap-2 px-3.5 py-2 text-sm rounded-xl border transition-all bg-card border-border select-none",
+                    isFilterOpen && "bg-muted"
+                  )}
+                >
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">필터</span>
+                </button>
+
+                {isFilterOpen && (
+                  <div className="absolute top-full left-0 mt-3 p-4 bg-card border border-border rounded-3xl shadow-2xl z-50 min-w-[240px] flex flex-col gap-4 animate-in fade-in-0 zoom-in-95 duration-150 select-none">
+                    <div className="absolute top-[-6px] left-5 w-3 h-3 bg-card border-l border-t border-border transform rotate-45" />
+
+                    <div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5 ml-1">
+                        전체
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => toggleFilter("all")}
+                          className={cn(
+                            "px-3 py-1 text-xs font-semibold rounded-full border transition-all cursor-pointer select-none",
+                            activeFilters.includes("all")
+                              ? "border-amber-400 text-amber-500 bg-amber-500/10 font-bold"
+                              : "border-border text-muted-foreground hover:border-amber-400 hover:text-amber-500 bg-muted/40"
+                          )}
+                        >
+                          전체
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5 ml-1">
+                        장르 및 주제
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { id: "game", label: "게임" },
+                          { id: "youtuber", label: "유튜버" },
+                          { id: "vtuber", label: "버튜버" },
+                        ].map((cat) => (
+                          <button
+                            key={cat.id}
+                            onClick={() => toggleFilter(cat.id)}
+                            className={cn(
+                              "px-3 py-1 text-xs font-semibold rounded-full border transition-all cursor-pointer select-none",
+                              activeFilters.includes(cat.id)
+                                ? "border-amber-400 text-amber-500 bg-amber-500/10 font-bold"
+                                : "border-border text-muted-foreground hover:border-amber-400 hover:text-amber-500 bg-muted/40"
+                            )}
+                          >
+                            {cat.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* User specific Filters */}
+              {user && (
+                <div className="flex items-center gap-1.5">
+                  {[
+                    { id: "subscribed", label: "구독 행사만" },
+                    { id: "bookmarks", label: "찜한 행사만" },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => toggleFilter(cat.id)}
+                      className={cn(
+                        "px-3.5 py-2 text-sm rounded-xl border transition-all whitespace-nowrap select-none",
+                        activeFilters.includes(cat.id)
+                          ? "bg-foreground text-background border-foreground font-medium shadow-sm"
+                          : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground bg-card"
+                      )}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 bg-muted/50 border border-border px-4 py-2 rounded-xl h-[42px]">
+                <span className="flex h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-xs font-bold text-muted-foreground">행사 위치 <span className="text-foreground">{filteredEvents.length}</span>곳</span>
+              </div>
             </div>
           </div>
 
@@ -446,13 +629,13 @@ function MapContent() {
               </div>
             )}
 
-            {!loading && events.length === 0 && (
+            {!loading && filteredEvents.length === 0 && (
               <div className="absolute inset-0 bg-background/80 z-50 flex flex-col items-center justify-center text-center p-6">
                 <div className="h-16 w-16 items-center justify-center rounded-full bg-muted flex mb-3 text-muted-foreground">
                   <Search className="h-7 w-7" />
                 </div>
-                <h3 className="text-base font-bold text-foreground">등록된 오프라인 행사가 없습니다.</h3>
-                <p className="text-xs text-muted-foreground mt-1">지도를 표시할 수 있는 행사가 등록되면 이곳에서 볼 수 있습니다.</p>
+                <h3 className="text-base font-bold text-foreground">해당 조건의 등록된 오프라인 행사가 없습니다.</h3>
+                <p className="text-xs text-muted-foreground mt-1">다른 조건의 필터를 선택해보세요.</p>
               </div>
             )}
 

@@ -254,7 +254,7 @@ export default function SubscriptionsPage() {
 
               <div className="p-4">
                 {loading ? (
-                  <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 gap-3 md:gap-4">
                     {Array.from({ length: 4 }).map((_, i) => (
                       <Card key={i} className="relative overflow-hidden animate-pulse pt-0">
                         <div className="aspect-[5/3] bg-muted-foreground/30 relative">
@@ -286,8 +286,8 @@ export default function SubscriptionsPage() {
                             구독한 채널의 오프라인 행사가 없습니다.
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-4">
-                            {offlineEvents.map((event) => (
+                                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                            {offlineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}
@@ -301,6 +301,7 @@ export default function SubscriptionsPage() {
                                 channels={event.channels}
                                 user={user}
                                 eventType="offline"
+                                isRightCard={index % 2 === 1}
                               />
                             ))}
                           </div>
@@ -315,8 +316,8 @@ export default function SubscriptionsPage() {
                             구독한 채널의 온라인 행사가 없습니다.
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-4">
-                            {onlineEvents.map((event) => (
+                                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                            {onlineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}
@@ -330,6 +331,7 @@ export default function SubscriptionsPage() {
                                 channels={event.channels}
                                 user={user}
                                 eventType="online"
+                                isRightCard={index % 2 === 1}
                               />
                             ))}
                           </div>

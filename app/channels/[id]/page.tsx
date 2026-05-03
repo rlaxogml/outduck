@@ -432,8 +432,8 @@ export default function ChannelProfilePage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {offlineEvents.map(event => (
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
+                {offlineEvents.map((event, index) => (
                   <EventCard
                     key={event.id}
                     id={event.id}
@@ -447,6 +447,7 @@ export default function ChannelProfilePage() {
                     channels={event.channels}
                     user={user}
                     eventType="offline"
+                    isRightCard={index % 2 === 1}
                   />
                 ))}
               </div>
@@ -463,8 +464,8 @@ export default function ChannelProfilePage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {onlineEvents.map(event => (
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
+                {onlineEvents.map((event, index) => (
                   <EventCard
                     key={event.id}
                     id={event.id}
@@ -478,6 +479,7 @@ export default function ChannelProfilePage() {
                     channels={event.channels}
                     user={user}
                     eventType="online"
+                    isRightCard={index % 2 === 1}
                   />
                 ))}
               </div>

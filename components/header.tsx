@@ -55,15 +55,15 @@ export function Header() {
     if (isActive) {
       return {
         isActive,
-        button: "flex items-center gap-1.5 text-sm font-bold transition-colors",
-        icon: "h-4 w-4 text-blue-500 flex-shrink-0",
+        button: "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-bold transition-colors min-w-[44px] sm:min-w-fit",
+        icon: "h-[18px] w-[18px] sm:h-4 sm:w-4 text-blue-500 flex-shrink-0",
         text: activeGradientStyle,
       };
     }
     return {
       isActive,
-      button: "flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors",
-      icon: "h-4 w-4 text-muted-foreground flex-shrink-0",
+      button: "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors min-w-[44px] sm:min-w-fit",
+      icon: "h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0",
       text: {}
     };
   };
@@ -213,7 +213,8 @@ export function Header() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.refresh();
+    setUser(null);
+    window.location.reload();
   };
 
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
@@ -301,21 +302,21 @@ export function Header() {
   return (
     <header className="border-b border-border bg-background">
       {/* Top bar: Logo and Login */}
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-3.5 md:px-4 py-2 md:py-3">
         <div
-          className="flex items-center gap-3 cursor-pointer"
+          className="flex items-center gap-2 md:gap-3 cursor-pointer"
           onClick={() => router.push("/")}
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full border-[2.5px] border-foreground">
-            <Star className="h-6 w-6" />
+          <div className="flex h-9 w-9 md:h-12 md:w-12 items-center justify-center rounded-full border-2 md:border-[2.5px] border-foreground">
+            <Star className="h-4 w-4 md:h-6 md:w-6" />
           </div>
-          <span className="text-2xl font-extrabold tracking-tight">아이콘</span>
+          <span className="text-lg md:text-2xl font-extrabold tracking-tight">아이콘</span>
         </div>
 
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Avatar className="size-11 border border-border cursor-pointer hover:opacity-80 transition-opacity">
+              <Avatar className="h-8 w-8 md:h-11 md:w-11 border border-border cursor-pointer hover:opacity-80 transition-opacity">
                 <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />
                 <AvatarFallback>{avatarFallbackText}</AvatarFallback>
               </Avatar>
@@ -335,7 +336,7 @@ export function Header() {
         ) : (
           <Button
             variant="ghost"
-            className="text-sm font-medium"
+            className="text-xs md:text-sm font-medium"
             onClick={handleGoogleLogin}
           >
             로그인
@@ -344,7 +345,7 @@ export function Header() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex items-center justify-center gap-4 sm:gap-6 border-t border-border px-4 py-3 flex-wrap">
+      <nav className="flex items-center justify-around sm:justify-center gap-2 sm:gap-6 border-t border-border px-3.5 py-2 sm:py-2.5 flex-nowrap overflow-x-auto no-scrollbar">
         <button 
           onClick={() => router.push("/")}
           className={getNavStyle("/").button}
@@ -352,7 +353,7 @@ export function Header() {
           <House className={getNavStyle("/").icon} />
           <span style={getNavStyle("/").text}>홈</span>
         </button>
-        <span className="text-border">|</span>
+        <span className="text-border shrink-0 select-none">|</span>
         <button 
           onClick={() => router.push("/calendar")}
           className={getNavStyle("/calendar").button}
@@ -360,7 +361,7 @@ export function Header() {
           <Calendar className={getNavStyle("/calendar").icon} />
           <span style={getNavStyle("/calendar").text}>캘린더</span>
         </button>
-        <span className="text-border">|</span>
+        <span className="text-border shrink-0 select-none">|</span>
         <button 
           onClick={() => router.push("/map")}
           className={getNavStyle("/map").button}
@@ -368,7 +369,7 @@ export function Header() {
           <MapPinned className={getNavStyle("/map").icon} />
           <span style={getNavStyle("/map").text}>지도</span>
         </button>
-        <span className="text-border">|</span>
+        <span className="text-border shrink-0 select-none">|</span>
         <button 
           onClick={() => router.push("/subscriptions")}
           className={getNavStyle("/subscriptions").button}
@@ -376,7 +377,7 @@ export function Header() {
           <Star className={getNavStyle("/subscriptions").icon} />
           <span style={getNavStyle("/subscriptions").text}>구독 행사</span>
         </button>
-        <span className="text-border">|</span>
+        <span className="text-border shrink-0 select-none">|</span>
         <button 
           onClick={() => router.push("/bookmarks")}
           className={getNavStyle("/bookmarks").button}
@@ -386,7 +387,7 @@ export function Header() {
         </button>
       </nav>
 
-      <div className="border-t border-border px-4 py-3">
+      <div className="border-t border-border px-3.5 md:px-4 py-2.5 md:py-3">
         <div className="relative mx-auto w-full max-w-3xl">
           <div className="relative flex w-full items-center">
             <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
@@ -402,7 +403,7 @@ export function Header() {
                 }, 120);
               }}
               placeholder="채널명을 검색해보세요"
-              className="h-12 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-[15px] outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
+              className="h-11 md:h-12 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm md:text-[15px] outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
             />
           </div>
 

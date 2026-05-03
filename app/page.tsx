@@ -149,8 +149,15 @@ export default function Home() {
           return "기타";
         };
 
+        const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+
         if (offlineData) {
-          const formatted = offlineData.map((event, index) => {
+          const filteredOffline = offlineData.filter(event => {
+            if (event.end_date && event.end_date < todayStr) return false;
+            return true;
+          });
+
+          const formatted = filteredOffline.map((event, index) => {
             const channels = extractChannels(event.offline_event_channels);
             return {
               id: event.id,
@@ -171,7 +178,13 @@ export default function Home() {
         }
 
         if (onlineData) {
-          const formatted = onlineData.map((event, index) => {
+          const filteredOnline = onlineData.filter(event => {
+            const endAtDate = event.end_at ? event.end_at.split("T")[0] : null;
+            if (endAtDate && endAtDate < todayStr) return false;
+            return true;
+          });
+
+          const formatted = filteredOnline.map((event, index) => {
             const channels = extractChannels(event.online_event_channels);
             return {
               id: event.id,
@@ -275,7 +288,7 @@ export default function Home() {
           {/* Event Grid */}
           <section className="p-4">
             {loading ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <Card key={i} className="relative overflow-hidden animate-pulse pt-0">
                     <div className="aspect-[5/3] bg-muted-foreground/30 relative">
@@ -299,8 +312,8 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {filteredEvents.map((event) => (
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
+                {filteredEvents.map((event, index) => (
                   <EventCard
                     key={event.id}
                     id={event.id}
@@ -314,6 +327,7 @@ export default function Home() {
                     channels={event.channels}
                     user={user}
                     eventType={activeTab}
+                    isRightCard={index % 2 === 1}
                   />
                 ))}
               </div>

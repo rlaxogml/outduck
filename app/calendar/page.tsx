@@ -408,7 +408,7 @@ function CalendarContent() {
               </div>
 
               {/* Direct Buttons */}
-              {[
+              {user && [
                 { id: "subscribed", label: "구독 행사만" },
                 { id: "bookmarks", label: "찜한 행사만" },
               ].map((cat) => (
@@ -519,7 +519,11 @@ function CalendarContent() {
                     const channelsWithProfile: any[] = [];
                     const seenChannelIds = new Set();
                     dayEvents.forEach(event => {
-                      event.channels.forEach(ch => {
+                      const filteredChannels = activeFilters.includes("subscribed")
+                        ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
+                        : event.channels;
+
+                      filteredChannels.forEach(ch => {
                         if (ch && !seenChannelIds.has(ch.id)) {
                           seenChannelIds.add(ch.id);
                           channelsWithProfile.push(ch);
@@ -536,18 +540,18 @@ function CalendarContent() {
                       return (
                         <div className="grid grid-cols-3 gap-0.5 mt-1 justify-items-center items-center w-full px-1">
                           {displayList.map((ch, idx) => (
-                            <div key={idx} className="w-5 h-5 rounded-full border border-background shadow-sm overflow-hidden flex-shrink-0 bg-muted">
+                            <div key={idx} className="w-7 h-7 rounded-full border border-background shadow-sm overflow-hidden flex-shrink-0 bg-muted">
                               {ch.image_url ? (
                                 <img src={ch.image_url} alt={ch.name} className="w-full h-full object-cover" />
                               ) : (
-                                <div className="w-full h-full bg-indigo-400 text-[10px] flex items-center justify-center font-bold text-white">
+                                <div className="w-full h-full bg-indigo-400 text-xs flex items-center justify-center font-bold text-white">
                                   {ch.name.charAt(0)}
                                 </div>
                               )}
                             </div>
                           ))}
                           {hasMore && (
-                            <div className="w-5 h-5 rounded-full border border-border bg-white flex items-center justify-center text-[8px] font-bold text-black flex-shrink-0 shadow-sm">
+                            <div className="w-7 h-7 rounded-full border border-border bg-white flex items-center justify-center text-[10px] font-bold text-black flex-shrink-0 shadow-sm">
                               +{extraCount}
                             </div>
                           )}
@@ -606,7 +610,10 @@ function CalendarContent() {
                           {/* 1. 프로필 이미지 + 이름 */}
                           <div className="flex items-center gap-4 w-[220px] flex-shrink-0">
                             <div className="flex -space-x-4 flex-shrink-0">
-                              {event.channels.slice(0, 3).map((ch, idx) => (
+                              {(activeFilters.includes("subscribed")
+                                 ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
+                                 : event.channels
+                               ).slice(0, 3).map((ch, idx) => (
                                 <div key={idx} className="w-16 h-16 rounded-full border-2 border-background overflow-hidden bg-muted flex-shrink-0 shadow-sm">
                                   {ch.image_url ? (
                                     <img src={ch.image_url} alt={ch.name} className="w-full h-full object-cover" />
@@ -620,14 +627,17 @@ function CalendarContent() {
                             </div>
                             <div className="min-w-0">
                               <span className="text-lg font-bold text-foreground truncate block">
-                                {event.channels.map(c => c.name).join(", ") || "일반"}
+                                {(activeFilters.includes("subscribed")
+                                   ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
+                                   : event.channels
+                                 ).map(c => c.name).join(", ") || "일반"}
                               </span>
                             </div>
                           </div>
 
                           {/* 2. 행사 제목 + 날짜 */}
                           <div className="w-[320px] flex-shrink-0 min-w-0 px-2">
-                            <a href={`/events/${event.id}`} className="text-lg font-bold text-foreground hover:text-primary transition-all line-clamp-1 block">
+                            <a href={event.eventType === "online" ? `/online-events/${event.id}` : `/events/${event.id}`} className="text-lg font-bold text-foreground hover:text-primary transition-all line-clamp-1 block">
                               {event.title}
                             </a>
                             <span className="text-sm font-medium text-muted-foreground block mt-1.5">
@@ -775,10 +785,9 @@ function CalendarContent() {
           color: white !important;
         }
         .react-calendar__tile--active {
-          background: transparent !important;
+          background: var(--muted) !important;
           font-weight: 700;
-          border: 2px dashed var(--foreground) !important;
-          box-shadow: none !important;
+          box-shadow: inset 0 0 0 2.5px var(--foreground) !important;
         }
         .react-calendar [class*="neighboringMonth"],
         .react-calendar [class*="neighboringMonth"] * {
