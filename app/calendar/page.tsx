@@ -430,6 +430,8 @@ function CalendarContent() {
             {/* Full Width Calendar Wrapper */}
             <div className="w-full bg-card border border-border p-5 shadow-sm min-h-[460px] overflow-hidden rounded-3xl">
               <Calendar
+                next2Label={null}
+                prev2Label={null}
                 onChange={(value) => {
                   if (value instanceof Date) {
                     setSelectedDate(value);
@@ -440,6 +442,24 @@ function CalendarContent() {
                     return; // Intercept month transitions from neighboring month day tiles
                   }
                   setSelectedDate(value);
+
+                  const hasEvents = filteredEvents.some((event) => {
+                    if (!event.startDateValue) return false;
+                    const start = new Date(event.startDateValue);
+                    start.setHours(0, 0, 0, 0);
+                    const end = event.endDateValue ? new Date(event.endDateValue) : start;
+                    end.setHours(23, 59, 59, 999);
+
+                    const calDate = new Date(value);
+                    calDate.setHours(12, 0, 0, 0);
+                    return calDate >= start && calDate <= end;
+                  });
+
+                  if (hasEvents) {
+                    setTimeout(() => {
+                      document.getElementById("events-list")?.scrollIntoView({ behavior: "smooth" });
+                    }, 50);
+                  }
                 }}
                 activeStartDate={currentMonth}
                 onActiveStartDateChange={({ activeStartDate, action }) => {
@@ -541,7 +561,7 @@ function CalendarContent() {
             </div>
 
             {/* Events List Below Calendar */}
-            <div className="flex flex-col gap-4 mt-6">
+            <div id="events-list" className="flex flex-col gap-4 mt-6">
               <div className="flex items-center justify-between border-b border-border/40 pb-2">
                 <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                   {selectedDate.toLocaleDateString("ko-KR", {
@@ -646,18 +666,32 @@ function CalendarContent() {
           margin-bottom: 1.5rem;
         }
         .react-calendar__navigation button {
-          background: none;
-          border: none;
           color: var(--foreground);
-          font-size: 1.15rem;
+          font-size: 1.25rem;
           font-weight: 700;
           cursor: pointer;
-          padding: 0.5rem 1rem;
-          border-radius: var(--radius);
           transition: all 0.2s;
         }
-        .react-calendar__navigation button:hover {
-          background: var(--muted);
+        .react-calendar__navigation__arrow {
+          background: var(--muted) !important;
+          border: 1px solid var(--border) !important;
+          font-size: 1.5rem !important;
+          padding: 0 !important;
+          border-radius: 14px !important;
+          width: 48px !important;
+          height: 48px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+        .react-calendar__navigation__arrow:hover {
+          background: var(--border) !important;
+        }
+        .react-calendar__navigation__label {
+          background: none !important;
+          border: none !important;
+          font-size: 1.25rem !important;
+          pointer-events: none;
         }
         .react-calendar__navigation button:disabled {
           opacity: 0.3;
@@ -689,7 +723,7 @@ function CalendarContent() {
           border-left: 1px solid var(--border);
         }
         .react-calendar__tile {
-          min-height: 105px;
+          min-height: 140px;
           aspect-ratio: auto !important;
           display: flex;
           flex-direction: column;
@@ -718,19 +752,33 @@ function CalendarContent() {
         }
         .react-calendar__tile--now {
           background: var(--card) !important;
-          color: var(--foreground) !important;
           font-weight: 700;
+        }
+        .react-calendar__tile--now abbr {
+          background: var(--foreground);
+          color: var(--background) !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 28px !important;
+          height: 28px !important;
+          border-radius: 8px !important;
+          margin-bottom: 2px;
+          font-weight: 700;
+        }
+        .react-calendar__month-view__days__day:nth-child(7n-1).react-calendar__tile--now abbr {
+          background: #3b82f6 !important;
+          color: white !important;
+        }
+        .react-calendar__month-view__days__day:nth-child(7n).react-calendar__tile--now abbr {
+          background: #ef4444 !important;
+          color: white !important;
         }
         .react-calendar__tile--active {
           background: transparent !important;
-          color: var(--foreground) !important;
           font-weight: 700;
           border: 2px dashed var(--foreground) !important;
           box-shadow: none !important;
-        }
-        .react-calendar__tile--active.react-calendar__tile--now {
-          background: transparent !important;
-          color: var(--foreground) !important;
         }
         .react-calendar [class*="neighboringMonth"],
         .react-calendar [class*="neighboringMonth"] * {
@@ -746,10 +794,10 @@ function CalendarContent() {
         .react-calendar__month-view__weekdays__weekday:nth-child(7) abbr {
           color: #ef4444 !important;
         }
-        .react-calendar__month-view__days__day:nth-child(7n-1):not(.react-calendar__tile--active):not([class*="neighboringMonth"]) {
+        .react-calendar__month-view__days__day:nth-child(7n-1):not([class*="neighboringMonth"]) {
           color: #3b82f6 !important;
         }
-        .react-calendar__month-view__days__day:nth-child(7n):not(.react-calendar__tile--active):not([class*="neighboringMonth"]) {
+        .react-calendar__month-view__days__day:nth-child(7n):not([class*="neighboringMonth"]) {
           color: #ef4444 !important;
         }
       `}</style>
