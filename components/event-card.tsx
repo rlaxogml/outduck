@@ -120,7 +120,7 @@ export function EventCard({
         setIsNavigating(true);
         router.push(eventType === "online" ? `/online-events/${id}` : `/events/${id}`);
       }}
-      className="relative overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      className="relative overflow-hidden hover:shadow-md transition-shadow cursor-pointer pt-0"
     >
       {isNavigating && (
         <div className="absolute inset-0 bg-background/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200">

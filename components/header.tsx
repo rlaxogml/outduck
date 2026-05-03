@@ -361,7 +361,10 @@ export function Header() {
           <span style={getNavStyle("/calendar").text}>캘린더</span>
         </button>
         <span className="text-border">|</span>
-        <button className={getNavStyle("/map").button}>
+        <button 
+          onClick={() => router.push("/map")}
+          className={getNavStyle("/map").button}
+        >
           <MapPinned className={getNavStyle("/map").icon} />
           <span style={getNavStyle("/map").text}>지도</span>
         </button>

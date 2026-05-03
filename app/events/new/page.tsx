@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,11 @@ export default function NewEventPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [isScriptLoaded, setIsScriptLoaded] = useState(() => {
+    return typeof window !== "undefined" && !!window.kakao && !!window.kakao.maps;
+  });
+  const cleanKey = (process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || "").trim();
+
   // Form states
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -125,6 +131,66 @@ export default function NewEventPage() {
   const [searchResults, setSearchResults] = useState<Channel[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Address search states
+  const [addrResults, setAddrResults] = useState<any[]>([]);
+  const [isSearchingAddr, setIsSearchingAddr] = useState(false);
+
+  useEffect(() => {
+    if (!location || location.trim().length < 2) {
+      setAddrResults([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (typeof window === "undefined" || !window.kakao || !window.kakao.maps) return;
+
+      const performSearch = () => {
+        if (!window.kakao.maps.services) return;
+        const places = new window.kakao.maps.services.Places();
+        const geocoder = new window.kakao.maps.services.Geocoder();
+
+        setIsSearchingAddr(true);
+        places.keywordSearch(location, (data: any, status: any) => {
+          if (status === window.kakao.maps.services.Status.OK && data && data.length > 0) {
+            const formatted = data.map((item: any) => ({
+              address: item.address_name,
+              placeName: item.place_name,
+            }));
+            setAddrResults(formatted);
+            setIsSearchingAddr(false);
+          } else {
+            geocoder.addressSearch(location, (result: any, addrStatus: any) => {
+              if (addrStatus === window.kakao.maps.services.Status.OK && result && result.length > 0) {
+                const formatted = result.map((item: any) => ({
+                  address: item.address_name,
+                  placeName: item.address_name,
+                }));
+                setAddrResults(formatted);
+              } else {
+                setAddrResults([]);
+              }
+              setIsSearchingAddr(false);
+            });
+          }
+        });
+      };
+
+      if (window.kakao.maps.services) {
+        performSearch();
+      } else {
+        window.kakao.maps.load(performSearch);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [location, isScriptLoaded]);
+
+  const selectAddress = (addr: string) => {
+    setLocation(addr);
+    setAddrResults([]);
+  };
+
 
   useEffect(() => {
     const checkAuthAndFetchChannels = async () => {
@@ -468,7 +534,30 @@ export default function NewEventPage() {
                   className="pl-10 h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
+                  autoComplete="off"
                 />
+
+                {isSearchingAddr && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+
+                {addrResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-2 bg-background border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto overflow-x-hidden animate-in fade-in zoom-in-95 duration-200 divide-y divide-border/40">
+                    {addrResults.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => selectAddress(item.placeName || item.address)}
+                        className="w-full text-left px-4 py-3 hover:bg-muted transition-colors text-sm flex flex-col gap-0.5 select-none"
+                      >
+                        <span className="font-semibold text-foreground">{item.placeName}</span>
+                        <span className="text-xs text-muted-foreground">{item.address}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -760,6 +849,17 @@ export default function NewEventPage() {
           </div>
         </form>
       </main>
+
+      <Script
+        src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${cleanKey}&libraries=services&autoload=false`}
+        onLoad={() => {
+          setIsScriptLoaded(true);
+          if (typeof window !== "undefined" && window.kakao && window.kakao.maps) {
+            window.kakao.maps.load();
+          }
+        }}
+        strategy="afterInteractive"
+      />
     </div>
   );
 }

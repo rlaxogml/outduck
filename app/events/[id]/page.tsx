@@ -265,7 +265,10 @@ export default function EventDetailPage() {
               </div>
               <span className="text-[12px] font-medium">저장</span>
             </button>
-            <button className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors cursor-default">
+            <button 
+              onClick={() => router.push(`/map?eventId=${event.id}`)}
+              className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
               <div className="w-10 h-10 flex items-center justify-center">
                 <MapPin className="w-6 h-6" />
               </div>
@@ -289,14 +292,13 @@ export default function EventDetailPage() {
 
         {/* Info List */}
         <div className="px-5">
-          <div className="py-4 flex items-start gap-3">
+          <div
+            onClick={() => router.push(`/map?eventId=${event.id}`)}
+            className="py-4 flex items-start gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
+          >
             <MapPin className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
             <div>
               <p className="text-[15px] text-foreground font-medium leading-snug">{event.location}</p>
-              <p className="text-[13px] text-muted-foreground mt-1.5 flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400">오프라인</span> 
-                행사장 위치를 확인해주세요
-              </p>
             </div>
           </div>
 

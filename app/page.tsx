@@ -277,7 +277,7 @@ export default function Home() {
             {loading ? (
               <div className="grid grid-cols-2 gap-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Card key={i} className="relative overflow-hidden animate-pulse">
+                  <Card key={i} className="relative overflow-hidden animate-pulse pt-0">
                     <div className="aspect-[5/3] bg-muted-foreground/30 relative">
                       <div className="absolute top-2 left-2 w-16 h-6 bg-muted-foreground/30 rounded" />
                       <div className="absolute -bottom-6 left-8">
