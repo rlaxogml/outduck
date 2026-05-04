@@ -104,7 +104,9 @@ export default function NewEventPage() {
   // Form states
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
+  const [locations, setLocations] = useState<string[]>([]);
+  const [locationInput, setLocationInput] = useState("");
+  const [isManualLocation, setIsManualLocation] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isAlways, setIsAlways] = useState(false);
@@ -137,7 +139,7 @@ export default function NewEventPage() {
   const [isSearchingAddr, setIsSearchingAddr] = useState(false);
 
   useEffect(() => {
-    if (!location || location.trim().length < 2) {
+    if (isManualLocation || !locationInput || locationInput.trim().length < 2) {
       setAddrResults([]);
       return;
     }
@@ -151,7 +153,7 @@ export default function NewEventPage() {
         const geocoder = new window.kakao.maps.services.Geocoder();
 
         setIsSearchingAddr(true);
-        places.keywordSearch(location, (data: any, status: any) => {
+        places.keywordSearch(locationInput, (data: any, status: any) => {
           if (status === window.kakao.maps.services.Status.OK && data && data.length > 0) {
             const formatted = data.map((item: any) => ({
               address: item.address_name,
@@ -160,7 +162,7 @@ export default function NewEventPage() {
             setAddrResults(formatted);
             setIsSearchingAddr(false);
           } else {
-            geocoder.addressSearch(location, (result: any, addrStatus: any) => {
+            geocoder.addressSearch(locationInput, (result: any, addrStatus: any) => {
               if (addrStatus === window.kakao.maps.services.Status.OK && result && result.length > 0) {
                 const formatted = result.map((item: any) => ({
                   address: item.address_name,
@@ -184,10 +186,11 @@ export default function NewEventPage() {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [location, isScriptLoaded]);
+  }, [locationInput, isManualLocation, isScriptLoaded]);
 
   const selectAddress = (addr: string) => {
-    setLocation(addr);
+    setLocations(prev => [...prev, addr]);
+    setLocationInput("");
     setAddrResults([]);
   };
 
@@ -308,7 +311,7 @@ export default function NewEventPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || (!isAlways && !startDate) || !location || !hostId) {
+    if (!title || (!isAlways && !startDate) || locations.length === 0 || !hostId) {
       toast.error("필수 정보를 모두 입력해주세요.");
       return;
     }
@@ -332,7 +335,6 @@ export default function NewEventPage() {
         .insert({
           title,
           description,
-          location,
           start_date: isAlways ? null : startDate,
           end_date: isAlways ? null : (endDate || null),
           start_time: startTime,
@@ -359,6 +361,19 @@ export default function NewEventPage() {
         .insert(channelRelations);
 
       if (relationError) throw relationError;
+
+      // 3. Insert into offline_event_locations
+      const locationRelations = locations.map((loc, idx) => ({
+        offline_event_id: eventData.id,
+        location: loc,
+        order_num: idx,
+      }));
+
+      const { error: locationError } = await supabase
+        .from("offline_event_locations")
+        .insert(locationRelations);
+
+      if (locationError) throw locationError;
 
       toast.success("행사가 성공적으로 등록되었습니다!");
       router.push(`/events/${eventData.id}`);
@@ -525,39 +540,90 @@ export default function NewEventPage() {
             </div>
 
             <div className="space-y-3">
-              <Label htmlFor="location" className="text-sm font-semibold">장소 <span className="text-destructive">*</span></Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="location"
-                  placeholder="행사가 열리는 장소를 입력해주세요"
-                  className="pl-10 h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  autoComplete="off"
-                />
-
-                {isSearchingAddr && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-
-                {addrResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-2 bg-background border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto overflow-x-hidden animate-in fade-in zoom-in-95 duration-200 divide-y divide-border/40">
-                    {addrResults.map((item, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => selectAddress(item.placeName || item.address)}
-                        className="w-full text-left px-4 py-3 hover:bg-muted transition-colors text-sm flex flex-col gap-0.5 select-none"
-                      >
-                        <span className="font-semibold text-foreground">{item.placeName}</span>
-                        <span className="text-xs text-muted-foreground">{item.address}</span>
-                      </button>
+              <Label className="text-sm font-semibold">장소 <span className="text-destructive">*</span></Label>
+              
+              <div className="flex flex-col gap-3">
+                {locations.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {locations.map((loc, idx) => (
+                      <div key={idx} className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-xl border border-border">
+                        <span className="text-sm">{loc}</span>
+                        <button type="button" onClick={() => setLocations(prev => prev.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
+
+                <div className="flex items-center justify-between mb-2 mt-2">
+                  <div className="flex items-center gap-2" onClick={() => setIsManualLocation(!isManualLocation)}>
+                    <div className={`w-5 h-5 rounded-[4px] border-2 flex items-center justify-center transition-colors cursor-pointer
+                      ${isManualLocation ? "bg-primary border-primary text-primary-foreground" : "bg-background border-foreground/40 hover:border-foreground"}`}
+                    >
+                      {isManualLocation && <Check className="w-3.5 h-3.5 stroke-[4]" />}
+                    </div>
+                    <Label className="text-xs font-bold cursor-pointer select-none">직접 입력 (지도에 표시되지 않음)</Label>
+                  </div>
+                </div>
+
+                <div className="relative flex gap-2">
+                  <div className="relative flex-1">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder={isManualLocation ? "장소가 확실하지 않을 때 사용해주세요(예: 전국 gs편의점 등)" : "장소를 검색하세요 (카카오맵)"}
+                      className="pl-10 h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
+                      value={locationInput}
+                      onChange={(e) => setLocationInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (isManualLocation && locationInput.trim()) {
+                            setLocations(prev => [...prev, locationInput.trim()]);
+                            setLocationInput("");
+                          }
+                        }
+                      }}
+                      autoComplete="off"
+                    />
+
+                    {!isManualLocation && isSearchingAddr && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+
+                    {!isManualLocation && addrResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-2 bg-background border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto overflow-x-hidden animate-in fade-in zoom-in-95 duration-200 divide-y divide-border/40">
+                        {addrResults.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => selectAddress(item.placeName || item.address)}
+                            className="w-full text-left px-4 py-3 hover:bg-muted transition-colors text-sm flex flex-col gap-0.5 select-none"
+                          >
+                            <span className="font-semibold text-foreground">{item.placeName}</span>
+                            <span className="text-xs text-muted-foreground">{item.address}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {isManualLocation && (
+                    <Button 
+                      type="button" 
+                      onClick={() => {
+                        if (locationInput.trim()) {
+                          setLocations(prev => [...prev, locationInput.trim()]);
+                          setLocationInput("");
+                        }
+                      }}
+                      className="h-12 px-6 rounded-xl font-bold bg-secondary text-secondary-foreground hover:bg-secondary/80 shrink-0"
+                    >
+                      추가
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 

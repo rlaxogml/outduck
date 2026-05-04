@@ -70,7 +70,6 @@ export default function Home() {
             title,
             start_date,
             end_date,
-            location,
             image_url,
             reservation_type,
             created_at,
@@ -81,6 +80,9 @@ export default function Home() {
                 type,
                 image_url
               )
+            ),
+            offline_event_locations(
+              location
             )
           `)
           .order("start_date", { ascending: true });
@@ -163,7 +165,7 @@ export default function Home() {
               id: event.id,
               title: event.title,
               date: formatEventDate(event.start_date, event.end_date),
-              location: event.location,
+              location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
               category: getCategory(channels[0]?.type),
               imageColor: imageColors[index % imageColors.length],
               imageUrl: event.image_url,

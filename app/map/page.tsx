@@ -99,7 +99,6 @@ function MapContent() {
             title,
             start_date,
             end_date,
-            location,
             image_url,
             offline_event_channels(
               channels(
@@ -108,15 +107,18 @@ function MapContent() {
                 type,
                 image_url
               )
+            ),
+            offline_event_locations(
+              location
             )
           `)
-          .not("location", "is", null);
 
         if (error) throw error;
 
         if (data) {
           const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
           const filteredData = data.filter((item: any) => {
+            if (!item.offline_event_locations || item.offline_event_locations.length === 0) return false;
             if (item.end_date && item.end_date < todayStr) return false;
             return true;
           });
@@ -138,7 +140,7 @@ function MapContent() {
               id: item.id,
               title: item.title,
               date: formatEventDate(item.start_date, item.end_date),
-              location: item.location,
+              location: item.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
               channelName: channel?.name || "기타",
               channelImage: channel?.image_url || null,
               channelType: channel?.type || null,

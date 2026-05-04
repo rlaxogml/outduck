@@ -148,8 +148,9 @@ export default function ChannelProfilePage() {
       const offlineEventsPromise = supabase
         .from("offline_events")
         .select(`
-          id, title, start_date, end_date, location, image_url, reservation_type,
-          offline_event_channels ( channels ( id, name, type, image_url ) )
+          id, title, start_date, end_date, image_url, reservation_type,
+          offline_event_channels ( channels ( id, name, type, image_url ) ),
+          offline_event_locations ( location )
         `)
         .order("start_date", { ascending: true })
         .then(res => res.data);
@@ -204,7 +205,7 @@ export default function ChannelProfilePage() {
               id: event.id,
               title: event.title,
               date,
-              location: event.location,
+              location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
               category: getChannelTypeText(sorted[0]?.type),
               imageColor: imageColors[index % imageColors.length],
               imageUrl: event.image_url,

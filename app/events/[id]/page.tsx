@@ -53,9 +53,10 @@ export default function EventDetailPage() {
       const { data, error } = await supabase
         .from("offline_events")
         .select(`
-          id, title, description, start_date, end_date, start_time, end_time, location, image_url, reservation_type,
+          id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
           offline_event_channels ( channels ( id, name, type, image_url ) ),
-          offline_event_images ( id, image_url, order )
+          offline_event_images ( id, image_url, order ),
+          offline_event_locations ( location )
         `)
         .eq("id", eventId)
         .maybeSingle();
@@ -73,7 +74,7 @@ export default function EventDetailPage() {
           end_date: data.end_date,
           start_time: data.start_time,
           end_time: data.end_time,
-          location: data.location,
+          location: data.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
           image_url: data.image_url,
           reservation_type: data.reservation_type,
           channels,
