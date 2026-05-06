@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from "@/components/ui/sonner"
+import Script from "next/script"
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -41,6 +42,12 @@ export default function RootLayout({
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
         <Toaster />
+        {process.env.NEXT_PUBLIC_KAKAO_MAP_KEY && (
+          <Script
+            src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY.trim()}&libraries=services&autoload=false`}
+            strategy="beforeInteractive"
+          />
+        )}
       </body>
     </html>
   )

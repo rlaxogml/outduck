@@ -28,7 +28,7 @@ export default function SubscriptionsPage() {
   useEffect(() => {
     const syncSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
       if (!session?.user) {
         setLoading(false);
       }
@@ -36,7 +36,7 @@ export default function SubscriptionsPage() {
     syncSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
       if (!session?.user) {
         setLoading(false);
       }
@@ -76,7 +76,9 @@ export default function SubscriptionsPage() {
               title,
               start_date,
               end_date,
-              location,
+              offline_event_locations (
+                location
+              ),
               image_url,
               reservation_type,
               created_at,
@@ -173,7 +175,7 @@ export default function SubscriptionsPage() {
               id: event.id,
               title: event.title,
               date: formatEventDate(event.start_date, event.end_date),
-              location: event.location,
+              location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
               category: getCategory(channels[0]?.type),
               imageColor: imageColors[index % imageColors.length],
               imageUrl: event.image_url,

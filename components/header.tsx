@@ -87,7 +87,7 @@ export function Header() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
     };
 
     syncSession();
@@ -95,7 +95,7 @@ export function Header() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
     });
 
     return () => {

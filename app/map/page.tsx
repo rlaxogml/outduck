@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense } from "react";
-import Script from "next/script";
+import { useEffect, useState, useRef, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/header";
 import { supabase } from "@/lib/supabase/client";
@@ -36,28 +35,46 @@ function MapContent() {
   const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
   const [activeFilters, setActiveFilters] = useState<string[]>(["all"]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [drawnMarkersCount, setDrawnMarkersCount] = useState(0);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   const mapRef = useRef<any>(null);
+  const isMapInitialized = useRef(false);
+  const markersRef = useRef<any[]>([]);
+  const overlaysRef = useRef<any[]>([]);
+  const openOverlayRef = useRef<any>(null);
+  const overlayRevealTimerRef = useRef<number | null>(null);
+  const userIdRef = useRef<string | null>(null);
+
   const cleanKey = (process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || "").trim();
 
   // 1. Sync User Session and Fetch favorites & bookmarks
   useEffect(() => {
+    const abortController = new AbortController();
+
     const syncSessionAndData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user ?? null;
+      userIdRef.current = currentUser?.id ?? null;
       setUser(currentUser);
 
       if (currentUser) {
-        const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
-          supabase.from("event_bookmarks").select("offline_event_id").eq("user_id", currentUser.id),
-          supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id),
-        ]);
+        try {
+          const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
+            supabase.from("event_bookmarks").select("offline_event_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
+            supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
+          ]);
 
-        if (bookmarksData) {
-          setUserBookmarkedEventIds(bookmarksData.map(b => b.offline_event_id).filter(Boolean));
-        }
-        if (favoritesData) {
-          setUserSubscribedChannelIds(favoritesData.map(f => f.channel_id).filter(Boolean));
+          if (bookmarksData) {
+            const newIds = bookmarksData.map(b => b.offline_event_id).filter(Boolean);
+            setUserBookmarkedEventIds(prev => JSON.stringify(prev) === JSON.stringify(newIds) ? prev : newIds);
+          }
+          if (favoritesData) {
+            const newIds = favoritesData.map(f => f.channel_id).filter(Boolean);
+            setUserSubscribedChannelIds(prev => JSON.stringify(prev) === JSON.stringify(newIds) ? prev : newIds);
+          }
+        } catch (error: any) {
+          if (error.name !== "AbortError") console.error(error);
         }
       }
     };
@@ -65,18 +82,32 @@ function MapContent() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
-          supabase.from("event_bookmarks").select("offline_event_id").eq("user_id", currentUser.id),
-          supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id),
-        ]);
+      const newUserId = currentUser?.id ?? null;
 
-        if (bookmarksData) {
-          setUserBookmarkedEventIds(bookmarksData.map(b => b.offline_event_id).filter(Boolean));
-        }
-        if (favoritesData) {
-          setUserSubscribedChannelIds(favoritesData.map(f => f.channel_id).filter(Boolean));
+      if (userIdRef.current === newUserId) {
+        return;
+      }
+
+      userIdRef.current = newUserId;
+      setUser(currentUser);
+      
+      if (currentUser) {
+        try {
+          const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
+            supabase.from("event_bookmarks").select("offline_event_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
+            supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
+          ]);
+
+          if (bookmarksData) {
+            const newIds = bookmarksData.map(b => b.offline_event_id).filter(Boolean);
+            setUserBookmarkedEventIds(prev => JSON.stringify(prev) === JSON.stringify(newIds) ? prev : newIds);
+          }
+          if (favoritesData) {
+            const newIds = favoritesData.map(f => f.channel_id).filter(Boolean);
+            setUserSubscribedChannelIds(prev => JSON.stringify(prev) === JSON.stringify(newIds) ? prev : newIds);
+          }
+        } catch (error: any) {
+          if (error.name !== "AbortError") console.error(error);
         }
       } else {
         setUserBookmarkedEventIds([]);
@@ -84,11 +115,28 @@ function MapContent() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      abortController.abort();
+    };
   }, []);
+
+  // 1-1. Wait for global Kakao Map Script to load
+  useEffect(() => {
+    if (isScriptLoaded) return;
+    const interval = setInterval(() => {
+      if (typeof window !== "undefined" && window.kakao && window.kakao.maps) {
+        clearInterval(interval);
+        setIsScriptLoaded(true);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isScriptLoaded]);
 
   // 2. Fetch events from Supabase and pre-generate marker base64 images
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchEvents = async () => {
       try {
         setLoading(true);
@@ -112,6 +160,7 @@ function MapContent() {
               location
             )
           `)
+          .abortSignal(abortController.signal);
 
         if (error) throw error;
 
@@ -230,36 +279,44 @@ function MapContent() {
 
           setEvents(eventsWithMarkerImages);
         }
-      } catch (err) {
-        console.error("Error fetching events for map:", err);
+      } catch (err: any) {
+        if (!err?.message?.includes("AbortError")) {
+          console.error("Error fetching events for map:", err);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchEvents();
+    return () => abortController.abort();
   }, []);
 
   // Filter events
-  const filteredEvents = events.filter((event) => {
-    if (activeFilters.includes("all")) return true;
+  const filteredEvents = useMemo(() => {
+    return events.filter((event) => {
+      if (activeFilters.includes("all")) return true;
 
-    const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber" || f === "vtuber");
-    const activeInteractions = activeFilters.filter(f => f === "subscribed" || f === "bookmarks");
+      const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber" || f === "vtuber");
+      const activeInteractions = activeFilters.filter(f => f === "subscribed" || f === "bookmarks");
 
-    const catMatched = activeCategories.length === 0 || (event.channelType && activeCategories.includes(event.channelType));
-    let intMatched = true;
+      const catMatched = activeCategories.length === 0 || event.channels?.some((c: any) => 
+        c.type && activeCategories.includes(c.type.trim().toLowerCase())
+      );
+      
+      let intMatched = true;
 
-    if (activeInteractions.length > 0) {
-      intMatched = activeInteractions.some(f => {
-        if (f === "subscribed") return event.channels?.some((c: any) => userSubscribedChannelIds.includes(c.id));
-        if (f === "bookmarks") return userBookmarkedEventIds.includes(event.id);
-        return false;
-      });
-    }
+      if (activeInteractions.length > 0) {
+        intMatched = activeInteractions.some(f => {
+          if (f === "subscribed") return event.channels?.some((c: any) => userSubscribedChannelIds.includes(c.id));
+          if (f === "bookmarks") return userBookmarkedEventIds.includes(event.id);
+          return false;
+        });
+      }
 
-    return catMatched && intMatched;
-  });
+      return catMatched && intMatched;
+    });
+  }, [events, activeFilters, userSubscribedChannelIds, userBookmarkedEventIds]);
 
   const toggleFilter = (filterId: string) => {
     setActiveFilters((prev) => {
@@ -277,6 +334,7 @@ function MapContent() {
 
   // 3. Initialize Kakao Map and place markers
   useEffect(() => {
+    let isMounted = true;
     const hasKakao = typeof window !== "undefined" && !!window.kakao && !!window.kakao.maps;
     if (!isScriptLoaded && !hasKakao) return;
     if (loading) return;
@@ -287,35 +345,47 @@ function MapContent() {
         clearInterval(interval);
 
         kakao.maps.load(() => {
+          if (!isMounted) return;
           const container = document.getElementById("map-container");
           if (!container) return;
-
-          container.innerHTML = "";
 
           const defaultCenter = new kakao.maps.LatLng(37.566535, 126.9779692);
           const geocoder = new kakao.maps.services.Geocoder();
           const places = new kakao.maps.services.Places();
           const bounds = new kakao.maps.LatLngBounds();
           let boundsChanged = false;
-          let openOverlay: any = null;
-          let overlayRevealTimer: number | null = null;
           let userAdjustedMapView = false;
+          let successCount = 0;
+
+          if (!mapRef.current) {
+            container.innerHTML = "";
+            mapRef.current = new kakao.maps.Map(container, {
+              center: defaultCenter,
+              level: 5,
+            });
+          }
+          const map = mapRef.current;
+
+          // Clear existing markers and overlays
+          markersRef.current.forEach((m: any) => m.setMap(null));
+          overlaysRef.current.forEach((o: any) => o.setMap(null));
+          markersRef.current = [];
+          overlaysRef.current = [];
+          if (openOverlayRef.current) openOverlayRef.current.setMap(null);
+          openOverlayRef.current = null;
+          setDrawnMarkersCount(0);
 
           const targetEvent = filteredEvents.find((ev) => String(ev.id) === String(eventIdParam));
 
-          const initializeMapAndPlaceMarkers = (centerCoords: any, level: number) => {
-            const options = {
-              center: centerCoords,
-              level: level,
-            };
-
-            const map = new kakao.maps.Map(container, options);
-            mapRef.current = map;
-
-            setTimeout(() => {
-              map.relayout();
-              map.setCenter(centerCoords);
-            }, 300);
+          const initializeMapAndPlaceMarkers = (centerCoords: any, level: number, initialLoad: boolean) => {
+            if (initialLoad) {
+              setTimeout(() => {
+                if (!isMounted) return;
+                map.relayout();
+                map.setCenter(centerCoords);
+                map.setLevel(level);
+              }, 300);
+            }
 
             const animateToMarker = (coords: any, done?: () => void) => {
               const currentLevel = map.getLevel();
@@ -325,6 +395,7 @@ function MapContent() {
 
               map.panTo(coords);
               window.setTimeout(() => {
+                if (!isMounted) return;
                 if (currentLevel !== focusLevel) {
                   map.setLevel(focusLevel, {
                     anchor: coords,
@@ -332,14 +403,18 @@ function MapContent() {
                   });
                 }
                 if (done) {
-                  window.setTimeout(done, currentLevel !== focusLevel ? zoomMs + 20 : 20);
+                  window.setTimeout(() => {
+                    if (!isMounted) return;
+                    done();
+                  }, currentLevel !== focusLevel ? zoomMs + 20 : 20);
                 }
               }, panMs);
             };
 
             kakao.maps.event.addListener(map, "idle", () => {
-              if (openOverlay && !userAdjustedMapView) {
-                openOverlay.setMap(map);
+              if (!isMounted) return;
+              if (openOverlayRef.current && !userAdjustedMapView) {
+                openOverlayRef.current.setMap(map);
               }
             });
 
@@ -348,6 +423,7 @@ function MapContent() {
 
             filteredEvents.forEach((event) => {
               const createMarkerAndPopup = (result: any, status: any) => {
+                if (!isMounted) return;
                 if (status === kakao.maps.services.Status.OK) {
                   const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
 
@@ -394,12 +470,12 @@ function MapContent() {
 
                   infoContent.querySelector(".close-btn")?.addEventListener("click", (e) => {
                     e.stopPropagation();
-                    if (overlayRevealTimer) {
-                      window.clearTimeout(overlayRevealTimer);
-                      overlayRevealTimer = null;
+                    if (overlayRevealTimerRef.current) {
+                      window.clearTimeout(overlayRevealTimerRef.current);
+                      overlayRevealTimerRef.current = null;
                     }
                     infoOverlay.setMap(null);
-                    openOverlay = null;
+                    openOverlayRef.current = null;
                   });
 
                   infoContent.querySelector(".detail-btn")?.addEventListener("click", (e) => {
@@ -420,27 +496,36 @@ function MapContent() {
 
                   kakao.maps.event.addListener(marker, "click", () => {
                     userAdjustedMapView = true;
-                    if (overlayRevealTimer) {
-                      window.clearTimeout(overlayRevealTimer);
-                      overlayRevealTimer = null;
+                    if (overlayRevealTimerRef.current) {
+                      window.clearTimeout(overlayRevealTimerRef.current);
+                      overlayRevealTimerRef.current = null;
                     }
-                    if (openOverlay) openOverlay.setMap(null);
-                    openOverlay = null;
+                    if (openOverlayRef.current) openOverlayRef.current.setMap(null);
+                    openOverlayRef.current = null;
 
                     animateToMarker(coords, () => {
-                      overlayRevealTimer = null;
+                      if (!isMounted) return;
+                      overlayRevealTimerRef.current = null;
                       infoOverlay.setMap(map);
-                      openOverlay = infoOverlay;
+                      openOverlayRef.current = infoOverlay;
                     });
                   });
+
+                  markersRef.current.push(marker);
+                  overlaysRef.current.push(infoOverlay);
+                  
+                  successCount++;
+                  setDrawnMarkersCount(successCount);
                 }
               };
 
               geocoder.addressSearch(event.location, (result: any, status: any) => {
+                if (!isMounted) return;
                 if (status === kakao.maps.services.Status.OK) {
                   createMarkerAndPopup(result, status);
                 } else {
                   places.keywordSearch(event.location, (data: any, placeStatus: any) => {
+                    if (!isMounted) return;
                     if (placeStatus === kakao.maps.services.Status.OK) {
                       createMarkerAndPopup(data, placeStatus);
                     }
@@ -450,13 +535,14 @@ function MapContent() {
             });
 
             setTimeout(() => {
+              if (!isMounted) return;
               if (targetCoords.length > 0) {
                 userAdjustedMapView = true;
                 if (targetCoords.length === 1) {
                   map.setCenter(targetCoords[0]);
                   map.setLevel(4);
                   targetOverlays[0].setMap(map);
-                  openOverlay = targetOverlays[0];
+                  openOverlayRef.current = targetOverlays[0];
                 } else {
                   const specificBounds = new kakao.maps.LatLngBounds();
                   targetCoords.forEach((c) => specificBounds.extend(c));
@@ -465,33 +551,43 @@ function MapContent() {
               } else if (boundsChanged && !userAdjustedMapView) {
                 map.setBounds(bounds);
               }
+              setIsMapReady(true);
             }, 1100);
           };
 
           if (targetEvent) {
             geocoder.addressSearch(targetEvent.location, (result: any, status: any) => {
+              if (!isMounted) return;
               if (status === kakao.maps.services.Status.OK) {
                 const centerCoords = new kakao.maps.LatLng(result[0].y, result[0].x);
-                initializeMapAndPlaceMarkers(centerCoords, 4);
+                initializeMapAndPlaceMarkers(centerCoords, 4, !isMapInitialized.current);
+                isMapInitialized.current = true;
               } else {
                 places.keywordSearch(targetEvent.location, (data: any, placeStatus: any) => {
+                  if (!isMounted) return;
                   if (placeStatus === kakao.maps.services.Status.OK) {
                     const centerCoords = new kakao.maps.LatLng(data[0].y, data[0].x);
-                    initializeMapAndPlaceMarkers(centerCoords, 4);
+                    initializeMapAndPlaceMarkers(centerCoords, 4, !isMapInitialized.current);
+                    isMapInitialized.current = true;
                   } else {
-                    initializeMapAndPlaceMarkers(defaultCenter, 5);
+                    initializeMapAndPlaceMarkers(defaultCenter, 5, !isMapInitialized.current);
+                    isMapInitialized.current = true;
                   }
                 });
               }
             });
           } else {
-            initializeMapAndPlaceMarkers(defaultCenter, 5);
+            initializeMapAndPlaceMarkers(defaultCenter, 5, !isMapInitialized.current);
+            isMapInitialized.current = true;
           }
         });
       }
     }, 100);
 
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [isScriptLoaded, loading, filteredEvents, eventIdParam]);
 
   if (!process.env.NEXT_PUBLIC_KAKAO_MAP_KEY) {
@@ -527,7 +623,7 @@ function MapContent() {
               <h1 className="text-3xl font-extrabold tracking-tight">🗺️ 오프라인 행사 지도</h1>
               <p className="text-sm text-muted-foreground">현재 등록된 오프라인 행사의 진행 위치를 한눈에 확인해보세요.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 relative z-50">
               {/* Filter Bubble */}
               <div className="relative shrink-0">
                 <button
@@ -618,21 +714,21 @@ function MapContent() {
 
               <div className="flex items-center gap-2 bg-muted/50 border border-border px-4 py-2 rounded-xl h-[42px]">
                 <span className="flex h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-xs font-bold text-muted-foreground">행사 위치 <span className="text-foreground">{filteredEvents.length}</span>곳</span>
+                <span className="text-xs font-bold text-muted-foreground">행사 위치 <span className="text-foreground">{drawnMarkersCount}</span>곳</span>
               </div>
             </div>
           </div>
 
           <div className="relative border border-border rounded-2xl bg-muted overflow-hidden shadow-sm h-[650px]">
-            {loading && (
-              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-3">
-                <div className="w-10 h-10 rounded-full border-3 border-primary border-t-transparent animate-spin" />
-                <p className="text-sm font-semibold text-foreground">행사 및 지도를 불러오는 중...</p>
+            {(!isMapReady || loading) && filteredEvents.length > 0 && (
+              <div className="absolute inset-0 bg-background/90 backdrop-blur-sm z-40 flex flex-col items-center justify-center gap-4 transition-opacity duration-500">
+                <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                <p className="text-sm font-bold text-foreground">지도를 불러오는 중입니다...</p>
               </div>
             )}
 
             {!loading && filteredEvents.length === 0 && (
-              <div className="absolute inset-0 bg-background/80 z-50 flex flex-col items-center justify-center text-center p-6">
+              <div className="absolute inset-0 bg-background/80 z-50 flex flex-col items-center justify-center text-center p-6 pointer-events-none">
                 <div className="h-16 w-16 items-center justify-center rounded-full bg-muted flex mb-3 text-muted-foreground">
                   <Search className="h-7 w-7" />
                 </div>
@@ -641,16 +737,14 @@ function MapContent() {
               </div>
             )}
 
-            <div id="map-container" className="w-full h-[650px] bg-muted" style={{ height: "650px", width: "100%" }} />
+            <div 
+              id="map-container" 
+              className={cn("w-full h-[650px] bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")} 
+              style={{ height: "650px", width: "100%" }} 
+            />
           </div>
         </main>
       </div>
-
-      <Script
-        src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${cleanKey}&libraries=services&autoload=false`}
-        onLoad={() => setIsScriptLoaded(true)}
-        strategy="afterInteractive"
-      />
     </div>
   );
 }

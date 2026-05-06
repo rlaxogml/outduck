@@ -48,19 +48,25 @@ export default function Home() {
 
   useEffect(() => {
     const syncSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
+      } catch (err) {
+        console.error(err);
+      }
     };
     syncSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchEvents = async () => {
       try {
         const offlineQuery = supabase
@@ -85,7 +91,8 @@ export default function Home() {
               location
             )
           `)
-          .order("start_date", { ascending: true });
+          .order("start_date", { ascending: true })
+          .abortSignal(abortController.signal);
 
         const onlineQuery = supabase
           .from("online_events")
@@ -105,7 +112,8 @@ export default function Home() {
               )
             )
           `)
-          .order("start_at", { ascending: true });
+          .order("start_at", { ascending: true })
+          .abortSignal(abortController.signal);
 
         const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
           offlineQuery,
@@ -205,14 +213,17 @@ export default function Home() {
           });
           setOnlineEvents(formatted);
         }
-      } catch (error) {
-        console.error("Failed to fetch events:", error);
+      } catch (error: any) {
+        if (!error?.message?.includes("AbortError")) {
+          console.error("Failed to fetch events:", error);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchEvents();
+    return () => abortController.abort();
   }, []);
 
   const filteredEvents = (() => {

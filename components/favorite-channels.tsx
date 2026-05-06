@@ -149,20 +149,27 @@ export function FavoriteChannels() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      fetchFavoritesAndBookmarks(currentUser);
+      setUser(prev => {
+        if (prev?.id === currentUser?.id) return prev;
+        fetchFavoritesAndBookmarks(currentUser);
+        return currentUser;
+      });
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        setIsLoading(true);
-        fetchFavoritesAndBookmarks(currentUser);
-      } else {
-        setChannels([]);
-        setIsLoading(false);
-      }
+      setUser(prev => {
+        if (prev?.id === currentUser?.id) return prev;
+        
+        if (currentUser) {
+          setIsLoading(true);
+          fetchFavoritesAndBookmarks(currentUser);
+        } else {
+          setChannels([]);
+          setIsLoading(false);
+        }
+        return currentUser;
+      });
     });
 
     return () => {

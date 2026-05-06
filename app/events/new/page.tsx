@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Script from "next/script";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
@@ -100,6 +99,18 @@ export default function NewEventPage() {
     return typeof window !== "undefined" && !!window.kakao && !!window.kakao.maps;
   });
   const cleanKey = (process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || "").trim();
+
+  // Wait for global Kakao Map Script to load
+  useEffect(() => {
+    if (isScriptLoaded) return;
+    const interval = setInterval(() => {
+      if (typeof window !== "undefined" && window.kakao && window.kakao.maps) {
+        clearInterval(interval);
+        setIsScriptLoaded(true);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isScriptLoaded]);
 
   // Form states
   const [title, setTitle] = useState("");
@@ -915,17 +926,6 @@ export default function NewEventPage() {
           </div>
         </form>
       </main>
-
-      <Script
-        src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${cleanKey}&libraries=services&autoload=false`}
-        onLoad={() => {
-          setIsScriptLoaded(true);
-          if (typeof window !== "undefined" && window.kakao && window.kakao.maps) {
-            window.kakao.maps.load();
-          }
-        }}
-        strategy="afterInteractive"
-      />
     </div>
   );
 }
