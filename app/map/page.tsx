@@ -33,7 +33,7 @@ function MapContent() {
   const [user, setUser] = useState<any>(null);
   const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>([]);
   const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
-  const [activeFilters, setActiveFilters] = useState<string[]>(["all"]);
+  const [activeFilters, setActiveFilters] = useState<string[]>(["subscribed"]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [drawnMarkersCount, setDrawnMarkersCount] = useState(0);
   const [isMapReady, setIsMapReady] = useState(false);
@@ -690,27 +690,31 @@ function MapContent() {
               </div>
 
               {/* User specific Filters */}
-              {user && (
-                <div className="flex items-center gap-1.5">
-                  {[
-                    { id: "subscribed", label: "구독 행사만" },
-                    { id: "bookmarks", label: "찜한 행사만" },
-                  ].map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => toggleFilter(cat.id)}
-                      className={cn(
-                        "px-3.5 py-2 text-sm rounded-xl border transition-all whitespace-nowrap select-none",
-                        activeFilters.includes(cat.id)
-                          ? "bg-foreground text-background border-foreground font-medium shadow-sm"
-                          : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground bg-card"
-                      )}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="flex items-center gap-1.5">
+                {[
+                  { id: "subscribed", label: "구독 행사만" },
+                  { id: "bookmarks", label: "찜한 행사만" },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      if (!user && !activeFilters.includes(cat.id)) {
+                        alert("로그인이 필요한 기능입니다.");
+                        return;
+                      }
+                      toggleFilter(cat.id);
+                    }}
+                    className={cn(
+                      "px-3.5 py-2 text-sm rounded-xl border transition-all whitespace-nowrap select-none",
+                      activeFilters.includes(cat.id)
+                        ? "bg-foreground text-background border-foreground font-medium shadow-sm"
+                        : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground bg-card"
+                    )}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
 
               <div className="flex items-center gap-2 bg-muted/50 border border-border px-4 py-2 rounded-xl h-[42px]">
                 <span className="flex h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />

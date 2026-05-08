@@ -20,7 +20,7 @@ type EventDetail = {
   location: string;
   image_url: string | null;
   reservation_type: string | null;
-  channels: { id: number; name: string; image_url: string; type: string }[];
+  channels: { id: number; name: string; image_url: string; type: string; owner_id: string }[];
   images: { id: number; image_url: string; order: number }[];
 };
 
@@ -54,7 +54,7 @@ export default function EventDetailPage() {
         .from("offline_events")
         .select(`
           id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
-          offline_event_channels ( channels ( id, name, type, image_url ) ),
+          offline_event_channels ( channels ( id, name, type, image_url, owner_id ) ),
           offline_event_images ( id, image_url, order ),
           offline_event_locations ( location )
         `)
@@ -134,6 +134,25 @@ export default function EventDetailPage() {
       toast("관심 행사가 저장되었습니다");
     }
   };
+
+  const handleDelete = async () => {
+    if (!window.confirm("정말 이 행사를 삭제하시겠습니까? (관련 위치 및 공동 주최 정보도 함께 삭제됩니다)")) return;
+
+    try {
+      // First delete dependent records manually if cascade is not guaranteed
+      await supabase.from("offline_event_locations").delete().eq("offline_event_id", eventId);
+      await supabase.from("offline_event_channels").delete().eq("event_id", eventId);
+      await supabase.from("offline_events").delete().eq("id", eventId);
+      
+      toast.success("행사가 삭제되었습니다.");
+      router.push("/");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("행사 삭제 중 오류가 발생했습니다.");
+    }
+  };
+
+  const isOwner = user && event?.channels?.[0]?.owner_id === user.id;
 
   if (isLoading) {
     return (
@@ -257,6 +276,24 @@ export default function EventDetailPage() {
               <span>{isBookmarked ? "관심저장" : "알림받기"}</span>
             </button>
           </div>
+
+          {/* Owner Action Row */}
+          {isOwner && (
+            <div className="flex gap-2 mt-4">
+              <button 
+                onClick={() => router.push(`/events/${event.id}/edit`)}
+                className="flex-1 py-2 bg-secondary text-secondary-foreground text-sm font-semibold rounded-xl hover:bg-secondary/80 transition-colors"
+              >
+                행사 수정
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="flex-1 py-2 bg-destructive/10 text-destructive text-sm font-semibold rounded-xl hover:bg-destructive/20 transition-colors"
+              >
+                행사 삭제
+              </button>
+            </div>
+          )}
 
           {/* Action Icons Row */}
           <div className="flex justify-around items-center mt-6 pt-5 border-t border-border/40">

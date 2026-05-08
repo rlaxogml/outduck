@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,6 @@ type Channel = {
   image_url: string | null;
   type: string | null;
 };
-
 
 const TimeInputPair = ({ 
   hour, 
@@ -183,8 +182,11 @@ const DateInputTriple = ({
   );
 };
 
-export default function NewEventPage() {
+export default function EditEventPage() {
   const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const eventId = Number(params.id);
+
   const [user, setUser] = useState<User | null>(null);
   const [ownedChannels, setOwnedChannels] = useState<Channel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -193,19 +195,6 @@ export default function NewEventPage() {
   const [isScriptLoaded, setIsScriptLoaded] = useState(() => {
     return typeof window !== "undefined" && !!window.kakao && !!window.kakao.maps;
   });
-  const cleanKey = (process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || "").trim();
-
-  // Wait for global Kakao Map Script to load
-  useEffect(() => {
-    if (isScriptLoaded) return;
-    const interval = setInterval(() => {
-      if (typeof window !== "undefined" && window.kakao && window.kakao.maps) {
-        clearInterval(interval);
-        setIsScriptLoaded(true);
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [isScriptLoaded]);
 
   // Form states
   const [title, setTitle] = useState("");
@@ -254,6 +243,19 @@ export default function NewEventPage() {
   const [addrResults, setAddrResults] = useState<any[]>([]);
   const [isSearchingAddr, setIsSearchingAddr] = useState(false);
 
+  // Wait for global Kakao Map Script to load
+  useEffect(() => {
+    if (isScriptLoaded) return;
+    const interval = setInterval(() => {
+      if (typeof window !== "undefined" && window.kakao && window.kakao.maps) {
+        clearInterval(interval);
+        setIsScriptLoaded(true);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isScriptLoaded]);
+
+  // Load address autocomplete search
   useEffect(() => {
     if (isManualLocation || !locationInput || locationInput.trim().length < 2) {
       setAddrResults([]);
@@ -311,36 +313,133 @@ export default function NewEventPage() {
     toast.success("장소가 등록 되었습니다");
   };
 
-
+  // Auth + Fetch Owned Channels + Fetch Event Data
   useEffect(() => {
-    const checkAuthAndFetchChannels = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("로그인이 필요합니다.");
-        router.push("/");
-        return;
-      }
-      setUser(session.user);
-
-      // Fetch owned channels
-      const { data: channels, error } = await supabase
-        .from("channels")
-        .select("id, name, image_url, type")
-        .eq("owner_id", session.user.id);
-
-      if (error) {
-        console.error("Error fetching owned channels:", error);
-      } else {
-        setOwnedChannels(channels || []);
-        if (channels && channels.length > 0) {
-          setHostId(channels[0].id.toString());
+    const initPage = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast.error("로그인이 필요합니다.");
+          router.push("/");
+          return;
         }
+        setUser(session.user);
+
+        // Fetch owned channels
+        const { data: channels, error: channelsError } = await supabase
+          .from("channels")
+          .select("id, name, image_url, type")
+          .eq("owner_id", session.user.id);
+
+        if (channelsError) throw channelsError;
+        setOwnedChannels(channels || []);
+
+        // Fetch Event Data to prepopulate
+        if (eventId) {
+          const { data: event, error: eventError } = await supabase
+            .from("offline_events")
+            .select(`
+              id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
+              reservation_starts_at, reservation_ends_at, is_reservation_always,
+              offline_event_channels ( channels ( id, name, type, image_url, owner_id ) ),
+              offline_event_locations ( location )
+            `)
+            .eq("id", eventId)
+            .maybeSingle();
+
+          if (eventError) throw eventError;
+
+          if (event) {
+            // Verify if the logged in user is the owner of the first channel
+            const eventHost = event.offline_event_channels?.[0]?.channels;
+            if (eventHost && eventHost.owner_id !== session.user.id) {
+              toast.error("수정 권한이 없습니다.");
+              router.push(`/events/${eventId}`);
+              return;
+            }
+
+            setTitle(event.title || "");
+            setDescription(event.description || "");
+            setImageUrl(event.image_url || null);
+            
+            if (event.start_date) {
+              const [y, m, d] = event.start_date.split("-");
+              setStartYear(y);
+              setStartMonth(m);
+              setStartDay(d);
+              setIsAlways(false);
+            } else {
+              setIsAlways(true);
+            }
+            if (event.end_date) {
+              const [y, m, d] = event.end_date.split("-");
+              setEndYear(y);
+              setEndMonth(m);
+              setEndDay(d);
+            }
+
+            if (event.start_time) {
+              const [h, m] = event.start_time.split(":");
+              setStartTimeHour(h);
+              setStartTimeMin(m);
+            }
+            if (event.end_time) {
+              const [h, m] = event.end_time.split(":");
+              setEndTimeHour(h);
+              setEndTimeMin(m);
+            }
+
+            setReservationType(event.reservation_type || "자유입장");
+            setIsResAlways(event.is_reservation_always || false);
+
+            if (event.reservation_starts_at) {
+              setShowResSchedule(true);
+              const dateObj = new Date(event.reservation_starts_at);
+              setResStartYear(String(dateObj.getFullYear()));
+              setResStartMonth(String(dateObj.getMonth() + 1).padStart(2, "0"));
+              setResStartDay(String(dateObj.getDate()).padStart(2, "0"));
+              setResStartHour(String(dateObj.getHours()).padStart(2, "0"));
+              setResStartMin(String(dateObj.getMinutes()).padStart(2, "0"));
+            }
+            if (event.reservation_ends_at) {
+              setShowResSchedule(true);
+              const dateObj = new Date(event.reservation_ends_at);
+              setResEndYear(String(dateObj.getFullYear()));
+              setResEndMonth(String(dateObj.getMonth() + 1).padStart(2, "0"));
+              setResEndDay(String(dateObj.getDate()).padStart(2, "0"));
+              setResEndHour(String(dateObj.getHours()).padStart(2, "0"));
+              setResEndMin(String(dateObj.getMinutes()).padStart(2, "0"));
+            }
+
+            if (event.offline_event_locations) {
+              setLocations(event.offline_event_locations.map((l: any) => l.location));
+            }
+
+            if (event.offline_event_channels) {
+              const mappedChannels = event.offline_event_channels
+                .map((ec: any) => ec.channels)
+                .filter(Boolean);
+
+              if (mappedChannels.length > 0) {
+                setHostId(mappedChannels[0].id.toString());
+                setCoHosts(mappedChannels.slice(1));
+              }
+            }
+          } else {
+            toast.error("행사를 찾을 수 없습니다.");
+            router.push("/");
+          }
+        }
+      } catch (err: any) {
+        console.error("Initialization error:", err);
+        toast.error("정보를 불러오는데 오류가 발생했습니다.");
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
-    checkAuthAndFetchChannels();
-  }, [router]);
+    initPage();
+  }, [eventId, router]);
 
   // Handle image upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -401,7 +500,6 @@ export default function NewEventPage() {
         .limit(5);
 
       if (!error && data) {
-        // Exclude host and already selected co-hosts
         const filtered = data.filter(c => 
           c.id.toString() !== hostId && 
           !coHosts.some(ch => ch.id === c.id)
@@ -426,11 +524,6 @@ export default function NewEventPage() {
     setCoHosts(prev => prev.filter(c => c.id !== id));
   };
 
-  const parseTimeFromDigits = (digits: string) => {
-    if (digits.length !== 4) return null;
-    return `${digits.slice(0, 2)}:${digits.slice(2)}:00`;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const startDate = startYear && startMonth && startDay ? `${startYear}-${startMonth.padStart(2, "0")}-${startDay.padStart(2, "0")}` : "";
@@ -446,7 +539,6 @@ export default function NewEventPage() {
     const startTime = startTimeHour && startTimeMin ? `${startTimeHour.padStart(2, "0")}:${startTimeMin.padStart(2, "0")}:00` : null;
     const endTime = endTimeHour && endTimeMin ? `${endTimeHour.padStart(2, "0")}:${endTimeMin.padStart(2, "0")}:00` : null;
     
-    // Format timestamptz strings: YYYY-MM-DDTHH:mm:ssZ
     const resStartsAt = (showResSchedule && !isResAlways && resStartDate && resStartHour && resStartMin) 
       ? `${resStartDate}T${resStartHour.padStart(2, "0")}:${resStartMin.padStart(2, "0")}:00Z` 
       : null;
@@ -456,10 +548,10 @@ export default function NewEventPage() {
 
     setIsSubmitting(true);
     try {
-      // 1. Insert into offline_events
-      const { data: eventData, error: eventError } = await supabase
+      // 1. Update offline_events
+      const { error: eventError } = await supabase
         .from("offline_events")
-        .insert({
+        .update({
           title,
           description,
           start_date: isAlways ? null : startDate,
@@ -472,15 +564,23 @@ export default function NewEventPage() {
           is_reservation_always: isResAlways,
           image_url: imageUrl,
         })
-        .select()
-        .single();
+        .eq("id", eventId);
 
       if (eventError) throw eventError;
 
-      // 2. Insert into offline_event_channels
+      // 2. Update offline_event_channels (Delete then Insert)
+      const { data: deletedChannels, error: deleteChannelError } = await supabase
+        .from("offline_event_channels")
+        .delete()
+        .eq("event_id", eventId)
+        .select();
+
+      if (deleteChannelError) throw deleteChannelError;
+      console.log("Deleted channels from DB:", deletedChannels);
+
       const channelRelations = [
-        { event_id: eventData.id, channel_id: parseInt(hostId) },
-        ...coHosts.map(ch => ({ event_id: eventData.id, channel_id: ch.id }))
+        { event_id: eventId, channel_id: parseInt(hostId) },
+        ...coHosts.map(ch => ({ event_id: eventId, channel_id: ch.id }))
       ];
 
       const { error: relationError } = await supabase
@@ -489,9 +589,18 @@ export default function NewEventPage() {
 
       if (relationError) throw relationError;
 
-      // 3. Insert into offline_event_locations
+      // 3. Update offline_event_locations (Delete then Insert)
+      const { data: deletedLocations, error: deleteLocError } = await supabase
+        .from("offline_event_locations")
+        .delete()
+        .eq("offline_event_id", eventId)
+        .select();
+
+      if (deleteLocError) throw deleteLocError;
+      console.log("Deleted locations from DB:", deletedLocations);
+
       const locationRelations = locations.map((loc, idx) => ({
-        offline_event_id: eventData.id,
+        offline_event_id: eventId,
         location: loc,
         order_num: idx,
       }));
@@ -502,11 +611,11 @@ export default function NewEventPage() {
 
       if (locationError) throw locationError;
 
-      toast.success("행사가 성공적으로 등록되었습니다!");
-      router.push(`/events/${eventData.id}`);
+      toast.success("행사가 성공적으로 수정되었습니다!");
+      router.push(`/events/${eventId}`);
     } catch (error: any) {
-      console.error("Submission error:", JSON.stringify(error, null, 2), error);
-      toast.error("등록 중 오류가 발생했습니다: " + (error?.message || JSON.stringify(error)));
+      console.error("Submission error:", error);
+      toast.error("수정 중 오류가 발생했습니다: " + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -533,8 +642,8 @@ export default function NewEventPage() {
 
       <main className="mx-auto max-w-2xl px-4 mt-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">오프라인 행사 등록</h1>
-          <p className="text-muted-foreground mt-2">새로운 행사를 개최하고 팬들과 만나보세요.</p>
+          <h1 className="text-3xl font-bold tracking-tight">행사 정보 수정</h1>
+          <p className="text-muted-foreground mt-2">등록된 행사 정보를 자유롭게 수정해 보세요.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -556,7 +665,7 @@ export default function NewEventPage() {
                     {ownedChannels.map(channel => (
                       <SelectItem key={channel.id} value={channel.id.toString()}>
                         <div className="flex items-center gap-2">
-                          <Avatar className="w-6 h-6">
+                           <Avatar className="w-6 h-6">
                             <AvatarImage src={channel.image_url || undefined} />
                             <AvatarFallback>{channel.name.slice(0,1)}</AvatarFallback>
                           </Avatar>
@@ -568,7 +677,7 @@ export default function NewEventPage() {
                 </Select>
               ) : (
                 <div className="p-4 rounded-xl bg-destructive/5 border border-destructive/20 text-destructive text-sm">
-                  보유하신 채널이 없습니다. 채널 관리자만 행사를 등록할 수 있습니다.
+                  보유하신 채널이 없습니다. 채널 관리자만 행사를 수정할 수 있습니다.
                 </div>
               )}
             </div>
@@ -852,7 +961,6 @@ export default function NewEventPage() {
                     }
                   }}
                 >
-                  {/* Custom Checkbox UI */}
                   <div className={`w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors
                     ${isAlways 
                       ? "bg-primary-foreground border-primary-foreground text-primary" 
@@ -953,7 +1061,6 @@ export default function NewEventPage() {
                     }`}
                   onClick={() => setShowResSchedule(!showResSchedule)}
                 >
-                  {/* Custom Checkbox UI */}
                   <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors
                     ${showResSchedule 
                       ? "bg-primary-foreground border-primary-foreground text-primary" 
@@ -977,7 +1084,6 @@ export default function NewEventPage() {
                           }`}
                         onClick={() => setIsResAlways(!isResAlways)}
                       >
-                        {/* Custom Checkbox UI */}
                         <div className={`w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors
                           ${isResAlways 
                             ? "bg-primary-foreground border-primary-foreground text-primary" 
@@ -1071,10 +1177,10 @@ export default function NewEventPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                  등록 중...
+                  수정 중...
                 </>
               ) : (
-                "행사 등록하기"
+                "행사 수정 완료"
               )}
             </Button>
           </div>

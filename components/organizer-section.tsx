@@ -175,6 +175,23 @@ export function OrganizerSection({ user }: { user: User | null }) {
                 />
               </div>
             ))}
+            {/* + Card for adding new events */}
+            <div 
+              onClick={() => router.push("/events/new")}
+              className="min-w-[280px] w-[280px] md:min-w-[320px] md:w-[320px] snap-start shrink-0"
+            >
+              <div className="border border-dashed border-primary/30 hover:border-primary/60 bg-background/50 hover:bg-background/80 rounded-2xl overflow-hidden transition-all h-full cursor-pointer group shadow-sm flex flex-col">
+                <div className="aspect-[16/9] w-full border-b border-dashed border-primary/20 bg-primary/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                  <div className="w-12 h-12 rounded-full bg-background border border-dashed border-primary/30 group-hover:border-primary/60 flex items-center justify-center transition-all group-hover:scale-105">
+                    <Plus className="w-6 h-6 text-primary" />
+                  </div>
+                </div>
+                <div className="p-4 flex-1 flex flex-col justify-center">
+                  <p className="font-bold text-sm md:text-base text-foreground group-hover:text-primary transition-colors text-center">새 행사 등록</p>
+                  <p className="text-[11px] md:text-xs text-muted-foreground mt-1 text-center">이벤트를 개최하여 팬들과 소통해보세요</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

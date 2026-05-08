@@ -1,17 +1,7 @@
-"use client";
+import { HomeClient } from "@/components/home-client";
+import { createClient } from "@supabase/supabase-js";
 
-import { useState, useEffect } from "react";
-import { Header } from "@/components/header";
-import { PosterSlider } from "@/components/poster-slider";
-import { EventTabs } from "@/components/event-tabs";
-import { CategoryFilter } from "@/components/category-filter";
-import { EventCard } from "@/components/event-card";
-import { GoogleAd } from "@/components/google-ad";
-import { FavoriteChannels } from "@/components/favorite-channels";
-import { OrganizerSection } from "@/components/organizer-section";
-import { supabase } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
-import { Card, CardContent } from "@/components/ui/card";
+export const revalidate = 60; // ISR cache revalidation every 60 seconds
 
 type Event = {
   id: number;
@@ -28,336 +18,170 @@ type Event = {
   startDateValue: string | null;
 };
 
-export default function Home() {
-  const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
-  const [activeCategory, setActiveCategory] = useState("all");
-  const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
+const imageColors = [
+  "bg-gradient-to-br from-indigo-400 to-indigo-600",
+  "bg-gradient-to-br from-pink-400 to-pink-600",
+  "bg-gradient-to-br from-green-400 to-green-600",
+  "bg-gradient-to-br from-orange-400 to-orange-600",
+  "bg-gradient-to-br from-purple-400 to-purple-600",
+  "bg-gradient-to-br from-red-400 to-red-600",
+];
 
-  const [offlineEvents, setOfflineEvents] = useState<Event[]>([]);
-  const [onlineEvents, setOnlineEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
+export default async function Home() {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false } }
+  );
 
-  const imageColors = [
-    "bg-gradient-to-br from-indigo-400 to-indigo-600",
-    "bg-gradient-to-br from-pink-400 to-pink-600",
-    "bg-gradient-to-br from-green-400 to-green-600",
-    "bg-gradient-to-br from-orange-400 to-orange-600",
-    "bg-gradient-to-br from-purple-400 to-purple-600",
-    "bg-gradient-to-br from-red-400 to-red-600",
-  ];
+  const offlineQuery = supabase
+    .from("offline_events")
+    .select(`
+      id,
+      title,
+      start_date,
+      end_date,
+      image_url,
+      reservation_type,
+      created_at,
+      offline_event_channels(
+        channels(
+          id,
+          name,
+          type,
+          image_url
+        )
+      ),
+      offline_event_locations(
+        location
+      )
+    `)
+    .order("start_date", { ascending: true });
 
-  useEffect(() => {
-    const syncSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
-      } catch (err) {
-        console.error(err);
-      }
+  const onlineQuery = supabase
+    .from("online_events")
+    .select(`
+      id,
+      title,
+      start_at,
+      end_at,
+      image_url,
+      created_at,
+      online_event_channels(
+        channels(
+          id,
+          name,
+          type,
+          image_url
+        )
+      )
+    `)
+    .order("start_at", { ascending: true });
+
+  const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
+    offlineQuery,
+    onlineQuery,
+  ]);
+
+  const formatEventDate = (start: string | null, end: string | null) => {
+    if (!start) return "상시";
+    return end
+      ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
+      : start.replaceAll("-", ".");
+  };
+
+  const formatOnlineEventDate = (start: string | null, end: string | null) => {
+    if (!start) return "상시";
+    
+    const formatDate = (dateStr: string) => {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "";
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${month}.${day}`;
     };
-    syncSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
+    const startFormatted = formatDate(start);
+    if (!end) return startFormatted;
+    
+    const endFormatted = formatDate(end);
+    return `${startFormatted} ~ ${endFormatted}`;
+  };
+
+  const extractChannels = (eventChannels: any[]) => {
+    return (eventChannels || [])
+      .map((ec: any) => ec.channels)
+      .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
+  };
+
+  const getCategory = (type?: string) => {
+    if (!type) return "기타";
+    const t = type.trim().toLowerCase();
+    if (t === "game") return "게임";
+    if (t === "vtuber") return "버튜버";
+    if (t === "youtuber") return "유튜버";
+    return "기타";
+  };
+
+  const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+
+  let offlineEvents: Event[] = [];
+  if (offlineData) {
+    const filteredOffline = offlineData.filter(event => {
+      if (event.end_date && event.end_date < todayStr) return false;
+      return true;
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    offlineEvents = filteredOffline.map((event, index) => {
+      const channels = extractChannels(event.offline_event_channels);
+      return {
+        id: event.id,
+        title: event.title,
+        date: formatEventDate(event.start_date, event.end_date),
+        location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
+        category: getCategory(channels[0]?.type),
+        imageColor: imageColors[index % imageColors.length],
+        imageUrl: event.image_url,
+        reservationType: event.reservation_type as Event["reservationType"],
+        channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+        isAlways: !event.start_date,
+        createdAt: event.created_at,
+        startDateValue: event.start_date,
+      };
+    });
+  }
 
-  useEffect(() => {
-    const abortController = new AbortController();
+  let onlineEvents: Event[] = [];
+  if (onlineData) {
+    const filteredOnline = onlineData.filter(event => {
+      const endAtDate = event.end_at ? event.end_at.split("T")[0] : null;
+      if (endAtDate && endAtDate < todayStr) return false;
+      return true;
+    });
 
-    const fetchEvents = async () => {
-      try {
-        const offlineQuery = supabase
-          .from("offline_events")
-          .select(`
-            id,
-            title,
-            start_date,
-            end_date,
-            image_url,
-            reservation_type,
-            created_at,
-            offline_event_channels(
-              channels(
-                id,
-                name,
-                type,
-                image_url
-              )
-            ),
-            offline_event_locations(
-              location
-            )
-          `)
-          .order("start_date", { ascending: true })
-          .abortSignal(abortController.signal);
-
-        const onlineQuery = supabase
-          .from("online_events")
-          .select(`
-            id,
-            title,
-            start_at,
-            end_at,
-            image_url,
-            created_at,
-            online_event_channels(
-              channels(
-                id,
-                name,
-                type,
-                image_url
-              )
-            )
-          `)
-          .order("start_at", { ascending: true })
-          .abortSignal(abortController.signal);
-
-        const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
-          offlineQuery,
-          onlineQuery,
-        ]);
-
-        const formatEventDate = (start: string, end: string | null) => {
-          return end
-            ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
-            : start?.replaceAll("-", ".") ?? "상시";
-        };
-
-        const formatOnlineEventDate = (start: string | null, end: string | null) => {
-          if (!start) return "상시";
-          
-          const formatDate = (dateStr: string) => {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return "";
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${month}.${day}`;
-          };
-
-          const startFormatted = formatDate(start);
-          if (!end) return startFormatted;
-          
-          const endFormatted = formatDate(end);
-          return `${startFormatted} ~ ${endFormatted}`;
-        };
-
-        const extractChannels = (eventChannels: any[]) => {
-          return (eventChannels || [])
-            .map((ec: any) => ec.channels)
-            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
-        };
-
-        const getCategory = (type?: string) => {
-          if (!type) return "기타";
-          const t = type.trim().toLowerCase();
-          if (t === "game") return "게임";
-          if (t === "vtuber") return "버튜버";
-          if (t === "youtuber") return "유튜버";
-          return "기타";
-        };
-
-        const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
-
-        if (offlineData) {
-          const filteredOffline = offlineData.filter(event => {
-            if (event.end_date && event.end_date < todayStr) return false;
-            return true;
-          });
-
-          const formatted = filteredOffline.map((event, index) => {
-            const channels = extractChannels(event.offline_event_channels);
-            return {
-              id: event.id,
-              title: event.title,
-              date: formatEventDate(event.start_date, event.end_date),
-              location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
-              category: getCategory(channels[0]?.type),
-              imageColor: imageColors[index % imageColors.length],
-              imageUrl: event.image_url,
-              reservationType: event.reservation_type as Event["reservationType"],
-              channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
-              isAlways: !event.start_date,
-              createdAt: event.created_at,
-              startDateValue: event.start_date,
-            };
-          });
-          setOfflineEvents(formatted);
-        }
-
-        if (onlineData) {
-          const filteredOnline = onlineData.filter(event => {
-            const endAtDate = event.end_at ? event.end_at.split("T")[0] : null;
-            if (endAtDate && endAtDate < todayStr) return false;
-            return true;
-          });
-
-          const formatted = filteredOnline.map((event, index) => {
-            const channels = extractChannels(event.online_event_channels);
-            return {
-              id: event.id,
-              title: event.title,
-              date: formatOnlineEventDate(event.start_at, event.end_at),
-              location: "온라인",
-              category: getCategory(channels[0]?.type),
-              imageColor: imageColors[index % imageColors.length],
-              imageUrl: event.image_url,
-              reservationType: undefined,
-              channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
-              isAlways: !event.start_at,
-              createdAt: event.created_at,
-              startDateValue: event.start_at,
-            };
-          });
-          setOnlineEvents(formatted);
-        }
-      } catch (error: any) {
-        if (!error?.message?.includes("AbortError")) {
-          console.error("Failed to fetch events:", error);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEvents();
-    return () => abortController.abort();
-  }, []);
-
-  const filteredEvents = (() => {
-    let result = activeTab === "offline" ? offlineEvents : onlineEvents;
-
-    // 1. Category Filter
-    if (activeCategory === "always") {
-      result = result.filter(e => e.isAlways);
-    } else if (activeCategory !== "all") {
-      if (activeCategory === "youtuber") {
-        result = result.filter(e => e.category === "유튜버" || e.category === "버튜버");
-      } else {
-        const catMap: Record<string, string> = {
-          game: "게임",
-        };
-        result = result.filter(e => e.category === catMap[activeCategory]);
-      }
-    }
-
-    // 2. Schedule Filter (Exclude "Always" from "Upcoming" unless specifically in "Always" category)
-    if (sortType === "upcoming" && activeCategory !== "always") {
-      result = result.filter(e => !e.isAlways);
-    }
-
-    // 3. Sorting
-    if (sortType === "recent") {
-      result = [...result].sort((a, b) => {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-    } else {
-      // Upcoming sort
-      result = [...result].sort((a, b) => {
-        if (a.isAlways && !b.isAlways) return 1;
-        if (!a.isAlways && b.isAlways) return -1;
-        if (!a.startDateValue || !b.startDateValue) return 0;
-        return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
-      });
-    }
-
-    return result;
-  })();
+    onlineEvents = filteredOnline.map((event, index) => {
+      const channels = extractChannels(event.online_event_channels);
+      return {
+        id: event.id,
+        title: event.title,
+        date: formatOnlineEventDate(event.start_at, event.end_at),
+        location: "온라인",
+        category: getCategory(channels[0]?.type),
+        imageColor: imageColors[index % imageColors.length],
+        imageUrl: event.image_url,
+        reservationType: undefined,
+        channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+        isAlways: !event.start_at,
+        createdAt: event.created_at,
+        startDateValue: event.start_at,
+      };
+    });
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Left Google Ad */}
-      <GoogleAd position="left" />
-
-      {/* Right Google Ad */}
-      <GoogleAd position="right" />
-
-      {/* Main Content */}
-      <div className="mx-auto max-w-5xl px-4 py-3">
-        <Header />
-
-        <main className="pb-8">
-          {/* Poster Slider */}
-          <section className="py-4">
-            <PosterSlider />
-          </section>
-
-          {/* Organizer Section */}
-          <OrganizerSection user={user} />
-
-          {/* Favorite Channels */}
-          <FavoriteChannels />
-
-          {/* Tabs */}
-          <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />
-
-          {/* Category Filter */}
-          <CategoryFilter
-            activeCategory={activeCategory}
-            onCategoryChange={setActiveCategory}
-            sortType={sortType}
-            onSortChange={setSortType}
-          />
-
-          {/* Event Grid */}
-          <section className="p-4">
-            {loading ? (
-              <div className="grid grid-cols-2 gap-3 md:gap-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Card key={i} className="relative overflow-hidden animate-pulse pt-0">
-                    <div className="aspect-[5/3] bg-muted-foreground/30 relative">
-                      <div className="absolute top-2 left-2 w-16 h-6 bg-muted-foreground/30 rounded" />
-                      <div className="absolute -bottom-6 left-8">
-                        <div className="w-18 h-18 rounded-full border-2 border-black/60 bg-muted" />
-                      </div>
-                    </div>
-                    <CardContent className="py-3 px-6">
-                      <div className="flex justify-between items-start gap-4 mb-2">
-                        <div className="space-y-2 w-2/3">
-                          <div className="h-7 bg-muted-foreground/30 rounded" />
-                          <div className="h-7 bg-muted-foreground/30 rounded w-1/2" />
-                        </div>
-                        <div className="h-8 bg-muted-foreground/30 rounded w-1/4 mt-1" />
-                      </div>
-                      <div className="h-6 bg-muted-foreground/20 rounded w-1/2 mb-1" />
-                      <div className="h-6 bg-muted-foreground/20 rounded w-1/3" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 md:gap-4">
-                {filteredEvents.map((event, index) => (
-                  <EventCard
-                    key={event.id}
-                    id={event.id}
-                    title={event.title}
-                    date={event.date}
-                    location={event.location}
-                    category={event.category}
-                    imageColor={event.imageColor}
-                    imageUrl={event.imageUrl}
-                    reservationType={event.reservationType}
-                    channels={event.channels}
-                    user={user}
-                    eventType={activeTab}
-                    isRightCard={index % 2 === 1}
-                  />
-                ))}
-              </div>
-            )}
-
-            {!loading && filteredEvents.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                해당 카테고리의 행사가 없습니다.
-              </div>
-            )}
-          </section>
-        </main>
-      </div>
-    </div>
+    <HomeClient 
+      initialOfflineEvents={offlineEvents} 
+      initialOnlineEvents={onlineEvents} 
+    />
   );
 }

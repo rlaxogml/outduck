@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
@@ -24,6 +25,7 @@ interface EventCardProps {
   user: User | null;
   eventType: "offline" | "online";
   isRightCard?: boolean;
+  isPriority?: boolean;
 }
 
 const reservationBadgeColors: Record<ReservationType, string> = {
@@ -52,6 +54,7 @@ export function EventCard({
   user,
   eventType,
   isRightCard,
+  isPriority,
 }: EventCardProps) {
   const [showChannels, setShowChannels] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -128,9 +131,16 @@ export function EventCard({
         </div>
       )}
       <div className="relative">
-        <div className={`aspect-[5/3] ${!imageUrl ? imageColor : 'bg-muted'} relative overflow-hidden rounded-t-xl`}>
+        <div className={`aspect-[16/9] ${!imageUrl ? imageColor : 'bg-muted'} relative overflow-hidden rounded-t-xl`}>
           {imageUrl ? (
-            <img src={imageUrl} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+            <Image 
+              src={imageUrl} 
+              alt={title} 
+              fill 
+              priority={isPriority}
+              className="object-cover" 
+              sizes="(max-width: 768px) 50vw, 33vw"
+            />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-2/3 h-1/2 border-2 border-white/30 rounded-lg flex items-end p-3">

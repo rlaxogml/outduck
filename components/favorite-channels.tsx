@@ -150,7 +150,12 @@ export function FavoriteChannels() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
       setUser(prev => {
-        if (prev?.id === currentUser?.id) return prev;
+        if (currentUser === null) {
+          setChannels([]);
+          setIsLoading(false);
+          return null;
+        }
+        if (prev?.id === currentUser.id) return prev;
         fetchFavoritesAndBookmarks(currentUser);
         return currentUser;
       });
@@ -159,15 +164,15 @@ export function FavoriteChannels() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(prev => {
-        if (prev?.id === currentUser?.id) return prev;
-        
-        if (currentUser) {
-          setIsLoading(true);
-          fetchFavoritesAndBookmarks(currentUser);
-        } else {
+        if (currentUser === null) {
           setChannels([]);
           setIsLoading(false);
+          return null;
         }
+        if (prev?.id === currentUser.id) return prev;
+        
+        setIsLoading(true);
+        fetchFavoritesAndBookmarks(currentUser);
         return currentUser;
       });
     });
