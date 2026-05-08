@@ -8,6 +8,7 @@ import { CategoryFilter } from "@/components/category-filter";
 import { EventCard } from "@/components/event-card";
 import { GoogleAd } from "@/components/google-ad";
 import { FavoriteChannels } from "@/components/favorite-channels";
+import { OrganizerSection } from "@/components/organizer-section";
 import { supabase } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
@@ -283,6 +284,9 @@ export default function Home() {
           <section className="py-4">
             <PosterSlider />
           </section>
+
+          {/* Organizer Section */}
+          <OrganizerSection user={user} />
 
           {/* Favorite Channels */}
           <FavoriteChannels />

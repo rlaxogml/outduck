@@ -135,6 +135,7 @@ export default function NewEventPage() {
   const [resEndMin, setResEndMin] = useState("");
   const [isResAlways, setIsResAlways] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imagePath, setImagePath] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [hostId, setHostId] = useState<string>("");
   const [coHosts, setCoHosts] = useState<Channel[]>([]);
@@ -143,6 +144,7 @@ export default function NewEventPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Channel[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [showCoHostSearch, setShowCoHostSearch] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Address search states
@@ -203,6 +205,7 @@ export default function NewEventPage() {
     setLocations(prev => [...prev, addr]);
     setLocationInput("");
     setAddrResults([]);
+    toast.success("장소가 등록 되었습니다");
   };
 
 
@@ -248,21 +251,26 @@ export default function NewEventPage() {
 
     setIsUploading(true);
     try {
+      if (imagePath) {
+        await supabase.storage.from("event_images").remove([imagePath]);
+      }
+
       const fileExt = file.name.split(".").pop();
       const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
       const filePath = `event-covers/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("events") // Assuming bucket name is 'events' based on common patterns
+        .from("event_images")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from("events")
+        .from("event_images")
         .getPublicUrl(filePath);
 
       setImageUrl(publicUrl);
+      setImagePath(filePath);
       toast.success("이미지가 업로드되었습니다.");
     } catch (error: any) {
       console.error("Upload error:", error);
@@ -363,8 +371,8 @@ export default function NewEventPage() {
 
       // 2. Insert into offline_event_channels
       const channelRelations = [
-        { offline_event_id: eventData.id, channel_id: parseInt(hostId) },
-        ...coHosts.map(ch => ({ offline_event_id: eventData.id, channel_id: ch.id }))
+        { event_id: eventData.id, channel_id: parseInt(hostId) },
+        ...coHosts.map(ch => ({ event_id: eventData.id, channel_id: ch.id }))
       ];
 
       const { error: relationError } = await supabase
@@ -389,8 +397,8 @@ export default function NewEventPage() {
       toast.success("행사가 성공적으로 등록되었습니다!");
       router.push(`/events/${eventData.id}`);
     } catch (error: any) {
-      console.error("Submission error:", error);
-      toast.error("등록 중 오류가 발생했습니다: " + error.message);
+      console.error("Submission error:", JSON.stringify(error, null, 2), error);
+      toast.error("등록 중 오류가 발생했습니다: " + (error?.message || JSON.stringify(error)));
     } finally {
       setIsSubmitting(false);
     }
@@ -458,46 +466,76 @@ export default function NewEventPage() {
             </div>
 
             <div className="space-y-3 pt-2">
-              <Label className="text-sm font-semibold">공동 주최자</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="채널명으로 검색하여 추가"
-                  className="pl-10 h-11 bg-muted/30 border-border/50 rounded-xl"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {isSearching && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                  </div>
-                )}
+              <Label className="text-sm font-semibold block">공동 주최자</Label>
+              {!showCoHostSearch && (
+                <div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-xs rounded-full"
+                    onClick={() => setShowCoHostSearch(true)}
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> 공동 주최자 추가
+                  </Button>
+                </div>
+              )}
+              
+              {showCoHostSearch && (
+                <div className="relative animate-in fade-in slide-in-from-top-1 duration-200">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="채널명으로 검색하여 추가"
+                    className="pl-10 pr-10 h-11 bg-muted/30 border-border/50 rounded-xl"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setShowCoHostSearch(false);
+                      setSearchQuery("");
+                      setSearchResults([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted-foreground/10 rounded-full text-muted-foreground transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  {isSearching && (
+                    <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
 
-                {searchResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-2 bg-background border border-border rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                    {searchResults.map(channel => (
-                      <button
-                        key={channel.id}
-                        type="button"
-                        onClick={() => addCoHost(channel)}
-                        className="w-full flex items-center justify-between p-3 hover:bg-muted transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={channel.image_url || undefined} />
-                            <AvatarFallback>{channel.name.slice(0,1)}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">{channel.name}</p>
-                            <p className="text-[10px] text-muted-foreground">{channel.type}</p>
+                  {searchResults.length > 0 && (
+                    <div className="absolute z-50 w-full mt-2 bg-background border border-border rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                      {searchResults.map(channel => (
+                        <button
+                          key={channel.id}
+                          type="button"
+                          onClick={() => {
+                            addCoHost(channel);
+                            setShowCoHostSearch(false);
+                          }}
+                          className="w-full flex items-center justify-between p-3 hover:bg-muted transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-8 h-8">
+                              <AvatarImage src={channel.image_url || undefined} />
+                              <AvatarFallback>{channel.name.slice(0,1)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="text-sm font-medium">{channel.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{channel.type}</p>
+                            </div>
                           </div>
-                        </div>
-                        <Plus className="w-4 h-4 text-primary" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                          <Plus className="w-4 h-4 text-primary" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {coHosts.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-3">
@@ -592,6 +630,7 @@ export default function NewEventPage() {
                           if (isManualLocation && locationInput.trim()) {
                             setLocations(prev => [...prev, locationInput.trim()]);
                             setLocationInput("");
+                            toast.success("장소가 등록 되었습니다");
                           }
                         }
                       }}
@@ -627,6 +666,7 @@ export default function NewEventPage() {
                         if (locationInput.trim()) {
                           setLocations(prev => [...prev, locationInput.trim()]);
                           setLocationInput("");
+                          toast.success("장소가 등록 되었습니다");
                         }
                       }}
                       className="h-12 px-6 rounded-xl font-bold bg-secondary text-secondary-foreground hover:bg-secondary/80 shrink-0"
@@ -646,7 +686,13 @@ export default function NewEventPage() {
                     <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
-                      onClick={() => setImageUrl(null)}
+                      onClick={async () => {
+                        setImageUrl(null);
+                        if (imagePath) {
+                          await supabase.storage.from("event_images").remove([imagePath]);
+                          setImagePath(null);
+                        }
+                      }}
                       className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
                     >
                       <X className="w-4 h-4" />

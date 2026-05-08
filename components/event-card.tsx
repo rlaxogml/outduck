@@ -232,17 +232,17 @@ export function EventCard({
           </div>
         )}
       </div>
-      <CardContent className="pt-[clamp(0.4rem,1vw,0.6rem)] pb-[clamp(0.2rem,0.8vw,0.5rem)] px-[clamp(0.75rem,2vw,1.25rem)]">
-        <div className="flex justify-between items-start gap-[clamp(0.25rem,1vw,1rem)]">
-          <h3 className="font-semibold text-[clamp(0.8rem,1.5vw,1.125rem)] line-clamp-2 mb-1 md:mb-1.5 leading-tight md:leading-normal">{title}</h3>
+      <CardContent className="pt-[clamp(0.3rem,0.8vw,0.5rem)] pb-[clamp(0.2rem,0.6vw,0.4rem)] px-[clamp(0.6rem,1.5vw,1rem)] flex flex-col justify-center">
+        <div className="flex justify-between items-start gap-[clamp(0.25rem,1vw,0.75rem)]">
+          <h3 className="font-semibold text-[clamp(0.75rem,1.3vw,1rem)] line-clamp-2 mb-0.5 md:mb-1 leading-tight">{title}</h3>
           {reservationType && (
-            <span className={`shrink-0 mt-0.5 px-[clamp(0.35rem,1vw,0.75rem)] py-[clamp(0.15rem,0.4vw,0.35rem)] rounded text-[clamp(0.65rem,1.2vw,0.9rem)] font-semibold ${reservationBadgeColors[reservationType]}`}>
+            <span className={`shrink-0 mt-0.5 px-[clamp(0.3rem,0.8vw,0.6rem)] py-[clamp(0.1rem,0.3vw,0.2rem)] rounded text-[clamp(0.6rem,1vw,0.75rem)] font-semibold ${reservationBadgeColors[reservationType]}`}>
               {reservationType}
             </span>
           )}
         </div>
-        <p className="text-[clamp(0.7rem,1.3vw,0.95rem)] text-muted-foreground mb-0.5">{date}</p>
-        <p className="text-[clamp(0.7rem,1.3vw,0.95rem)] text-muted-foreground">{location}</p>
+        <p className="text-[clamp(0.65rem,1.1vw,0.85rem)] text-muted-foreground mt-0.5">{date}</p>
+        <p className="text-[clamp(0.65rem,1.1vw,0.85rem)] text-muted-foreground truncate leading-tight">{location}</p>
       </CardContent>
     </Card>
   );
