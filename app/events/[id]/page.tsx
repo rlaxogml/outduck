@@ -139,10 +139,15 @@ export default function EventDetailPage() {
     if (!window.confirm("정말 이 행사를 삭제하시겠습니까? (관련 위치 및 공동 주최 정보도 함께 삭제됩니다)")) return;
 
     try {
-      // First delete dependent records manually if cascade is not guaranteed
+      // First delete dependent records manually to satisfy foreign key constraints
       await supabase.from("offline_event_locations").delete().eq("offline_event_id", eventId);
       await supabase.from("offline_event_channels").delete().eq("event_id", eventId);
-      await supabase.from("offline_events").delete().eq("id", eventId);
+      await supabase.from("event_links").delete().eq("offline_event_id", eventId);
+      await supabase.from("event_bookmarks").delete().eq("offline_event_id", eventId);
+      await supabase.from("offline_event_images").delete().eq("offline_event_id", eventId);
+      
+      const { error } = await supabase.from("offline_events").delete().eq("id", eventId);
+      if (error) throw error;
       
       toast.success("행사가 삭제되었습니다.");
       router.push("/");
