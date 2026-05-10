@@ -5,7 +5,7 @@ interface GoogleAdProps {
 export function GoogleAd({ position }: GoogleAdProps) {
   return (
     <div
-      className={`hidden lg:flex fixed top-1/2 -translate-y-1/2 ${
+      className={`hidden lg:flex fixed top-1/2 -translate-y-1/2 z-50 ${
         position === "left" ? "left-4" : "right-4"
       }`}
     >

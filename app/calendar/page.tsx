@@ -46,6 +46,7 @@ function CalendarContent() {
   const highlightId = searchParams.get("event") ? Number(searchParams.get("event")) : null;
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [focusEventId, setFocusEventId] = useState<number | null>(highlightId);
   const [activeFilters, setActiveFilters] = useState<string[]>(["all"]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
@@ -246,6 +247,7 @@ function CalendarContent() {
   }, [user, highlightId]);
 
   const toggleFilter = (id: string) => {
+    setFocusEventId(null); // Clear special event focus when any filter is interacted with
     if (id === "all") {
       setActiveFilters(["all"]);
     } else {
@@ -258,6 +260,9 @@ function CalendarContent() {
   };
 
   const filteredEvents = events.filter((event) => {
+    if (focusEventId) {
+      return event.id === focusEventId;
+    }
     if (activeFilters.includes("all")) return true;
 
     const activeModes = activeFilters.filter(f => f === "online" || f === "offline");
@@ -301,7 +306,7 @@ function CalendarContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-4 py-3">
+      <div className="mx-auto max-w-6xl px-4 py-3">
         <Header />
 
         <main className="pb-12 mt-6">
@@ -405,6 +410,16 @@ function CalendarContent() {
                   </div>
                 )}
               </div>
+              {/* Focus Event Filter Pill */}
+              {focusEventId && (
+                <button
+                  onClick={() => setFocusEventId(null)}
+                  className="px-3.5 py-2 text-sm rounded-xl border border-pink-500 bg-pink-50 dark:bg-pink-950/30 text-pink-600 dark:text-pink-400 font-bold shadow-sm flex items-center gap-1.5 animate-in zoom-in-95 duration-200 whitespace-nowrap shrink-0"
+                >
+                  <span>선택된 행사만 보기</span>
+                  <span className="bg-pink-500/20 px-1.5 rounded-md ml-0.5">✕</span>
+                </button>
+              )}
 
               {/* Direct Buttons */}
               {user && [

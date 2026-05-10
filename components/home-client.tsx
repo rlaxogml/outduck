@@ -117,7 +117,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
       <GoogleAd position="right" />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-5xl px-4 py-3">
+      <div className="mx-auto max-w-6xl px-4 py-3">
         <Header />
 
         <main className="pb-8">

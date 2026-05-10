@@ -34,8 +34,8 @@ export function CategoryFilter({
               className={cn(
                 "px-3 py-1.5 text-sm rounded-full border transition-all whitespace-nowrap",
                 activeCategory === category.id
-                  ? "bg-foreground text-background border-foreground font-medium shadow-sm"
-                  : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground"
+                  ? "bg-primary text-primary-foreground border-primary font-semibold shadow-sm"
+                  : "bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-primary"
               )}
               onClick={() => onCategoryChange(category.id)}
             >

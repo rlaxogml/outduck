@@ -133,12 +133,12 @@ export function EventCard({
       <div className="relative">
         <div className={`aspect-[16/9] ${!imageUrl ? imageColor : 'bg-muted'} relative overflow-hidden rounded-t-xl`}>
           {imageUrl ? (
-            <Image 
-              src={imageUrl} 
-              alt={title} 
-              fill 
+            <Image
+              src={imageUrl}
+              alt={title}
+              fill
               priority={isPriority}
-              className="object-cover" 
+              className="object-cover"
               sizes="(max-width: 768px) 50vw, 33vw"
             />
           ) : (

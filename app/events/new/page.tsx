@@ -633,7 +633,7 @@ export default function NewEventPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <div className="mx-auto max-w-5xl w-full px-4 py-3">
+        <div className="mx-auto max-w-6xl w-full px-4 py-3">
           <Header />
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -645,7 +645,7 @@ export default function NewEventPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 dark:bg-background pb-20">
-      <div className="mx-auto max-w-5xl px-4 py-3">
+      <div className="mx-auto max-w-6xl px-4 py-3">
         <Header />
       </div>
 

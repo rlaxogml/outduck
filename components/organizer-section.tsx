@@ -132,10 +132,12 @@ export function OrganizerSection({ user }: { user: User | null }) {
       {/* Header Outside the box */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => router.push(`/channels/${channel.id}`)}>
-          <Avatar className="w-16 h-16 md:w-28 md:h-28 border-2 border-primary/20 group-hover:border-primary transition-colors bg-background shadow-sm shrink-0">
-            <AvatarImage src={channel.image_url || undefined} className="object-cover" />
-            <AvatarFallback className="font-bold text-2xl">{channel.name.slice(0, 1)}</AvatarFallback>
-          </Avatar>
+          <div className="p-[3px] md:p-[4px] rounded-full bg-brand-gradient shadow-md group-hover:scale-105 transition-transform">
+            <Avatar className="w-16 h-16 md:w-28 md:h-28 border-2 border-white bg-background shrink-0 overflow-hidden">
+              <AvatarImage src={channel.image_url || undefined} className="object-cover" />
+              <AvatarFallback className="font-bold text-2xl text-muted-foreground">{channel.name.slice(0, 1)}</AvatarFallback>
+            </Avatar>
+          </div>
           <div className="flex flex-col justify-center">
             <h2 className="text-xl md:text-3xl font-bold group-hover:text-primary transition-colors leading-tight">{channel.name}</h2>
             <span className="text-[10px] md:text-sm text-muted-foreground font-semibold mt-0.5 md:mt-1">주최자 대시보드</span>
@@ -147,7 +149,7 @@ export function OrganizerSection({ user }: { user: User | null }) {
         </Button>
       </div>
 
-      <div className="bg-primary/5 rounded-2xl p-3 md:p-4 border border-primary/10 shadow-sm relative">
+      <div className="bg-gradient-to-br from-[#eefcf9] via-background to-[#fdf2ff] dark:from-primary/5 dark:via-background dark:to-primary/10 rounded-2xl p-3 md:p-4 border border-primary/10 shadow-sm relative overflow-hidden">
         {events.length === 0 ? (
           <div className="py-10 text-center bg-background/60 rounded-xl border border-border/50">
             <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-2">

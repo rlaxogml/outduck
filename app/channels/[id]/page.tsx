@@ -31,6 +31,7 @@ type Channel = {
   image_url: string | null;
   team_id: number | null;
   is_team: boolean;
+  owner_id?: string | null;
 };
 
 const channelTypeLabel: Record<ChannelType, string> = {
@@ -89,7 +90,7 @@ export default function ChannelProfilePage() {
 
       const { data: channelData, error: channelError } = await supabase
         .from("channels")
-        .select("id, name, type, image_url, team_id, is_team")
+        .select("id, name, type, image_url, team_id, is_team, owner_id")
         .eq("id", channelId)
         .maybeSingle();
 
@@ -255,7 +256,7 @@ export default function ChannelProfilePage() {
 
   if (isLoading) {
     return (
-      <main className="mx-auto w-full max-w-5xl px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl px-4 py-8">
         <div className="text-sm text-muted-foreground">채널 정보를 불러오는 중...</div>
       </main>
     );
@@ -263,18 +264,20 @@ export default function ChannelProfilePage() {
 
   if (errorText || !channel) {
     return (
-      <main className="mx-auto w-full max-w-5xl px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl px-4 py-8">
         <div className="text-sm text-destructive">{errorText || "채널을 찾을 수 없습니다."}</div>
       </main>
     );
   }
 
+  const isOwner = user && channel?.owner_id === user.id;
+
   return (
     <>
-      <div className="mx-auto w-full max-w-5xl px-4 py-3">
+      <div className="mx-auto w-full max-w-6xl px-4 py-3">
         <Header />
       </div>
-      <main className="mx-auto w-full max-w-5xl px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl px-4 py-8">
         <section className="rounded-2xl border border-border bg-card p-6">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
@@ -427,9 +430,19 @@ export default function ChannelProfilePage() {
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
                   <Calendar className="h-10 w-10 text-muted-foreground/60" />
                 </div>
-                <div className="text-center space-y-1.5">
+                <div className="text-center space-y-1.5 flex flex-col items-center">
                   <h3 className="text-lg font-semibold text-foreground">등록된 오프라인 일정이 없어요</h3>
                   <p className="text-sm text-muted-foreground">새로운 일정이 추가되면 이곳에서 확인하실 수 있습니다.</p>
+                  {isOwner && (
+                    <div className="pt-4 animate-in fade-in zoom-in-95 duration-200">
+                      <Link
+                        href="/events/new"
+                        className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+                      >
+                        행사 등록하러 가기
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -459,9 +472,19 @@ export default function ChannelProfilePage() {
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
                   <ShoppingBag className="h-10 w-10 text-muted-foreground/60" />
                 </div>
-                <div className="text-center space-y-1.5">
+                <div className="text-center space-y-1.5 flex flex-col items-center">
                   <h3 className="text-lg font-semibold text-foreground">등록된 온라인 일정이 없어요</h3>
                   <p className="text-sm text-muted-foreground">새로운 일정이 추가되면 이곳에서 확인하실 수 있습니다.</p>
+                  {isOwner && (
+                    <div className="pt-4 animate-in fade-in zoom-in-95 duration-200">
+                      <Link
+                        href="/events/new"
+                        className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+                      >
+                        행사 등록하러 가기
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

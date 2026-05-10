@@ -227,17 +227,17 @@ export function FavoriteChannels() {
         ) : (
           <>
             {channels.map((channel) => (
-              <Link key={channel.id} href={`/channels/${channel.id}`} className="flex flex-col items-center gap-2 min-w-[56px] md:min-w-[80px]">
-                <div className="relative w-14 h-14 md:w-20 md:h-20">
-                  <div className="w-full h-full rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0">
+              <Link key={channel.id} href={`/channels/${channel.id}`} className="flex flex-col items-center gap-2 min-w-[56px] md:min-w-[80px] group">
+                <div className="relative w-14 h-14 md:w-20 md:h-20 bg-brand-gradient p-[2.5px] rounded-full shadow-sm group-hover:scale-105 transition-transform">
+                  <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-muted flex items-center justify-center shrink-0">
                     {channel.image_url ? (
                       <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-base md:text-xl font-bold">{channel.name.slice(0, 1).toUpperCase()}</span>
+                      <span className="text-base md:text-xl font-bold text-muted-foreground">{channel.name.slice(0, 1).toUpperCase()}</span>
                     )}
                   </div>
                   {channel.activeEventCount !== undefined && channel.activeEventCount > 0 && (
-                    <div className="absolute top-0 right-0 bg-rose-500 text-white text-[9px] md:text-[10px] font-bold px-1 md:px-1.5 py-0.5 rounded-full border-2 border-background min-w-[16px] md:min-w-[20px] text-center shadow-sm leading-none">
+                    <div className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] md:text-[10px] font-bold px-1 md:px-1.5 py-0.5 rounded-full border-2 border-white min-w-[16px] md:min-w-[20px] text-center shadow-sm leading-none">
                       {channel.activeEventCount}
                     </div>
                   )}

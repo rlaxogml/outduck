@@ -114,7 +114,7 @@ export default function OnlineEventDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-5xl px-4 py-3 relative z-10">
+        <div className="mx-auto max-w-6xl px-4 py-3 relative z-10">
           <Header />
         </div>
         <div className="flex items-center justify-center py-32 text-muted-foreground">
@@ -130,7 +130,7 @@ export default function OnlineEventDetailPage() {
   if (!event) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-5xl px-4 py-3 relative z-10">
+        <div className="mx-auto max-w-6xl px-4 py-3 relative z-10">
           <Header />
         </div>
         <div className="flex flex-col items-center justify-center py-32 gap-4">
@@ -189,7 +189,7 @@ export default function OnlineEventDetailPage() {
 
   return (
     <div className="min-h-screen bg-background pb-12">
-      <div className="mx-auto max-w-5xl px-4 py-3 relative z-10">
+      <div className="mx-auto max-w-6xl px-4 py-3 relative z-10">
         <Header />
       </div>
       

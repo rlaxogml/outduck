@@ -593,7 +593,7 @@ function MapContent() {
   if (!process.env.NEXT_PUBLIC_KAKAO_MAP_KEY) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-5xl px-4 py-3">
+        <div className="mx-auto max-w-6xl px-4 py-3">
           <Header />
           <div className="mt-8 rounded-2xl border border-border bg-card p-8 text-center max-w-xl mx-auto">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-600 mx-auto mb-4">
@@ -614,7 +614,7 @@ function MapContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-4 py-3">
+      <div className="mx-auto max-w-6xl px-4 py-3">
         <Header />
 
         <main className="py-6">
