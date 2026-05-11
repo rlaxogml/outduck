@@ -148,7 +148,7 @@ export function FavoriteChannels() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
-      setUser(prev => {
+      setUser((prev: any) => {
         if (currentUser === null) {
           setChannels([]);
           setIsLoading(false);
@@ -162,7 +162,7 @@ export function FavoriteChannels() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;
-      setUser(prev => {
+      setUser((prev: any) => {
         if (currentUser === null) {
           setChannels([]);
           setIsLoading(false);

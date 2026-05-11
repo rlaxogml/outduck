@@ -351,7 +351,7 @@ export default function EditEventPage() {
 
           if (event) {
             // Verify if the logged in user is the owner of the first channel
-            const eventHost = event.offline_event_channels?.[0]?.channels;
+            const eventHost = event.offline_event_channels?.[0]?.channels as any;
             if (eventHost && eventHost.owner_id !== session.user.id) {
               toast.error("수정 권한이 없습니다.");
               router.push(`/events/${eventId}`);

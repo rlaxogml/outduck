@@ -96,6 +96,9 @@ function CalendarContent() {
                 type,
                 image_url
               )
+            ),
+            offline_event_locations (
+              location
             )
           `)
           .not("start_date", "is", null);
