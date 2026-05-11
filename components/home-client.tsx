@@ -116,10 +116,10 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
       {/* Right Google Ad */}
       <GoogleAd position="right" />
 
+      <Header />
+
       {/* Main Content */}
       <div className="mx-auto max-w-6xl px-4 py-3">
-        <Header />
-
         <main className="pb-8">
           {/* Poster Slider */}
           <section className="py-4">

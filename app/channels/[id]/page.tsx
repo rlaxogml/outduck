@@ -22,7 +22,7 @@ type OfflineEvent = {
   channels: { id: number; name: string; image_url: string }[];
 };
 
-type ChannelType = "game" | "youtuber" | "vtuber";
+type ChannelType = "game" | "youtuber";
 
 type Channel = {
   id: number;
@@ -37,7 +37,6 @@ type Channel = {
 const channelTypeLabel: Record<ChannelType, string> = {
   game: "게임",
   youtuber: "유튜버",
-  vtuber: "버튜버",
 };
 
 function getChannelTypeText(type: string | null) {
@@ -274,9 +273,7 @@ export default function ChannelProfilePage() {
 
   return (
     <>
-      <div className="mx-auto w-full max-w-6xl px-4 py-3">
-        <Header />
-      </div>
+      <Header />
       <main className="mx-auto w-full max-w-6xl px-4 py-8">
         <section className="rounded-2xl border border-border bg-card p-6">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">

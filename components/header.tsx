@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase/client";
 
-type ChannelType = "game" | "youtuber" | "vtuber";
+type ChannelType = "game" | "youtuber";
 
 type ChannelSearchItem = {
   id: number;
@@ -31,7 +31,6 @@ const RECENT_CHANNELS_STORAGE_KEY = "recent-searched-channels";
 const channelTypeLabel: Record<ChannelType, string> = {
   game: "게임",
   youtuber: "유튜버",
-  vtuber: "버튜버",
 };
 
 const sanitizeSearchText = (value: string) => {
@@ -291,7 +290,6 @@ export function Header() {
     if (!channelType || !(channelType in channelTypeLabel)) {
       return "기타";
     }
-
     return channelTypeLabel[channelType];
   };
 
@@ -300,140 +298,145 @@ export function Header() {
   };
 
   return (
-    <header className="border-b border-border bg-background">
-      {/* Top bar: Logo and Login */}
-      <div className="flex items-center justify-between px-3.5 md:px-4 py-2 md:py-3">
-        <div
-          className="flex items-center gap-2 md:gap-3 cursor-pointer"
-          onClick={() => router.push("/")}
-        >
-          <div className="flex h-9 w-9 md:h-12 md:w-12 items-center justify-center rounded-full border-2 md:border-[2.5px] border-foreground">
-            <Star className="h-4 w-4 md:h-6 md:w-6" />
-          </div>
-          <span className="text-lg md:text-2xl font-extrabold tracking-tight hidden sm:inline">아이콘</span>
-        </div>
-
-        {/* Integrated Search Bar */}
-        <div className="relative flex-1 max-w-2xl mx-3 md:mx-8">
-          <div className="relative flex w-full items-center">
-            <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
-            <input
-              type="text"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              onKeyDown={handleSearchInputKeyDown}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => {
-                window.setTimeout(() => {
-                  setIsSearchFocused(false);
-                }, 120);
-              }}
-              placeholder="채널명을 검색해보세요"
-              className="h-11 md:h-12 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm md:text-[15px] outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
-            />
+    <header className="border-b border-border bg-background w-full">
+      {/* Top bar: Logo and Login (Wrapper spans full width) */}
+      <div className="border-b border-border/50">
+        <div className="mx-auto max-w-6xl w-full flex items-center justify-between px-3.5 md:px-4 py-2 md:py-3">
+          <div
+            className="flex items-center gap-2 md:gap-3 cursor-pointer flex-shrink-0"
+            onClick={() => router.push("/")}
+          >
+            <div className="flex h-9 w-9 md:h-12 md:w-12 items-center justify-center rounded-full border-2 md:border-[2.5px] border-foreground">
+              <Star className="h-4 w-4 md:h-6 md:w-6" />
+            </div>
+            <span className="text-lg md:text-2xl font-extrabold tracking-tight hidden sm:inline">아이콘</span>
           </div>
 
-          {isSearchFocused && (
-            <div className="absolute top-[52px] left-0 right-0 z-[100] w-full rounded-2xl border border-border bg-background p-2 shadow-xl">
-              {displayedChannels.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {hasTypedInput
-                    ? showNoResultsMessage
-                      ? "검색 결과가 없습니다."
-                      : "검색 결과를 확인하는 중..."
-                    : "최근 검색한 채널이 없습니다."}
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  {!hasTypedInput && displayedChannels.length > 0 && (
-                    <div className="flex items-center justify-between px-3 pt-1 pb-2">
-                      <span className="text-sm font-semibold">최근 검색</span>
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={clearRecentChannels}
-                      >
-                        전체 삭제
-                      </button>
-                    </div>
-                  )}
-                  <ul className="flex gap-3 overflow-x-auto p-1 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    {displayedChannels.map((channel) => (
-                      <li
-                        key={channel.id}
-                        className="relative min-w-[100px] flex-shrink-0 group"
-                      >
-                        {!hasTypedInput && (
+          {/* Integrated Search Bar */}
+          <div className="relative flex-1 max-w-2xl mx-3 md:mx-8">
+            <div className="relative flex w-full items-center">
+              <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
+              <input
+                type="text"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                onKeyDown={handleSearchInputKeyDown}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setIsSearchFocused(false);
+                  }, 120);
+                }}
+                placeholder="채널명을 검색해보세요"
+                className="h-11 md:h-12 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm md:text-[15px] outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
+              />
+            </div>
+
+            {isSearchFocused && (
+              <div className="absolute top-[52px] left-0 right-0 z-[100] w-full rounded-2xl border border-border bg-background p-2 shadow-xl">
+                {displayedChannels.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    {hasTypedInput
+                      ? showNoResultsMessage
+                        ? "검색 결과가 없습니다."
+                        : "검색 결과를 확인하는 중..."
+                      : "최근 검색한 채널이 없습니다."}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {!hasTypedInput && displayedChannels.length > 0 && (
+                      <div className="flex items-center justify-between px-3 pt-1 pb-2">
+                        <span className="text-sm font-semibold">최근 검색</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearRecentChannels();
+                          }}
+                          className="text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          모두 지우기
+                        </button>
+                      </div>
+                    )}
+                    <ul className="flex gap-3 overflow-x-auto p-1 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      {displayedChannels.map((channel) => (
+                        <li
+                          key={channel.id}
+                          className="relative min-w-[100px] flex-shrink-0 group"
+                        >
+                          {!hasTypedInput && (
+                            <button
+                              type="button"
+                              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-background hover:text-foreground group-hover:opacity-100"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeRecentChannel(channel.id);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
                           <button
                             type="button"
-                            className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-background hover:text-foreground group-hover:opacity-100"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeRecentChannel(channel.id);
-                            }}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleChannelSelect(channel)}
+                            className="w-full rounded-xl border border-border p-2.5 text-center hover:bg-muted transition-colors"
                           >
-                            <X className="h-3 w-3" />
+                            <Avatar className="mx-auto mb-2 h-10 w-10 border border-border">
+                              <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
+                              <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                                {getChannelInitial(channel.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="truncate text-[13px] font-medium">
+                              {channel.name}
+                            </div>
+                            <div className="mt-0.5 text-[10.5px] text-muted-foreground">
+                              {renderChannelType(channel.type)}
+                            </div>
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => handleChannelSelect(channel)}
-                          className="w-full rounded-xl border border-border p-2.5 text-center hover:bg-muted transition-colors"
-                        >
-                          <Avatar className="mx-auto mb-2 h-10 w-10 border border-border">
-                            <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
-                            <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                              {getChannelInitial(channel.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="truncate text-[13px] font-medium">
-                            {channel.name}
-                          </div>
-                          <div className="mt-0.5 text-[10.5px] text-muted-foreground">
-                            {renderChannelType(channel.type)}
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-        {user ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Avatar className="h-8 w-8 md:h-11 md:w-11 border border-border cursor-pointer hover:opacity-80 transition-opacity">
-                <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />
-                <AvatarFallback>{avatarFallbackText}</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>{userName}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
-                마이페이지
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10">
-                로그아웃
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <Button
-            variant="ghost"
-            className="text-xs md:text-sm font-medium"
-            onClick={handleGoogleLogin}
-          >
-            로그인
-          </Button>
-        )}
+          <div className="flex-shrink-0">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Avatar className="h-8 w-8 md:h-11 md:w-11 border border-border cursor-pointer hover:opacity-80 transition-opacity">
+                    <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />
+                    <AvatarFallback>{avatarFallbackText}</AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel>{userName}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
+                    마이페이지
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10">
+                    로그아웃
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                variant="ghost"
+                className="text-xs md:text-sm font-medium"
+                onClick={handleGoogleLogin}
+              >
+                로그인
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Navigation */}

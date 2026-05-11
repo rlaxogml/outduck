@@ -114,9 +114,7 @@ export default function OnlineEventDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-6xl px-4 py-3 relative z-10">
-          <Header />
-        </div>
+        <Header />
         <div className="flex items-center justify-center py-32 text-muted-foreground">
           <div className="animate-pulse flex flex-col items-center gap-4">
             <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
@@ -130,9 +128,7 @@ export default function OnlineEventDetailPage() {
   if (!event) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-6xl px-4 py-3 relative z-10">
-          <Header />
-        </div>
+        <Header />
         <div className="flex flex-col items-center justify-center py-32 gap-4">
           <p className="text-xl font-bold text-foreground">행사를 찾을 수 없습니다.</p>
           <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground hover:underline">
@@ -189,9 +185,7 @@ export default function OnlineEventDetailPage() {
 
   return (
     <div className="min-h-screen bg-background pb-12">
-      <div className="mx-auto max-w-6xl px-4 py-3 relative z-10">
-        <Header />
-      </div>
+      <Header />
       
       {/* Representative Image (Width max-w-4xl) */}
       <div className="mx-auto max-w-4xl relative">

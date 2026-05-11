@@ -149,7 +149,7 @@ export default function SubscriptionsPage() {
           if (!type) return "기타";
           const t = type.trim().toLowerCase();
           if (t === "game") return "게임";
-          if (t === "vtuber") return "버튜버";
+
           if (t === "youtuber") return "유튜버";
           return "기타";
         };
@@ -235,9 +235,8 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Header />
       <div className="mx-auto max-w-6xl px-4 py-3">
-        <Header />
-
         <main className="pb-8 py-4">
           {!user && !loading && (
             <div className="text-center py-20 flex flex-col items-center justify-center border border-dashed border-muted rounded-xl bg-card">

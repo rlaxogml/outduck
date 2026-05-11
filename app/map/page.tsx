@@ -4,8 +4,10 @@ import { useEffect, useState, useRef, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/header";
 import { supabase } from "@/lib/supabase/client";
-import { MapPin, Search, Filter } from "lucide-react";
+import { MapPin, Search, Filter, Gamepad2, Video, Tv, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
 declare global {
   interface Window {
@@ -33,8 +35,9 @@ function MapContent() {
   const [user, setUser] = useState<any>(null);
   const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>([]);
   const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
-  const [activeFilters, setActiveFilters] = useState<string[]>(["subscribed"]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing">("subscribed");
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [drawnMarkersCount, setDrawnMarkersCount] = useState(0);
   const [isMapReady, setIsMapReady] = useState(false);
 
@@ -189,6 +192,7 @@ function MapContent() {
               id: item.id,
               title: item.title,
               date: formatEventDate(item.start_date, item.end_date),
+              rawStartDate: item.start_date,
               location: item.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
               channelName: channel?.name || "기타",
               channelImage: channel?.image_url || null,
@@ -295,41 +299,45 @@ function MapContent() {
   // Filter events
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
-      if (activeFilters.includes("all")) return true;
+      // 1. Category Filters
+      let catMatched = true;
+      if (selectedCategories.length > 0) {
+        catMatched = event.channels?.some((c: any) => 
+          c.type && selectedCategories.includes(c.type.trim().toLowerCase())
+        );
+      }
 
-      const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber" || f === "vtuber");
-      const activeInteractions = activeFilters.filter(f => f === "subscribed" || f === "bookmarks");
-
-      const catMatched = activeCategories.length === 0 || event.channels?.some((c: any) => 
-        c.type && activeCategories.includes(c.type.trim().toLowerCase())
-      );
-      
+      // 2. Interaction Filters
       let intMatched = true;
-
-      if (activeInteractions.length > 0) {
-        intMatched = activeInteractions.some(f => {
-          if (f === "subscribed") return event.channels?.some((c: any) => userSubscribedChannelIds.includes(c.id));
-          if (f === "bookmarks") return userBookmarkedEventIds.includes(event.id);
-          return false;
-        });
+      if (interactionFilter === "subscribed") {
+        intMatched = event.channels?.some((c: any) => userSubscribedChannelIds.includes(c.id));
+      } else if (interactionFilter === "bookmarks") {
+        intMatched = userBookmarkedEventIds.includes(event.id);
+      } else if (interactionFilter === "ongoing") {
+        const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+        intMatched = !event.rawStartDate || event.rawStartDate <= today;
       }
 
       return catMatched && intMatched;
     });
-  }, [events, activeFilters, userSubscribedChannelIds, userBookmarkedEventIds]);
+  }, [events, selectedCategories, interactionFilter, userSubscribedChannelIds, userBookmarkedEventIds]);
 
-  const toggleFilter = (filterId: string) => {
-    setActiveFilters((prev) => {
-      if (filterId === "all") return ["all"];
-      const withoutAll = prev.filter((f) => f !== "all");
-
-      if (withoutAll.includes(filterId)) {
-        const next = withoutAll.filter((f) => f !== filterId);
-        return next.length === 0 ? ["all"] : next;
+  const toggleCategory = (categoryId: string) => {
+    setSelectedCategories(prev => {
+      if (prev.includes(categoryId)) {
+        return prev.filter(c => c !== categoryId);
       } else {
-        return [...withoutAll, filterId];
+        return [...prev, categoryId];
       }
     });
+  };
+
+  const toggleInteractionFilter = (filter: "subscribed" | "bookmarks" | "ongoing") => {
+    if ((filter === "subscribed" || filter === "bookmarks") && !user) {
+      alert("로그인이 필요한 기능입니다.");
+      return;
+    }
+    setInteractionFilter(prev => prev === filter ? "all" : filter);
   };
 
   // 3. Initialize Kakao Map and place markers
@@ -389,7 +397,7 @@ function MapContent() {
 
             const animateToMarker = (coords: any, done?: () => void) => {
               const currentLevel = map.getLevel();
-              const focusLevel = 4;
+              const focusLevel = 3;
               const panMs = 360;
               const zoomMs = 320;
 
@@ -540,7 +548,7 @@ function MapContent() {
                 userAdjustedMapView = true;
                 if (targetCoords.length === 1) {
                   map.setCenter(targetCoords[0]);
-                  map.setLevel(4);
+                  map.setLevel(3);
                   targetOverlays[0].setMap(map);
                   openOverlayRef.current = targetOverlays[0];
                 } else {
@@ -593,8 +601,8 @@ function MapContent() {
   if (!process.env.NEXT_PUBLIC_KAKAO_MAP_KEY) {
     return (
       <div className="min-h-screen bg-background">
+        <Header />
         <div className="mx-auto max-w-6xl px-4 py-3">
-          <Header />
           <div className="mt-8 rounded-2xl border border-border bg-card p-8 text-center max-w-xl mx-auto">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-600 mx-auto mb-4">
               <MapPin className="h-7 w-7" />
@@ -614,116 +622,107 @@ function MapContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Header />
       <div className="mx-auto max-w-6xl px-4 py-3">
-        <Header />
-
         <main className="py-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
             <div className="space-y-1">
               <h1 className="text-3xl font-extrabold tracking-tight">🗺️ 오프라인 행사 지도</h1>
               <p className="text-sm text-muted-foreground">현재 등록된 오프라인 행사의 진행 위치를 한눈에 확인해보세요.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3 relative z-50">
-              {/* Filter Bubble */}
-              <div className="relative shrink-0">
-                <button
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  className={cn(
-                    "flex items-center gap-2 px-3.5 py-2 text-sm rounded-xl border transition-all bg-card border-border select-none",
-                    isFilterOpen && "bg-muted"
-                  )}
-                >
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">필터</span>
-                </button>
 
-                {isFilterOpen && (
-                  <div className="absolute top-full left-0 mt-3 p-4 bg-card border border-border rounded-3xl shadow-2xl z-50 min-w-[240px] flex flex-col gap-4 animate-in fade-in-0 zoom-in-95 duration-150 select-none">
-                    <div className="absolute top-[-6px] left-5 w-3 h-3 bg-card border-l border-t border-border transform rotate-45" />
-
-                    <div>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5 ml-1">
-                        전체
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => toggleFilter("all")}
-                          className={cn(
-                            "px-3 py-1 text-xs font-semibold rounded-full border transition-all cursor-pointer select-none",
-                            activeFilters.includes("all")
-                              ? "border-amber-400 text-amber-500 bg-amber-500/10 font-bold"
-                              : "border-border text-muted-foreground hover:border-amber-400 hover:text-amber-500 bg-muted/40"
-                          )}
-                        >
-                          전체
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5 ml-1">
-                        장르 및 주제
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          { id: "game", label: "게임" },
-                          { id: "youtuber", label: "유튜버" },
-                          { id: "vtuber", label: "버튜버" },
-                        ].map((cat) => (
-                          <button
-                            key={cat.id}
-                            onClick={() => toggleFilter(cat.id)}
-                            className={cn(
-                              "px-3 py-1 text-xs font-semibold rounded-full border transition-all cursor-pointer select-none",
-                              activeFilters.includes(cat.id)
-                                ? "border-amber-400 text-amber-500 bg-amber-500/10 font-bold"
-                                : "border-border text-muted-foreground hover:border-amber-400 hover:text-amber-500 bg-muted/40"
-                            )}
-                          >
-                            {cat.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* User specific Filters */}
-              <div className="flex items-center gap-1.5">
-                {[
-                  { id: "subscribed", label: "구독 행사만" },
-                  { id: "bookmarks", label: "찜한 행사만" },
-                ].map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      if (!user && !activeFilters.includes(cat.id)) {
-                        alert("로그인이 필요한 기능입니다.");
-                        return;
-                      }
-                      toggleFilter(cat.id);
-                    }}
-                    className={cn(
-                      "px-3.5 py-2 text-sm rounded-xl border transition-all whitespace-nowrap select-none",
-                      activeFilters.includes(cat.id)
-                        ? "bg-foreground text-background border-foreground font-medium shadow-sm"
-                        : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground bg-card"
-                    )}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2 bg-muted/50 border border-border px-4 py-2 rounded-xl h-[42px]">
-                <span className="flex h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-xs font-bold text-muted-foreground">행사 위치 <span className="text-foreground">{drawnMarkersCount}</span>곳</span>
-              </div>
-            </div>
           </div>
 
-          <div className="relative border border-border rounded-2xl bg-muted overflow-hidden shadow-sm h-[650px]">
+          <div className="relative border border-border rounded-2xl bg-muted overflow-hidden shadow-md h-[650px]">
+            {/* New Floating Panel */}
+            <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-white border-2 border-slate-300 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden">
+              {/* Master Header Toggle */}
+              <div 
+                className={cn(
+                  "p-2.5 sm:p-3.5 flex items-center justify-between cursor-pointer select-none hover:bg-muted/30 transition-all",
+                  isSidebarExpanded && "border-b border-border/40 bg-background/10"
+                )}
+                onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-foreground" />
+                  <h3 className="text-[12px] sm:text-[13px] font-bold text-foreground tracking-tight">필터 설정</h3>
+                </div>
+                {isSidebarExpanded ? <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />}
+              </div>
+
+              {/* Expandable Content Body */}
+              {isSidebarExpanded && (
+                <div className="animate-in fade-in slide-in-from-top-1 duration-200 flex flex-col">
+                  {/* 빠른 필터 Section */}
+                  <div className="p-2.5 sm:p-4 border-b-2 border-slate-200">
+                    <h4 className="text-[10px] sm:text-[11px] font-bold text-muted-foreground mb-2">빠른 필터</h4>
+                  <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="grid grid-cols-2 gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                    {[
+                      { id: "all", label: "전체" },
+                      { id: "ongoing", label: "진행 중" },
+                      { id: "subscribed", label: "구독 행사" },
+                      { id: "bookmarks", label: "찜한 행사" },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => item.id === "all" ? setInteractionFilter("all") : toggleInteractionFilter(item.id as any)}
+                        className={cn(
+                          "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[10px] sm:text-[11px] font-bold border transition-all px-0.5 whitespace-nowrap",
+                          interactionFilter === item.id
+                            ? item.id === "all" 
+                                ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
+                                : "bg-indigo-100 text-indigo-800 border-2 border-indigo-500 shadow-sm"
+                            : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  </div>
+              </div>
+
+              {/* 장르 및 주제 Section */}
+              <div className="p-2.5 sm:p-4">
+                <h4 className="text-[10px] sm:text-[11px] font-bold text-muted-foreground mb-2">장르 및 주제</h4>
+                  <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                    <button
+                      onClick={() => setSelectedCategories([])}
+                      className={cn(
+                        "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold border transition-all",
+                        selectedCategories.length === 0
+                          ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
+                          : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      전체
+                    </button>
+                    {[
+                      { id: "game", label: "게임", activeClass: "bg-blue-100 text-blue-800 border-2 border-blue-500 shadow-sm" },
+                      { id: "youtuber", label: "유튜버", activeClass: "bg-red-100 text-red-800 border-2 border-red-500 shadow-sm" },
+
+                    ].map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => toggleCategory(cat.id)}
+                        className={cn(
+                          "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-bold border transition-all",
+                          selectedCategories.includes(cat.id)
+                            ? cat.activeClass
+                            : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                        )}
+                      >
+                        <span>{cat.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
             {(!isMapReady || loading) && filteredEvents.length > 0 && (
               <div className="absolute inset-0 bg-background/90 backdrop-blur-sm z-40 flex flex-col items-center justify-center gap-4 transition-opacity duration-500">
                 <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />

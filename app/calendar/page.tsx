@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 const categoryLabelMap: Record<string, string> = {
   game: "게임",
   youtuber: "유튜버",
-  vtuber: "버튜버",
 };
 
 const imageColors = [
@@ -158,7 +157,6 @@ function CalendarContent() {
           if (!type) return "기타";
           const t = type.trim().toLowerCase();
           if (t === "game") return "게임";
-          if (t === "vtuber") return "버튜버";
           if (t === "youtuber") return "유튜버";
           return "기타";
         };
@@ -266,7 +264,7 @@ function CalendarContent() {
     if (activeFilters.includes("all")) return true;
 
     const activeModes = activeFilters.filter(f => f === "online" || f === "offline");
-    const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber" || f === "vtuber");
+    const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber");
     const activeInteractions = activeFilters.filter(f => f === "subscribed" || f === "bookmarks");
 
     const modeMatched = activeModes.length === 0 || activeModes.includes(event.eventType);
@@ -306,9 +304,8 @@ function CalendarContent() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Header />
       <div className="mx-auto max-w-6xl px-4 py-3">
-        <Header />
-
         <main className="pb-12 mt-6">
           <div className="flex flex-col gap-6">
             {/* Header / Banner */}
@@ -390,7 +387,6 @@ function CalendarContent() {
                         {[
                           { id: "game", label: "게임" },
                           { id: "youtuber", label: "유튜버" },
-                          { id: "vtuber", label: "버튜버" },
                         ].map((cat) => (
                           <button
                             key={cat.id}

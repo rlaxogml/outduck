@@ -624,9 +624,7 @@ export default function EditEventPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <div className="mx-auto max-w-6xl w-full px-4 py-3">
-          <Header />
-        </div>
+        <Header />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -636,9 +634,7 @@ export default function EditEventPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 dark:bg-background pb-20">
-      <div className="mx-auto max-w-6xl px-4 py-3">
-        <Header />
-      </div>
+      <Header />
 
       <main className="mx-auto max-w-2xl px-4 mt-8">
         <div className="mb-8">
