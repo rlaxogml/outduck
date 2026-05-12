@@ -83,18 +83,21 @@ function CalendarContent() {
           .from("offline_events")
           .select(`
             id,
+            event_id,
             title,
             start_date,
             end_date,
             image_url,
             reservation_type,
             created_at,
-            offline_event_channels(
-              channels(
-                id,
-                name,
-                type,
-                image_url
+            events(
+              event_channels(
+                channels(
+                  id,
+                  name,
+                  type,
+                  image_url
+                )
               )
             ),
             offline_event_locations (
@@ -107,17 +110,20 @@ function CalendarContent() {
           .from("online_events")
           .select(`
             id,
+            event_id,
             title,
             start_at,
             end_at,
             image_url,
             created_at,
-            online_event_channels(
-              channels(
-                id,
-                name,
-                type,
-                image_url
+            events(
+              event_channels(
+                channels(
+                  id,
+                  name,
+                  type,
+                  image_url
+                )
               )
             )
           `)
@@ -133,13 +139,13 @@ function CalendarContent() {
 
         if (user) {
           const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
-            supabase.from("event_bookmarks").select("offline_event_id, online_event_id").eq("user_id", user.id),
+            supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id),
             supabase.from("favorites").select("channel_id").eq("user_id", user.id),
           ]);
 
           if (bookmarksData) {
             bookmarks = bookmarksData
-              .map(b => b.offline_event_id || b.online_event_id)
+              .map(b => b.event_id)
               .filter(Boolean) as number[];
           }
           if (favoritesData) {
@@ -187,9 +193,10 @@ function CalendarContent() {
         };
 
         const formattedOffline: Event[] = (offlineEventsData || []).map((event, index) => {
-          const channels = extractChannels(event.offline_event_channels);
+          const channels = extractChannels((event.events as any)?.event_channels);
           return {
             id: event.id,
+            baseEventId: event.event_id,
             title: event.title,
             date: formatOfflineEventDate(event.start_date, event.end_date),
             location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
@@ -207,9 +214,10 @@ function CalendarContent() {
         });
 
         const formattedOnline: Event[] = (onlineEventsData || []).map((event, index) => {
-          const channels = extractChannels(event.online_event_channels);
+          const channels = extractChannels((event.events as any)?.event_channels);
           return {
             id: event.id,
+            baseEventId: event.event_id,
             title: event.title,
             date: formatOnlineEventDate(event.start_at, event.end_at),
             location: "온라인",
@@ -277,7 +285,7 @@ function CalendarContent() {
     if (activeInteractions.length > 0) {
       intMatched = activeInteractions.some(f => {
         if (f === "subscribed") return event.channels.some(c => userSubscribedChannelIds.includes(c.id));
-        if (f === "bookmarks") return userBookmarkedEventIds.includes(event.id);
+        if (f === "bookmarks") return userBookmarkedEventIds.includes((event as any).baseEventId);
         return false;
       });
     }
@@ -317,132 +325,100 @@ function CalendarContent() {
             </div>
 
             {/* Filter Group */}
-            <div className="flex items-center gap-3 pb-1">
-              <div className="relative shrink-0">
+            {/* Inline Filter Area */}
+            <div className="flex flex-col gap-3 animate-in fade-in duration-300">
+              {/* Row 1: Quick filters | Modes */}
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
+                  onClick={() => toggleFilter("all")}
                   className={cn(
-                    "flex items-center gap-2 px-3.5 py-2 text-sm rounded-xl border transition-all bg-card border-border",
-                    isFilterOpen && "bg-muted"
+                    "px-3.5 py-2 text-sm font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
+                    activeFilters.includes("all")
+                      ? "bg-slate-300 text-slate-950 border-slate-700"
+                      : "bg-card border-slate-300 text-slate-600 hover:bg-muted/60"
                   )}
                 >
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">필터</span>
+                  전체
                 </button>
+                {user && [
+                  { id: "subscribed", label: "구독 행사" },
+                  { id: "bookmarks", label: "찜한 행사" },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => toggleFilter(item.id)}
+                    className={cn(
+                      "px-3.5 py-2 text-sm font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
+                      activeFilters.includes(item.id)
+                        ? "bg-indigo-100 text-indigo-800 border-indigo-500"
+                        : "bg-card border-slate-300 text-slate-600 hover:bg-muted/60"
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
 
-                {isFilterOpen && (
-                  <div className="absolute top-full left-0 mt-3 p-4 bg-card border border-border rounded-3xl shadow-2xl z-50 min-w-[240px] flex flex-col gap-4 animate-in fade-in-0 zoom-in-95 duration-150 select-none">
-                    {/* The small triangle arrow pointer of the bubble */}
-                    <div className="absolute top-[-6px] left-5 w-3 h-3 bg-card border-l border-t border-border transform rotate-45" />
+                {/* Separator */}
+                <div className="h-5 w-px bg-border/60 mx-1 shrink-0 hidden sm:block" />
 
-                    {/* All group */}
-                    <div>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5 ml-1">
-                        전체
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => toggleFilter("all")}
-                          className={cn(
-                            "px-3 py-1 text-xs font-semibold rounded-full border transition-all cursor-pointer select-none",
-                            activeFilters.includes("all")
-                              ? "border-amber-400 text-amber-500 bg-amber-500/10"
-                              : "border-border text-muted-foreground hover:border-amber-400 hover:text-amber-500 bg-muted/40"
-                          )}
-                        >
-                          전체
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Progress mode group */}
-                    <div>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5 ml-1">
-                        진행 방식
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          { id: "online", label: "온라인" },
-                          { id: "offline", label: "오프라인" },
-                        ].map((cat) => (
-                          <button
-                            key={cat.id}
-                            onClick={() => toggleFilter(cat.id)}
-                            className={cn(
-                              "px-3 py-1 text-xs font-semibold rounded-full border transition-all cursor-pointer select-none",
-                              activeFilters.includes(cat.id)
-                                ? "border-amber-400 text-amber-500 bg-amber-500/10"
-                                : "border-border text-muted-foreground hover:border-amber-400 hover:text-amber-500 bg-muted/40"
-                            )}
-                          >
-                            {cat.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Topic group */}
-                    <div>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1.5 ml-1">
-                        장르 및 주제
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          { id: "game", label: "게임" },
-                          { id: "youtuber", label: "유튜버" },
-                        ].map((cat) => (
-                          <button
-                            key={cat.id}
-                            onClick={() => toggleFilter(cat.id)}
-                            className={cn(
-                              "px-3 py-1 text-xs font-semibold rounded-full border transition-all cursor-pointer select-none",
-                              activeFilters.includes(cat.id)
-                                ? "border-amber-400 text-amber-500 bg-amber-500/10"
-                                : "border-border text-muted-foreground hover:border-amber-400 hover:text-amber-500 bg-muted/40"
-                            )}
-                          >
-                            {cat.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {[
+                  { id: "online", label: "온라인" },
+                  { id: "offline", label: "오프라인" },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => toggleFilter(cat.id)}
+                    className={cn(
+                      "px-3.5 py-2 text-sm font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
+                      activeFilters.includes(cat.id)
+                        ? "bg-slate-300 text-slate-950 border-slate-700"
+                        : "bg-card border-slate-300 text-slate-600 hover:bg-muted/60"
+                    )}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
               </div>
+
+              {/* Row 2: Genres */}
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { id: "game", label: "게임", activeClass: "bg-blue-100 text-blue-800 border-blue-500 shadow-sm" },
+                  { id: "youtuber", label: "유튜버", activeClass: "bg-red-100 text-red-800 border-red-500 shadow-sm" },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => toggleFilter(cat.id)}
+                    className={cn(
+                      "px-3.5 py-2 text-sm font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
+                      activeFilters.includes(cat.id)
+                        ? cat.activeClass
+                        : "bg-card border-slate-300 text-slate-600 hover:bg-muted/60"
+                    )}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
               {/* Focus Event Filter Pill */}
               {focusEventId && (
-                <button
-                  onClick={() => setFocusEventId(null)}
-                  className="px-3.5 py-2 text-sm rounded-xl border border-pink-500 bg-pink-50 dark:bg-pink-950/30 text-pink-600 dark:text-pink-400 font-bold shadow-sm flex items-center gap-1.5 animate-in zoom-in-95 duration-200 whitespace-nowrap shrink-0"
-                >
-                  <span>선택된 행사만 보기</span>
-                  <span className="bg-pink-500/20 px-1.5 rounded-md ml-0.5">✕</span>
-                </button>
+                <div className="flex items-center pt-1">
+                  <button
+                    onClick={() => setFocusEventId(null)}
+                    className="px-3 py-1.5 text-xs sm:text-sm rounded-xl border border-pink-500 bg-pink-50 dark:bg-pink-950/30 text-pink-600 dark:text-pink-400 font-bold shadow-sm flex items-center gap-1.5 animate-in zoom-in-95 duration-200 whitespace-nowrap"
+                  >
+                    <span>선택된 행사만 보기</span>
+                    <span className="bg-pink-500/20 px-1 rounded-md ml-0.5">✕</span>
+                  </button>
+                </div>
               )}
-
-              {/* Direct Buttons */}
-              {user && [
-                { id: "subscribed", label: "구독 행사만" },
-                { id: "bookmarks", label: "찜한 행사만" },
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => toggleFilter(cat.id)}
-                  className={cn(
-                    "px-3.5 py-2 text-sm rounded-xl border transition-all whitespace-nowrap",
-                    activeFilters.includes(cat.id)
-                      ? "bg-foreground text-background border-foreground font-medium shadow-sm"
-                      : "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground bg-card"
-                  )}
-                >
-                  {cat.label}
-                </button>
-              ))}
             </div>
 
-            {/* Full Width Calendar Wrapper */}
-            <div className="w-full bg-card border border-border p-5 shadow-sm min-h-[460px] overflow-hidden rounded-3xl">
-              <Calendar
+            {/* Full Width Calendar Wrapper with New Styling */}
+            <div className="bg-gradient-to-br from-[#dbeafe] to-[#f6e4ff] dark:from-primary/10 dark:to-primary/10 rounded-[2rem] p-2.5 md:p-3.5 border border-primary/20 shadow-sm relative overflow-hidden">
+              <div className="w-full bg-white/60 dark:bg-black/40 backdrop-blur-[2px] border border-white/40 dark:border-white/10 p-4 md:p-6 shadow-sm min-h-[460px] overflow-hidden rounded-[1.75rem]">
+                <Calendar
                 next2Label={null}
                 prev2Label={null}
                 onChange={(value) => {
@@ -575,6 +551,7 @@ function CalendarContent() {
                   return null;
                 }}
               />
+              </div>
             </div>
 
             {/* Events List Below Calendar */}
@@ -624,9 +601,9 @@ function CalendarContent() {
                           <div className="flex items-center gap-4 w-[220px] flex-shrink-0">
                             <div className="flex -space-x-4 flex-shrink-0">
                               {(activeFilters.includes("subscribed")
-                                 ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
-                                 : event.channels
-                               ).slice(0, 3).map((ch, idx) => (
+                                ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
+                                : event.channels
+                              ).slice(0, 3).map((ch, idx) => (
                                 <div key={idx} className="w-16 h-16 rounded-full border-2 border-background overflow-hidden bg-muted flex-shrink-0 shadow-sm">
                                   {ch.image_url ? (
                                     <img src={ch.image_url} alt={ch.name} className="w-full h-full object-cover" />
@@ -641,9 +618,9 @@ function CalendarContent() {
                             <div className="min-w-0">
                               <span className="text-lg font-bold text-foreground truncate block">
                                 {(activeFilters.includes("subscribed")
-                                   ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
-                                   : event.channels
-                                 ).map(c => c.name).join(", ") || "일반"}
+                                  ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
+                                  : event.channels
+                                ).map(c => c.name).join(", ") || "일반"}
                               </span>
                             </div>
                           </div>

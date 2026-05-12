@@ -24,6 +24,7 @@ interface EventCardProps {
   channels?: { id: number; name: string; image_url: string }[];
   user: User | null;
   eventType: "offline" | "online";
+  baseEventId?: number;
   isRightCard?: boolean;
   isPriority?: boolean;
 }
@@ -53,6 +54,7 @@ export function EventCard({
   channels,
   user,
   eventType,
+  baseEventId,
   isRightCard,
   isPriority,
 }: EventCardProps) {
@@ -63,21 +65,42 @@ export function EventCard({
   const router = useRouter();
   const popupRef = useRef<HTMLDivElement>(null);
 
-  const eventColumn = eventType === "offline" ? "offline_event_id" : "online_event_id";
+  const [resolvedBaseEventId, setResolvedBaseEventId] = useState<number | null>(baseEventId || null);
+
+  useEffect(() => {
+    if (baseEventId) {
+      setResolvedBaseEventId(baseEventId);
+    }
+  }, [baseEventId]);
 
   useEffect(() => {
     if (!user) return;
-    const checkBookmark = async () => {
+    const loadAndCheckBookmark = async () => {
+      let curBaseId = resolvedBaseEventId;
+      if (!curBaseId) {
+        const tableName = eventType === "offline" ? "offline_events" : "online_events";
+        const { data } = await supabase
+          .from(tableName)
+          .select("event_id")
+          .eq("id", id)
+          .maybeSingle();
+        if (data?.event_id) {
+          curBaseId = data.event_id;
+          setResolvedBaseEventId(curBaseId);
+        }
+      }
+      if (!curBaseId) return;
+
       const { data } = await supabase
         .from("event_bookmarks")
         .select("id")
         .eq("user_id", user.id)
-        .eq(eventColumn, id)
+        .eq("event_id", curBaseId)
         .maybeSingle();
       setIsBookmarked(!!data);
     };
-    checkBookmark();
-  }, [user, id, eventColumn]);
+    loadAndCheckBookmark();
+  }, [user, id, eventType]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -99,18 +122,36 @@ export function EventCard({
     setHeartAnim(true);
     setTimeout(() => setHeartAnim(false), 300);
 
+    let curBaseId = resolvedBaseEventId;
+    if (!curBaseId) {
+      const tableName = eventType === "offline" ? "offline_events" : "online_events";
+      const { data } = await supabase
+        .from(tableName)
+        .select("event_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (data?.event_id) {
+        curBaseId = data.event_id;
+        setResolvedBaseEventId(curBaseId);
+      }
+    }
+    if (!curBaseId) {
+      toast.error("행사 정보를 찾을 수 없습니다.");
+      return;
+    }
+
     if (isBookmarked) {
       await supabase
         .from("event_bookmarks")
         .delete()
         .eq("user_id", user.id)
-        .eq(eventColumn, id);
+        .eq("event_id", curBaseId);
       setIsBookmarked(false);
       toast("관심 행사가 해제되었습니다");
     } else {
       await supabase
         .from("event_bookmarks")
-        .insert({ user_id: user.id, [eventColumn]: id });
+        .insert({ user_id: user.id, event_id: curBaseId });
       setIsBookmarked(true);
       toast("관심 행사가 저장되었습니다");
     }
@@ -175,7 +216,7 @@ export function EventCard({
         </div>
 
         {channels && channels.length > 0 && (
-          <div className="absolute -bottom-5 md:-bottom-6 left-4 md:left-8" ref={popupRef}>
+          <div className="absolute -bottom-4 md:-bottom-5 left-3 md:left-6" ref={popupRef}>
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -186,12 +227,12 @@ export function EventCard({
                   setShowChannels(!showChannels);
                 }
               }}
-              className="flex items-center -space-x-5 md:-space-x-8 transition-transform hover:scale-105 active:scale-95"
+              className="flex items-center -space-x-4 md:-space-x-6 transition-transform hover:scale-105 active:scale-95"
             >
               {channels.slice(0, 3).map((channel, i) => (
                 <Avatar
                   key={i}
-                  className={`relative w-12 h-12 md:w-16 md:h-16 border-2 border-black/60 bg-muted ${i === 2 ? "hidden md:inline-flex" : ""}`}
+                  className={`relative w-10 h-10 md:w-14 md:h-14 border-2 border-black/60 bg-muted ${i === 2 ? "hidden md:inline-flex" : ""}`}
                   style={{ zIndex: 10 - i }}
                 >
                   <AvatarImage src={channel.image_url || undefined} alt={channel.name} className="object-cover" />
@@ -202,7 +243,7 @@ export function EventCard({
               ))}
               {channels.length > 2 && (
                 <div
-                  className="relative w-12 h-12 rounded-full border-2 border-black/60 bg-secondary flex md:hidden items-center justify-center text-xs font-bold text-secondary-foreground"
+                  className="relative w-10 h-10 rounded-full border-2 border-black/60 bg-secondary flex md:hidden items-center justify-center text-xs font-bold text-secondary-foreground"
                   style={{ zIndex: 0 }}
                 >
                   +{channels.length - 2}
@@ -210,7 +251,7 @@ export function EventCard({
               )}
               {channels.length > 3 && (
                 <div
-                  className="relative w-16 h-16 rounded-full border-2 border-black/60 bg-secondary hidden md:flex items-center justify-center text-xs font-bold text-secondary-foreground"
+                  className="relative w-14 h-14 rounded-full border-2 border-black/60 bg-secondary hidden md:flex items-center justify-center text-xs font-bold text-secondary-foreground"
                   style={{ zIndex: 0 }}
                 >
                   +{channels.length - 3}

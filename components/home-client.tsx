@@ -14,6 +14,7 @@ import dynamic from "next/dynamic";
 const GoogleAd = dynamic(() => import("@/components/google-ad").then(m => m.GoogleAd), { ssr: false });
 const OrganizerSection = dynamic(() => import("@/components/organizer-section").then(m => m.OrganizerSection), { ssr: false });
 const FavoriteChannels = dynamic(() => import("@/components/favorite-channels").then(m => m.FavoriteChannels), { ssr: false });
+const MiniCalendar = dynamic(() => import("@/components/mini-calendar").then(m => m.MiniCalendar), { ssr: false });
 
 type Event = {
   id: number;
@@ -119,7 +120,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
       <Header />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-6xl px-4 py-3">
+      <div className="mx-auto max-w-7xl px-4 py-3">
         <main className="pb-8">
           {/* Poster Slider */}
           <section className="py-4">
@@ -128,6 +129,9 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
 
           {/* Organizer Section */}
           <OrganizerSection user={user} />
+
+          {/* Mini Calendar Section */}
+          <MiniCalendar user={user} />
 
           {/* Favorite Channels */}
           <FavoriteChannels />
@@ -145,7 +149,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
 
           {/* Event Grid */}
           <section className="p-4">
-            <div className="grid grid-cols-2 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
               {filteredEvents.slice(0, visibleCount).map((event, index) => (
                 <EventCard
                   key={event.id}

@@ -37,7 +37,7 @@ export function OrganizerSection({ user }: { user: User | null }) {
           .select("id, name, image_url")
           .eq("owner_id", user.id)
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (channelError || !channelData) {
           setLoading(false);
@@ -47,7 +47,7 @@ export function OrganizerSection({ user }: { user: User | null }) {
         setChannel(channelData);
 
         const { data: mappingData, error: mappingError } = await supabase
-          .from("offline_event_channels")
+          .from("event_channels")
           .select("event_id")
           .eq("channel_id", channelData.id);
 
@@ -70,9 +70,9 @@ export function OrganizerSection({ user }: { user: User | null }) {
             reservation_type,
             created_at,
             offline_event_locations(location),
-            offline_event_channels(channels(id, name, type, image_url))
+            events(event_channels(channels(id, name, type, image_url)))
           `)
-          .in("id", eventIds)
+          .in("event_id", eventIds)
           .order("created_at", { ascending: false });
 
         if (!eventsError && eventsData) {
@@ -92,7 +92,7 @@ export function OrganizerSection({ user }: { user: User | null }) {
           };
 
           const formattedEvents = eventsData.map((e: any, index: number) => {
-            const evChannels = e.offline_event_channels
+            const evChannels = e.events?.event_channels
               ?.map((c: any) => c.channels)
               .filter(Boolean) || [];
             

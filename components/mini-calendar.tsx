@@ -1,0 +1,363 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
+import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight, CalendarDays, MapPin } from "lucide-react";
+import Link from "next/link";
+
+interface WeeklyEvent {
+  id: number;
+  title: string;
+  startDateValue: string;
+  endDateValue: string | null;
+  eventType: "online" | "offline";
+  dateStr: string;
+  location?: string;
+  channels: { id: number; name: string; image_url: string }[];
+}
+
+export function MiniCalendar({ user }: { user: User | null }) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [events, setEvents] = useState<WeeklyEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const getWeekDates = (baseDate: Date) => {
+    const dates = [];
+    const day = baseDate.getDay(); // 0 = Sun
+    
+    if (day === 0) {
+      // Special requirement: On Sunday, show coming Monday-Saturday first, and current Sunday last.
+      for (let i = 1; i <= 6; i++) {
+        const d = new Date(baseDate);
+        d.setDate(baseDate.getDate() + i);
+        dates.push(d);
+      }
+      dates.push(new Date(baseDate)); // Current Sunday at index 6
+      return dates;
+    }
+
+    // Standard Monday-start logic for Monday to Saturday
+    const diff = baseDate.getDate() - day + 1; 
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(baseDate);
+      d.setDate(diff + i);
+      dates.push(d);
+    }
+    return dates;
+  };
+
+  const weekDates = getWeekDates(currentDate);
+  // Safely find min/max bounds since Sunday special order is not sequential
+  const sortedWeekDates = [...weekDates].sort((a, b) => a.getTime() - b.getTime());
+  const weekStart = sortedWeekDates[0].toLocaleDateString("sv-SE");
+  const weekEnd = sortedWeekDates[6].toLocaleDateString("sv-SE");
+
+  useEffect(() => {
+    const fetchWeeklyEvents = async () => {
+      try {
+        setLoading(true);
+        
+        let bookmarkedEventIds: number[] = [];
+        let subscribedChannelIds: number[] = [];
+
+        if (user) {
+          const [{ data: bData }, { data: fData }] = await Promise.all([
+            supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id),
+            supabase.from("favorites").select("channel_id").eq("user_id", user.id),
+          ]);
+          if (bData) {
+            bookmarkedEventIds = bData.map(d => d.event_id).filter(Boolean);
+          }
+          if (fData) {
+            subscribedChannelIds = fData.map(f => f.channel_id).filter(Boolean);
+          }
+        }
+
+        const offlineQuery = supabase
+          .from("offline_events")
+          .select(`
+            id, event_id, title, start_date, end_date,
+            offline_event_locations(location),
+            events(event_channels(channels(id, name, image_url)))
+          `)
+          .lte("start_date", weekEnd)
+          .gte("end_date", weekStart);
+
+        const [offRes, onRes] = await Promise.all([
+          offlineQuery,
+          supabase
+            .from("online_events")
+            .select(`
+              id, event_id, title, start_at, end_at,
+              events(event_channels(channels(id, name, image_url)))
+            `)
+            .lte("start_at", weekEnd)
+            .or(`end_at.gte.${weekStart},end_at.is.null`)
+        ]);
+
+        const allRawOffline = offRes.data || [];
+        const allRawOnline = onRes.data || [];
+
+        const formatOfflineEventDate = (start: string, end: string | null) => {
+          return end
+            ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
+            : start?.replaceAll("-", ".") ?? "상시";
+        };
+
+        const formatOnlineEventDate = (start: string | null, end: string | null) => {
+          if (!start) return "상시";
+          const parseDate = (dStr: string) => {
+            const d = new Date(dStr);
+            return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+          };
+          return end ? `${parseDate(start)} ~ ${parseDate(end)}` : parseDate(start);
+        };
+
+        const formattedOffline: WeeklyEvent[] = allRawOffline.map((e: any) => ({
+          id: e.id,
+          baseEventId: e.event_id,
+          title: e.title,
+          startDateValue: e.start_date,
+          endDateValue: e.end_date,
+          eventType: "offline",
+          dateStr: formatOfflineEventDate(e.start_date, e.end_date),
+          location: e.offline_event_locations?.[0]?.location || "장소 정보 없음",
+          channels: e.events?.event_channels?.map((c: any) => c.channels).filter(Boolean) || []
+        }));
+
+        const formattedOnline: WeeklyEvent[] = allRawOnline.map((e: any) => {
+          const sDate = e.start_at ? new Date(e.start_at).toLocaleDateString("sv-SE") : null;
+          const eDate = e.end_at ? new Date(e.end_at).toLocaleDateString("sv-SE") : null;
+          return {
+            id: e.id,
+            baseEventId: e.event_id,
+            title: e.title,
+            startDateValue: sDate || "",
+            endDateValue: eDate,
+            eventType: "online",
+            dateStr: formatOnlineEventDate(e.start_at, e.end_at),
+            location: "온라인",
+            channels: e.events?.event_channels?.map((c: any) => c.channels).filter(Boolean) || []
+          };
+        }).filter(e => e.startDateValue !== "");
+
+        const combined = [...formattedOffline, ...formattedOnline];
+
+        let finalEvents = combined;
+        if (user) {
+          finalEvents = combined.filter(ev => {
+            const isBookmarked = bookmarkedEventIds.includes((ev as any).baseEventId);
+            const isSubscribed = ev.channels.some(ch => subscribedChannelIds.includes(ch.id));
+            return isBookmarked || isSubscribed;
+          });
+        }
+
+        setEvents(finalEvents);
+      } catch (error) {
+        console.error("Fail load mini cal:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWeeklyEvents();
+  }, [weekStart, weekEnd, user]);
+
+  const getEventsForDate = (dateStr: string) => {
+    return events.filter(e => {
+      const start = e.startDateValue;
+      const end = e.endDateValue || start;
+      return dateStr >= start && dateStr <= end;
+    });
+  };
+
+  const changeWeek = (offset: number) => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + (offset * 7));
+    setCurrentDate(d);
+  };
+
+  const dayNames = ["월", "화", "수", "목", "금", "토", "일"];
+  const currentDayEvents = getEventsForDate(selectedDate || "");
+
+  return (
+
+    <div className="mt-4 mb-10 px-2 sm:px-4 mx-auto max-w-6xl">
+
+        <div className="flex items-center gap-2 mb-3.5 ml-1">
+          <div className="w-1.5 h-5 bg-primary rounded-full" />
+          <h2 className="text-base md:text-lg font-bold text-foreground">
+            이번 주 일정
+          </h2>
+        </div>
+
+        {/* Calendar Grid (Matching Full Calendar Style) */}
+        <div className="w-full border-t border-l border-slate-300 dark:border-slate-700 overflow-hidden rounded-lg bg-gradient-to-br from-[#dbeafe]/50 to-[#f6e4ff]/50 dark:from-primary/10 dark:to-primary/10">
+              <div className="grid grid-cols-7 text-center bg-white/20 dark:bg-slate-900/20">
+            {dayNames.map((name, idx) => (
+              <div 
+                key={idx} 
+                className={cn(
+                  "py-2 border-r border-b border-slate-300 dark:border-slate-700 text-sm sm:text-base font-bold",
+                  idx === 5 ? "text-blue-500" : idx === 6 ? "text-red-500" : "text-muted-foreground"
+                )}
+              >
+                {name}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {weekDates.map((date, idx) => {
+              const dateStr = date.toLocaleDateString("sv-SE");
+              const todayStr = new Date().toLocaleDateString("sv-SE");
+              const isSelected = selectedDate === dateStr;
+              const isToday = todayStr === dateStr;
+              const isPast = dateStr < todayStr;
+              const dateEvents = getEventsForDate(dateStr);
+
+              const seenChannelIds = new Set();
+              const channelsWithProfile: any[] = [];
+              dateEvents.forEach(ev => {
+                ev.channels.forEach(ch => {
+                  if (ch && !seenChannelIds.has(ch.id)) {
+                    seenChannelIds.add(ch.id);
+                    channelsWithProfile.push(ch);
+                  }
+                });
+              });
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    if (selectedDate === dateStr) {
+                      setSelectedDate(null);
+                    } else {
+                      setSelectedDate(dateStr);
+                    }
+                  }}
+                  className={cn(
+                    "flex flex-col items-center justify-start min-h-[110px] sm:min-h-[140px] md:min-h-[150px] border-r border-b border-slate-300 dark:border-slate-700 cursor-pointer transition-all relative p-1",
+                    isToday ? "bg-primary/10 z-10" : "bg-white/20 dark:bg-slate-900/20 backdrop-blur-[1px] hover:bg-white/40 dark:hover:bg-black/40",
+                    isSelected && "ring-inset ring-2 ring-primary shadow-md z-20 bg-white dark:bg-slate-900",
+                    isToday && !isSelected && "ring-inset ring-1 ring-primary/40"
+                  )}
+                >
+                  <span className={cn(
+                    "text-sm font-bold mt-1 w-6 h-6 flex items-center justify-center rounded-lg transition-opacity",
+                    isToday ? "bg-primary text-white scale-110 shadow-sm" : "",
+                    idx === 5 && !isToday ? "text-blue-500" : idx === 6 && !isToday ? "text-red-500" : "",
+                    isPast && !isToday && "opacity-30"
+                  )}>
+                    {date.getDate()}
+                  </span>
+
+                  {/* Day Avatar Grid */}
+                  {channelsWithProfile.length > 0 && (
+                    <div className={cn("grid grid-cols-3 gap-0.5 mt-1.5 justify-items-center items-center w-full px-0.5 sm:px-1 transition-opacity", isPast && !isToday && "opacity-40")}>
+                      {channelsWithProfile.slice(0, 5).map((ch, i) => (
+                        <div key={i} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-background bg-muted overflow-hidden shadow-sm">
+                          {ch.image_url ? (
+                            <img src={ch.image_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-indigo-400 flex items-center justify-center text-[8px] font-bold text-white">
+                              {ch.name.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {channelsWithProfile.length > 5 && (
+                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-border bg-white flex items-center justify-center text-[8px] font-bold flex-shrink-0">
+                          +{channelsWithProfile.length - 5}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Selected Day Event List (Matching Calendar Page Style) */}
+        {selectedDate && (
+          <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-top-2 duration-300 mt-6">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2">
+              <h3 className="text-base font-bold text-foreground">
+                {new Date(selectedDate).toLocaleDateString("ko-KR", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </h3>
+              <span className="text-xs font-bold bg-secondary text-secondary-foreground px-2.5 py-1 rounded-full">
+                {currentDayEvents.length}개의 행사
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-3 min-h-[100px]">
+              {loading ? (
+                <div className="flex items-center justify-center py-10 text-muted-foreground text-xs animate-pulse">로딩 중...</div>
+              ) : currentDayEvents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground bg-muted/20 border border-dashed border-muted rounded-xl">
+                  <p className="text-sm font-semibold">이 날에 진행되는 일정이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {currentDayEvents.map((event) => (
+                    <Link
+                      key={`${event.eventType}-${event.id}`}
+                      href={event.eventType === "online" ? `/online-events/${event.id}` : `/events/${event.id}`}
+                      className="flex items-center justify-start gap-4 md:gap-x-8 p-3 md:p-4 bg-card border border-border rounded-xl md:rounded-2xl hover:bg-muted/40 transition-all cursor-pointer relative shadow-sm"
+                    >
+                      {/* 1. Channels Avatar Group + Names */}
+                      <div className="flex items-center gap-3 w-[130px] sm:w-[180px] flex-shrink-0">
+                        <div className="flex -space-x-3 flex-shrink-0">
+                          {event.channels.slice(0, 2).map((ch, idx) => (
+                            <div key={idx} className="w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-background overflow-hidden bg-muted flex-shrink-0 shadow-sm">
+                              {ch.image_url ? (
+                                <img src={ch.image_url} alt={ch.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-indigo-500 text-white font-bold text-xs">
+                                  {ch.name.charAt(0)}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="min-w-0 hidden sm:block">
+                          <span className="text-sm font-bold text-foreground truncate block">
+                            {event.channels.map(c => c.name).join(", ") || "일반"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 2. Event Title & Date */}
+                      <div className="flex-1 min-w-0 px-1">
+                        <h4 className="text-sm sm:text-lg font-bold text-foreground hover:text-primary transition-all line-clamp-1">
+                          {event.title}
+                        </h4>
+                        <span className="text-[11px] sm:text-sm font-medium text-muted-foreground block mt-0.5 sm:mt-1">
+                          {event.dateStr}
+                        </span>
+                      </div>
+
+                      {/* 3. Location */}
+                      <div className="flex-shrink-0 min-w-0 text-xs sm:text-base font-medium text-muted-foreground hidden sm:block truncate max-w-[180px]">
+                        {event.location}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+    </div>
+
+  );
+}

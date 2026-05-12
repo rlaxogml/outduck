@@ -44,12 +44,14 @@ export default async function Home() {
       image_url,
       reservation_type,
       created_at,
-      offline_event_channels(
-        channels(
-          id,
-          name,
-          type,
-          image_url
+      events(
+        event_channels(
+          channels(
+            id,
+            name,
+            type,
+            image_url
+          )
         )
       ),
       offline_event_locations(
@@ -67,12 +69,14 @@ export default async function Home() {
       end_at,
       image_url,
       created_at,
-      online_event_channels(
-        channels(
-          id,
-          name,
-          type,
-          image_url
+      events(
+        event_channels(
+          channels(
+            id,
+            name,
+            type,
+            image_url
+          )
         )
       )
     `)
@@ -133,7 +137,7 @@ export default async function Home() {
     });
 
     offlineEvents = filteredOffline.map((event, index) => {
-      const channels = extractChannels(event.offline_event_channels);
+      const channels = extractChannels((event.events as any)?.event_channels);
       return {
         id: event.id,
         title: event.title,
@@ -160,7 +164,7 @@ export default async function Home() {
     });
 
     onlineEvents = filteredOnline.map((event, index) => {
-      const channels = extractChannels(event.online_event_channels);
+      const channels = extractChannels((event.events as any)?.event_channels);
       return {
         id: event.id,
         title: event.title,

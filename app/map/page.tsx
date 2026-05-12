@@ -36,7 +36,7 @@ function MapContent() {
   const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>([]);
   const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing">("subscribed");
+  const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing">("all");
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [drawnMarkersCount, setDrawnMarkersCount] = useState(0);
   const [isMapReady, setIsMapReady] = useState(false);
@@ -62,14 +62,15 @@ function MapContent() {
       setUser(currentUser);
 
       if (currentUser) {
+        setInteractionFilter("subscribed");
         try {
           const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
-            supabase.from("event_bookmarks").select("offline_event_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
+            supabase.from("event_bookmarks").select("event_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
             supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
           ]);
 
           if (bookmarksData) {
-            const newIds = bookmarksData.map(b => b.offline_event_id).filter(Boolean);
+            const newIds = bookmarksData.map(b => b.event_id).filter(Boolean);
             setUserBookmarkedEventIds(prev => JSON.stringify(prev) === JSON.stringify(newIds) ? prev : newIds);
           }
           if (favoritesData) {
@@ -93,16 +94,16 @@ function MapContent() {
 
       userIdRef.current = newUserId;
       setUser(currentUser);
-      
+
       if (currentUser) {
         try {
           const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
-            supabase.from("event_bookmarks").select("offline_event_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
+            supabase.from("event_bookmarks").select("event_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
             supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
           ]);
 
           if (bookmarksData) {
-            const newIds = bookmarksData.map(b => b.offline_event_id).filter(Boolean);
+            const newIds = bookmarksData.map(b => b.event_id).filter(Boolean);
             setUserBookmarkedEventIds(prev => JSON.stringify(prev) === JSON.stringify(newIds) ? prev : newIds);
           }
           if (favoritesData) {
@@ -147,16 +148,19 @@ function MapContent() {
           .from("offline_events")
           .select(`
             id,
+            event_id,
             title,
             start_date,
             end_date,
             image_url,
-            offline_event_channels(
-              channels(
-                id,
-                name,
-                type,
-                image_url
+            events(
+              event_channels(
+                channels(
+                  id,
+                  name,
+                  type,
+                  image_url
+                )
               )
             ),
             offline_event_locations(
@@ -176,7 +180,7 @@ function MapContent() {
           });
 
           const formatted = filteredData.map((item: any) => {
-            const channels = item.offline_event_channels
+            const channels = (item.events as any)?.event_channels
               ?.map((ec: any) => ec.channels)
               .filter(Boolean) || [];
             const channel = channels[0];
@@ -190,10 +194,12 @@ function MapContent() {
 
             return {
               id: item.id,
+              baseEventId: item.event_id,
               title: item.title,
               date: formatEventDate(item.start_date, item.end_date),
               rawStartDate: item.start_date,
               location: item.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
+              locationsList: item.offline_event_locations?.map((l: any) => l.location).filter(Boolean) || [],
               channelName: channel?.name || "기타",
               channelImage: channel?.image_url || null,
               channelType: channel?.type || null,
@@ -302,7 +308,7 @@ function MapContent() {
       // 1. Category Filters
       let catMatched = true;
       if (selectedCategories.length > 0) {
-        catMatched = event.channels?.some((c: any) => 
+        catMatched = event.channels?.some((c: any) =>
           c.type && selectedCategories.includes(c.type.trim().toLowerCase())
         );
       }
@@ -312,7 +318,7 @@ function MapContent() {
       if (interactionFilter === "subscribed") {
         intMatched = event.channels?.some((c: any) => userSubscribedChannelIds.includes(c.id));
       } else if (interactionFilter === "bookmarks") {
-        intMatched = userBookmarkedEventIds.includes(event.id);
+        intMatched = userBookmarkedEventIds.includes(event.baseEventId);
       } else if (interactionFilter === "ongoing") {
         const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
         intMatched = !event.rawStartDate || event.rawStartDate <= today;
@@ -430,7 +436,7 @@ function MapContent() {
             const targetOverlays: any[] = [];
 
             filteredEvents.forEach((event) => {
-              const createMarkerAndPopup = (result: any, status: any) => {
+              const createMarkerAndPopup = (result: any, status: any, activeLocation: string) => {
                 if (!isMounted) return;
                 if (status === kakao.maps.services.Status.OK) {
                   const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
@@ -470,7 +476,7 @@ function MapContent() {
                       </p>
                       <p class="text-xs text-muted-foreground flex items-center gap-1">
                         <span class="font-bold text-foreground/80 shrink-0 min-w-[44px]">장소:</span>
-                        <span class="truncate">${event.location}</span>
+                        <span class="truncate font-medium text-blue-600 dark:text-blue-400">${activeLocation}</span>
                       </p>
                     </div>
                     <button class="detail-btn mt-3.5 w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-opacity active:scale-[0.98] shadow-sm">상세 보기</button>
@@ -521,24 +527,31 @@ function MapContent() {
 
                   markersRef.current.push(marker);
                   overlaysRef.current.push(infoOverlay);
-                  
+
                   successCount++;
                   setDrawnMarkersCount(successCount);
                 }
               };
 
-              geocoder.addressSearch(event.location, (result: any, status: any) => {
-                if (!isMounted) return;
-                if (status === kakao.maps.services.Status.OK) {
-                  createMarkerAndPopup(result, status);
-                } else {
-                  places.keywordSearch(event.location, (data: any, placeStatus: any) => {
-                    if (!isMounted) return;
-                    if (placeStatus === kakao.maps.services.Status.OK) {
-                      createMarkerAndPopup(data, placeStatus);
-                    }
-                  });
-                }
+              const currentLocs = event.locationsList && event.locationsList.length > 0 
+                ? event.locationsList 
+                : [event.location];
+
+              currentLocs.forEach((singleLocation: string) => {
+                if (!singleLocation || !singleLocation.trim()) return;
+                geocoder.addressSearch(singleLocation.trim(), (result: any, status: any) => {
+                  if (!isMounted) return;
+                  if (status === kakao.maps.services.Status.OK) {
+                    createMarkerAndPopup(result, status, singleLocation.trim());
+                  } else {
+                    places.keywordSearch(singleLocation.trim(), (data: any, placeStatus: any) => {
+                      if (!isMounted) return;
+                      if (placeStatus === kakao.maps.services.Status.OK) {
+                        createMarkerAndPopup(data, placeStatus, singleLocation.trim());
+                      }
+                    });
+                  }
+                });
               });
             });
 
@@ -635,12 +648,12 @@ function MapContent() {
 
           <div className="relative border border-border rounded-2xl bg-muted overflow-hidden shadow-md h-[650px]">
             {/* New Floating Panel */}
-            <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-white border-2 border-slate-300 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden">
+            <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-gradient-to-br from-[#dbeafe] to-[#f6e4ff] dark:from-primary/20 dark:to-primary/20 border border-primary/30 rounded-2xl sm:rounded-[1.75rem] shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden backdrop-blur-md">
               {/* Master Header Toggle */}
-              <div 
+              <div
                 className={cn(
-                  "p-2.5 sm:p-3.5 flex items-center justify-between cursor-pointer select-none hover:bg-muted/30 transition-all",
-                  isSidebarExpanded && "border-b border-border/40 bg-background/10"
+                  "p-2.5 sm:p-3.5 flex items-center justify-between cursor-pointer select-none hover:bg-primary/10 transition-all bg-white/20 dark:bg-black/10",
+                  isSidebarExpanded && "border-b border-primary/10"
                 )}
                 onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
               >
@@ -653,75 +666,91 @@ function MapContent() {
 
               {/* Expandable Content Body */}
               {isSidebarExpanded && (
-                <div className="animate-in fade-in slide-in-from-top-1 duration-200 flex flex-col">
+                <div className="animate-in fade-in slide-in-from-top-1 duration-200 flex flex-col bg-white/10 dark:bg-black/10">
                   {/* 빠른 필터 Section */}
-                  <div className="p-2.5 sm:p-4 border-b-2 border-slate-200">
-                    <h4 className="text-[10px] sm:text-[11px] font-bold text-muted-foreground mb-2">빠른 필터</h4>
-                  <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="grid grid-cols-2 gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
-                    {[
-                      { id: "all", label: "전체" },
-                      { id: "ongoing", label: "진행 중" },
-                      { id: "subscribed", label: "구독 행사" },
-                      { id: "bookmarks", label: "찜한 행사" },
-                    ].map((item) => (
+                  <div className="p-2.5 sm:p-4 border-b border-primary/10">
+                    <h4 className="text-[10px] sm:text-[11px] font-bold text-foreground/70 mb-2">빠른 필터</h4>
+                    <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                      <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                        {[
+                          { id: "all", label: "전체" },
+                          { id: "subscribed", label: "구독 행사" },
+                          { id: "bookmarks", label: "찜한 행사" },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => item.id === "all" ? setInteractionFilter("all") : toggleInteractionFilter(item.id as any)}
+                            className={cn(
+                              "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[10px] sm:text-[11px] font-bold border transition-all px-0.5 whitespace-nowrap",
+                              interactionFilter === item.id
+                                ? item.id === "all"
+                                  ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
+                                  : "bg-indigo-100 text-indigo-800 border-2 border-indigo-500 shadow-sm"
+                                : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                            )}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 장르 및 주제 Section */}
+                  <div className="p-2.5 sm:p-4 border-b border-primary/10">
+                    <h4 className="text-[10px] sm:text-[11px] font-bold text-muted-foreground mb-2">장르 및 주제</h4>
+                    <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                       <button
-                        key={item.id}
-                        onClick={() => item.id === "all" ? setInteractionFilter("all") : toggleInteractionFilter(item.id as any)}
+                        onClick={() => setSelectedCategories([])}
                         className={cn(
-                          "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[10px] sm:text-[11px] font-bold border transition-all px-0.5 whitespace-nowrap",
-                          interactionFilter === item.id
-                            ? item.id === "all" 
-                                ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
-                                : "bg-indigo-100 text-indigo-800 border-2 border-indigo-500 shadow-sm"
+                          "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold border transition-all",
+                          selectedCategories.length === 0
+                            ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
                             : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
                         )}
                       >
-                        {item.label}
+                        전체
                       </button>
-                    ))}
-                  </div>
-                  </div>
-              </div>
+                      <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
+                        {[
+                          { id: "game", label: "게임", activeClass: "bg-blue-100 text-blue-800 border-2 border-blue-500 shadow-sm" },
+                          { id: "youtuber", label: "유튜버", activeClass: "bg-red-100 text-red-800 border-2 border-red-500 shadow-sm" },
 
-              {/* 장르 및 주제 Section */}
-              <div className="p-2.5 sm:p-4">
-                <h4 className="text-[10px] sm:text-[11px] font-bold text-muted-foreground mb-2">장르 및 주제</h4>
-                  <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                        ].map((cat) => (
+                          <button
+                            key={cat.id}
+                            onClick={() => toggleCategory(cat.id)}
+                            className={cn(
+                              "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-bold border transition-all",
+                              selectedCategories.includes(cat.id)
+                                ? cat.activeClass
+                                : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                            )}
+                          >
+                            <span>{cat.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 추가 필터 (진행 중) */}
+                  <div className="p-2.5 sm:p-4">
                     <button
-                      onClick={() => setSelectedCategories([])}
+                      onClick={() => toggleInteractionFilter("ongoing")}
                       className={cn(
-                        "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold border transition-all",
-                        selectedCategories.length === 0
+                        "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[10px] sm:text-[11px] font-bold border transition-all w-full shadow-sm",
+                        interactionFilter === "ongoing"
                           ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
                           : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
                       )}
                     >
-                      전체
+                      진행 중
                     </button>
-                    {[
-                      { id: "game", label: "게임", activeClass: "bg-blue-100 text-blue-800 border-2 border-blue-500 shadow-sm" },
-                      { id: "youtuber", label: "유튜버", activeClass: "bg-red-100 text-red-800 border-2 border-red-500 shadow-sm" },
-
-                    ].map((cat) => (
-                      <button
-                        key={cat.id}
-                        onClick={() => toggleCategory(cat.id)}
-                        className={cn(
-                          "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[11px] sm:text-xs font-bold border transition-all",
-                          selectedCategories.includes(cat.id)
-                            ? cat.activeClass
-                            : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
-                        )}
-                      >
-                        <span>{cat.label}</span>
-                      </button>
-                    ))}
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
             {(!isMapReady || loading) && filteredEvents.length > 0 && (
               <div className="absolute inset-0 bg-background/90 backdrop-blur-sm z-40 flex flex-col items-center justify-center gap-4 transition-opacity duration-500">
@@ -740,10 +769,10 @@ function MapContent() {
               </div>
             )}
 
-            <div 
-              id="map-container" 
-              className={cn("w-full h-[650px] bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")} 
-              style={{ height: "650px", width: "100%" }} 
+            <div
+              id="map-container"
+              className={cn("w-full h-[650px] bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")}
+              style={{ height: "650px", width: "100%" }}
             />
           </div>
         </main>

@@ -49,19 +49,18 @@ export function FavoriteChannels() {
         const [{ data: favoritesData, error: favError }, { data: bookmarksData }] = await Promise.all([
           supabase
             .from("favorites")
-            .select("channel_id, created_at, channels(id, name, type, image_url, offline_event_channels(offline_events(id, created_at, end_date)), online_event_channels(online_events(id, created_at, end_at)))")
+            .select("channel_id, created_at, channels(id, name, type, image_url, event_channels(events(id, offline_events(id, created_at, end_date), online_events(id, created_at, end_at))))")
             .eq("user_id", currentUser.id)
             .order("created_at", { ascending: false }),
           supabase
             .from("event_bookmarks")
-            .select("offline_event_id, online_event_id")
+            .select("event_id")
             .eq("user_id", currentUser.id),
         ]);
 
         if (!favError && favoritesData) {
           const today = new Date().toISOString().split("T")[0];
-          const bookmarkedOfflineIds = bookmarksData?.map(b => b.offline_event_id).filter(Boolean) || [];
-          const bookmarkedOnlineIds = bookmarksData?.map(b => b.online_event_id).filter(Boolean) || [];
+          const bookmarkedEventIds = bookmarksData?.map(b => b.event_id).filter(Boolean) || [];
 
           const favoriteChannels = favoritesData
             .map((f: any) => {
@@ -72,36 +71,42 @@ export function FavoriteChannels() {
               let hasBookmarkedEvent = false;
               let latestEventCreatedAt = "";
 
-              if (channel.offline_event_channels) {
-                channel.offline_event_channels.forEach((ec: any) => {
-                  const event = ec.offline_events;
-                  if (event) {
-                    if (!event.end_date || event.end_date >= today) {
-                      activeCount++;
-                    }
-                    if (bookmarkedOfflineIds.includes(event.id)) {
-                      hasBookmarkedEvent = true;
-                    }
-                    if (event.created_at && (!latestEventCreatedAt || event.created_at > latestEventCreatedAt)) {
-                      latestEventCreatedAt = event.created_at;
-                    }
-                  }
-                });
-              }
+              if (channel.event_channels) {
+                channel.event_channels.forEach((ec: any) => {
+                  const baseEv = ec.events;
+                  if (!baseEv) return;
 
-              if (channel.online_event_channels) {
-                channel.online_event_channels.forEach((ec: any) => {
-                  const event = ec.online_events;
-                  if (event) {
-                    if (!event.end_at || event.end_at >= today) {
-                      activeCount++;
-                    }
-                    if (bookmarkedOnlineIds.includes(event.id)) {
-                      hasBookmarkedEvent = true;
-                    }
-                    if (event.created_at && (!latestEventCreatedAt || event.created_at > latestEventCreatedAt)) {
-                      latestEventCreatedAt = event.created_at;
-                    }
+                  const baseEvId = baseEv.id;
+                  const isMatchedBookmark = bookmarkedEventIds.includes(baseEvId);
+
+                  // Handle offline variants
+                  if (baseEv.offline_events) {
+                    baseEv.offline_events.forEach((event: any) => {
+                      if (!event.end_date || event.end_date >= today) {
+                        activeCount++;
+                      }
+                      if (isMatchedBookmark) {
+                        hasBookmarkedEvent = true;
+                      }
+                      if (event.created_at && (!latestEventCreatedAt || event.created_at > latestEventCreatedAt)) {
+                        latestEventCreatedAt = event.created_at;
+                      }
+                    });
+                  }
+
+                  // Handle online variants
+                  if (baseEv.online_events) {
+                    baseEv.online_events.forEach((event: any) => {
+                      if (!event.end_at || event.end_at.split('T')[0] >= today) {
+                        activeCount++;
+                      }
+                      if (isMatchedBookmark) {
+                        hasBookmarkedEvent = true;
+                      }
+                      if (event.created_at && (!latestEventCreatedAt || event.created_at > latestEventCreatedAt)) {
+                        latestEventCreatedAt = event.created_at;
+                      }
+                    });
                   }
                 });
               }

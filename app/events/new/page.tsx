@@ -492,10 +492,23 @@ export default function NewEventPage() {
           ? `${resEndDate}T${resEndHour.padStart(2, "0")}:${resEndMin.padStart(2, "0")}:00Z` 
           : null;
 
-        // 1. Insert into offline_events
+        // 0. Insert foundational event entry
+        const { data: baseEvent, error: baseError } = await supabase
+          .from("events")
+          .insert({
+            is_offline: true,
+            is_online: false,
+          })
+          .select("id")
+          .single();
+
+        if (baseError) throw baseError;
+
+        // 1. Insert into offline_events linked to base event
         const { data: eventData, error: eventError } = await supabase
           .from("offline_events")
           .insert({
+            event_id: baseEvent.id,
             title,
             description,
             start_date: isAlways ? null : startDate,
@@ -513,14 +526,14 @@ export default function NewEventPage() {
 
         if (eventError) throw eventError;
 
-        // 2. Insert into offline_event_channels
+        // 2. Insert into consolidated event_channels
         const channelRelations = [
-          { event_id: eventData.id, channel_id: parseInt(hostId) },
-          ...coHosts.map(ch => ({ event_id: eventData.id, channel_id: ch.id }))
+          { event_id: baseEvent.id, channel_id: parseInt(hostId) },
+          ...coHosts.map(ch => ({ event_id: baseEvent.id, channel_id: ch.id }))
         ];
 
         const { error: relationError } = await supabase
-          .from("offline_event_channels")
+          .from("event_channels")
           .insert(channelRelations);
 
         if (relationError) throw relationError;
@@ -538,14 +551,14 @@ export default function NewEventPage() {
 
         if (locationError) throw locationError;
 
-        // 4. Insert into event_links (offline_event_id)
+        // 4. Insert into event_links (event_id)
         if (eventLinks.length > 0) {
           const linksToInsert = eventLinks
             .filter(link => link.link_name.trim() && link.link_url.trim())
             .map(link => ({
               link_name: link.link_name.trim(),
               link_url: link.link_url.trim(),
-              offline_event_id: eventData.id
+              event_id: baseEvent.id
             }));
 
           if (linksToInsert.length > 0) {
@@ -574,10 +587,23 @@ export default function NewEventPage() {
           return;
         }
 
+        // 0. Insert foundational event entry
+        const { data: baseEvent, error: baseError } = await supabase
+          .from("events")
+          .insert({
+            is_offline: false,
+            is_online: true,
+          })
+          .select("id")
+          .single();
+
+        if (baseError) throw baseError;
+
         // 1. Insert into online_events
         const { data: eventData, error: eventError } = await supabase
           .from("online_events")
           .insert({
+            event_id: baseEvent.id,
             title,
             description,
             start_at: onlineStartsAt,
@@ -589,26 +615,26 @@ export default function NewEventPage() {
 
         if (eventError) throw eventError;
 
-        // 2. Insert into online_event_channels
+        // 2. Insert into event_channels
         const channelRelations = [
-          { event_id: eventData.id, channel_id: parseInt(hostId) },
-          ...coHosts.map(ch => ({ event_id: eventData.id, channel_id: ch.id }))
+          { event_id: baseEvent.id, channel_id: parseInt(hostId) },
+          ...coHosts.map(ch => ({ event_id: baseEvent.id, channel_id: ch.id }))
         ];
 
         const { error: relationError } = await supabase
-          .from("online_event_channels")
+          .from("event_channels")
           .insert(channelRelations);
 
         if (relationError) throw relationError;
 
-        // 3. Insert into event_links (online_event_id)
+        // 3. Insert into event_links (event_id)
         if (eventLinks.length > 0) {
           const linksToInsert = eventLinks
             .filter(link => link.link_name.trim() && link.link_url.trim())
             .map(link => ({
               link_name: link.link_name.trim(),
               link_url: link.link_url.trim(),
-              online_event_id: eventData.id
+              event_id: baseEvent.id
             }));
 
           if (linksToInsert.length > 0) {

@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { 
-  Loader2, 
-  CheckCircle2, 
-  XCircle, 
-  ExternalLink, 
-  User, 
-  Users, 
-  Calendar, 
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  ExternalLink,
+  User,
+  Users,
+  Calendar,
   Building2,
   Filter
 } from "lucide-react";
@@ -40,28 +40,28 @@ export default function AdminPage() {
   const router = useRouter();
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  
+
   const [requests, setRequests] = useState<ChannelRequest[]>([]);
   const [teams, setTeams] = useState<Record<number, string>>({});
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
-  
+
   const [processingId, setProcessingId] = useState<number | null>(null);
 
   useEffect(() => {
     const checkAdminAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (!session || session.user.id !== ALLOWED_UID) {
           toast.error("접근 권한이 없습니다.");
           router.replace("/");
           return;
         }
-        
+
         setIsAuthorized(true);
         setIsLoadingAuth(false);
-        
+
         fetchInitialData();
       } catch (err) {
         router.replace("/");
@@ -78,7 +78,7 @@ export default function AdminPage() {
         .from("channels")
         .select("id, name")
         .eq("is_team", true);
-        
+
       const lookup: Record<number, string> = {};
       if (teamData) {
         teamData.forEach(t => {
@@ -91,7 +91,7 @@ export default function AdminPage() {
         .from("channel_requests")
         .select("*")
         .order("created_at", { ascending: false });
-        
+
       if (error) throw error;
       setRequests(reqData || []);
     } catch (error: any) {
@@ -104,15 +104,15 @@ export default function AdminPage() {
 
   const handleAction = async (request: ChannelRequest, action: "approve" | "reject") => {
     setProcessingId(request.id);
-    
+
     try {
       const newStatus = action === "approve" ? "approved" : "rejected";
-      
+
       const { error: updateError } = await supabase
         .from("channel_requests")
         .update({ status: newStatus })
         .eq("id", request.id);
-        
+
       if (updateError) throw updateError;
 
       if (action === "approve") {
@@ -164,18 +164,18 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-50/50 dark:bg-[#0B0B0E] text-foreground flex flex-col pb-20">
       <Header />
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-10">
-        
+
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div className="space-y-1">
             <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 mb-2 px-3 py-1">Admin Console</Badge>
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">신청 현황 관리</h1>
             <p className="text-muted-foreground text-sm">주최자 신청을 검토하고 승인/거절을 관리합니다.</p>
           </div>
-          
+
           <div className="bg-background border border-border shadow-sm rounded-2xl p-4 flex items-center gap-6">
             <div className="text-center px-2">
               <div className="text-xs text-muted-foreground font-medium mb-1">대기 중</div>
-              <div className="text-xl font-bold text-amber-500">{requests.filter(r=>r.status === "pending").length}</div>
+              <div className="text-xl font-bold text-amber-500">{requests.filter(r => r.status === "pending").length}</div>
             </div>
             <div className="w-px h-8 bg-border/50" />
             <div className="text-center px-2">
@@ -191,9 +191,8 @@ export default function AdminPage() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                  filter === f ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                }`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${filter === f ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
               >
                 {f === "all" && "전체 목록"}
                 {f === "pending" && "⏳ 대기 중"}

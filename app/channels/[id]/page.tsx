@@ -107,21 +107,21 @@ export default function ChannelProfilePage() {
 
       const teamDataPromise = (!currentChannel.is_team && currentChannel.team_id)
         ? supabase
-            .from("channels")
-            .select("id, name, type, image_url, team_id, is_team")
-            .eq("id", currentChannel.team_id)
-            .maybeSingle()
-            .then(res => res.data)
+          .from("channels")
+          .select("id, name, type, image_url, team_id, is_team")
+          .eq("id", currentChannel.team_id)
+          .maybeSingle()
+          .then(res => res.data)
         : Promise.resolve(null);
 
       const membersDataPromise = currentChannel.is_team
         ? supabase
-            .from("channels")
-            .select("id, name, type, image_url, team_id, is_team")
-            .eq("team_id", currentChannel.id)
-            .eq("is_team", false)
-            .order("name", { ascending: true })
-            .then(res => res.data)
+          .from("channels")
+          .select("id, name, type, image_url, team_id, is_team")
+          .eq("team_id", currentChannel.id)
+          .eq("is_team", false)
+          .order("name", { ascending: true })
+          .then(res => res.data)
         : Promise.resolve([]);
 
       const favoriteCountPromise = supabase
@@ -149,7 +149,7 @@ export default function ChannelProfilePage() {
         .from("offline_events")
         .select(`
           id, title, start_date, end_date, image_url, reservation_type,
-          offline_event_channels ( channels ( id, name, type, image_url ) ),
+          events ( event_channels ( channels ( id, name, type, image_url ) ) ),
           offline_event_locations ( location )
         `)
         .order("start_date", { ascending: true })
@@ -159,7 +159,7 @@ export default function ChannelProfilePage() {
         .from("online_events")
         .select(`
           id, title, start_at, end_at, image_url,
-          online_event_channels ( channels ( id, name, type, image_url ) )
+          events ( event_channels ( channels ( id, name, type, image_url ) ) )
         `)
         .order("start_at", { ascending: true })
         .then(res => res.data);
@@ -188,10 +188,10 @@ export default function ChannelProfilePage() {
       if (offlineData) {
         const formatted = offlineData
           .filter(event =>
-            event.offline_event_channels?.some((ec: any) => relatedChannelIds.includes(ec.channels?.id))
+            (event.events as any)?.event_channels?.some((ec: any) => relatedChannelIds.includes(ec.channels?.id))
           )
           .map((event, index) => {
-            const allChannels = (event.offline_event_channels || [])
+            const allChannels = ((event.events as any)?.event_channels || [])
               .map((ec: any) => ec.channels)
               .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
             const sorted = [
@@ -219,10 +219,10 @@ export default function ChannelProfilePage() {
       if (onlineData) {
         const formatted = onlineData
           .filter(event =>
-            event.online_event_channels?.some((ec: any) => relatedChannelIds.includes(ec.channels?.id))
+            (event.events as any)?.event_channels?.some((ec: any) => relatedChannelIds.includes(ec.channels?.id))
           )
           .map((event, index) => {
-            const allChannels = (event.online_event_channels || [])
+            const allChannels = ((event.events as any)?.event_channels || [])
               .map((ec: any) => ec.channels)
               .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
             const sorted = [

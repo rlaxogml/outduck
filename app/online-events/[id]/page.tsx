@@ -11,6 +11,7 @@ import type { User } from "@supabase/supabase-js";
 
 type OnlineEventDetail = {
   id: number;
+  event_id: number;
   title: string;
   description: string;
   start_at: string | null;
@@ -44,19 +45,23 @@ export default function OnlineEventDetailPage() {
       const { data, error } = await supabase
         .from("online_events")
         .select(`
-          id, title, description, start_at, end_at, image_url,
-          online_event_channels ( channels ( id, name, type, image_url ) )
+          id, event_id, title, description, start_at, end_at, image_url,
+          events (
+            event_channels ( channels ( id, name, type, image_url ) )
+          )
         `)
         .eq("id", eventId)
         .maybeSingle();
         
       if (data) {
-        const channels = (data.online_event_channels || [])
+        const eventObj = data.events as any;
+        const channels = (eventObj?.event_channels || [])
           .map((ec: any) => ec.channels)
           .filter(Boolean);
           
         setEvent({
           id: data.id,
+          event_id: data.event_id,
           title: data.title,
           description: data.description,
           start_at: data.start_at,
@@ -73,17 +78,17 @@ export default function OnlineEventDetailPage() {
 
   useEffect(() => {
     const checkBookmark = async () => {
-      if (!user || !eventId) return;
+      if (!user || !event?.event_id) return;
       const { data } = await supabase
         .from("event_bookmarks")
         .select("id")
         .eq("user_id", user.id)
-        .eq("online_event_id", eventId)
+        .eq("event_id", event.event_id)
         .maybeSingle();
       setIsBookmarked(!!data);
     };
     checkBookmark();
-  }, [user, eventId]);
+  }, [user, event?.event_id]);
 
   const handleBookmark = async () => {
     if (!user) {
@@ -94,18 +99,20 @@ export default function OnlineEventDetailPage() {
     setHeartAnim(true);
     setTimeout(() => setHeartAnim(false), 300);
 
+    if (!event?.event_id) return;
+
     if (isBookmarked) {
       await supabase
         .from("event_bookmarks")
         .delete()
         .eq("user_id", user.id)
-        .eq("online_event_id", eventId);
+        .eq("event_id", event.event_id);
       setIsBookmarked(false);
       toast("관심 행사가 해제되었습니다");
     } else {
       await supabase
         .from("event_bookmarks")
-        .insert({ user_id: user.id, online_event_id: eventId });
+        .insert({ user_id: user.id, event_id: event.event_id });
       setIsBookmarked(true);
       toast("관심 행사가 저장되었습니다");
     }

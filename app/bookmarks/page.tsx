@@ -55,24 +55,26 @@ export default function BookmarksPage() {
         const { data: offlineBookmarks } = await supabase
           .from("event_bookmarks")
           .select(`
-            offline_events (
-              id,
-              title,
-              start_date,
-              end_date,
-              offline_event_locations (
-                location
-              ),
-              image_url,
-              reservation_type,
-              created_at,
-              offline_event_channels (
-                channels (
+            events!inner(
+              event_channels(
+                channels(
                   id,
                   name,
                   type,
                   image_url
                 )
+              ),
+              offline_events!inner(
+                id,
+                title,
+                start_date,
+                end_date,
+                offline_event_locations(
+                  location
+                ),
+                image_url,
+                reservation_type,
+                created_at
               )
             )
           `)
@@ -81,20 +83,22 @@ export default function BookmarksPage() {
         const { data: onlineBookmarks } = await supabase
           .from("event_bookmarks")
           .select(`
-            online_events (
-              id,
-              title,
-              start_at,
-              end_at,
-              image_url,
-              created_at,
-              online_event_channels (
-                channels (
+            events!inner(
+              event_channels(
+                channels(
                   id,
                   name,
                   type,
                   image_url
                 )
+              ),
+              online_events!inner(
+                id,
+                title,
+                start_at,
+                end_at,
+                image_url,
+                created_at
               )
             )
           `)
@@ -138,51 +142,49 @@ export default function BookmarksPage() {
         };
 
         if (offlineBookmarks) {
-          const raw = offlineBookmarks
-            .map((b: any) => b.offline_events)
-            .filter(Boolean);
-
-          const formatted = raw.map((event: any, index: number) => {
-            const channels = extractChannels(event.offline_event_channels);
-            return {
+          const formatted = (offlineBookmarks as any[]).flatMap((b: any, index: number) => {
+            const baseEv = b.events;
+            const rawChannels = baseEv?.event_channels || [];
+            const extracted = extractChannels(rawChannels);
+            
+            return (baseEv?.offline_events || []).map((event: any) => ({
               id: event.id,
               title: event.title,
               date: formatEventDate(event.start_date, event.end_date),
               location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
-              category: getCategory(channels[0]?.type),
+              category: getCategory(extracted[0]?.type),
               imageColor: imageColors[index % imageColors.length],
               imageUrl: event.image_url,
               reservationType: event.reservation_type,
-              channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+              channels: extracted.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
               isAlways: !event.start_date,
               createdAt: event.created_at,
               startDateValue: event.start_date,
-            };
+            }));
           });
           setOfflineEvents(formatted);
         }
 
         if (onlineBookmarks) {
-          const raw = onlineBookmarks
-            .map((b: any) => b.online_events)
-            .filter(Boolean);
+          const formatted = (onlineBookmarks as any[]).flatMap((b: any, index: number) => {
+            const baseEv = b.events;
+            const rawChannels = baseEv?.event_channels || [];
+            const extracted = extractChannels(rawChannels);
 
-          const formatted = raw.map((event: any, index: number) => {
-            const channels = extractChannels(event.online_event_channels);
-            return {
+            return (baseEv?.online_events || []).map((event: any) => ({
               id: event.id,
               title: event.title,
               date: formatOnlineEventDate(event.start_at, event.end_at),
               location: "온라인",
-              category: getCategory(channels[0]?.type),
+              category: getCategory(extracted[0]?.type),
               imageColor: imageColors[index % imageColors.length],
               imageUrl: event.image_url,
               reservationType: undefined,
-              channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+              channels: extracted.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
               isAlways: !event.start_at,
               createdAt: event.created_at,
               startDateValue: event.start_at,
-            };
+            }));
           });
           setOnlineEvents(formatted);
         }
@@ -218,7 +220,7 @@ export default function BookmarksPage() {
 
               <div className="p-4">
                 {loading ? (
-                          <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
                     {Array.from({ length: 4 }).map((_, i) => (
                       <Card key={i} className="relative overflow-hidden animate-pulse pt-0">
                         <div className="aspect-[5/3] bg-muted-foreground/30 relative">
@@ -250,7 +252,7 @@ export default function BookmarksPage() {
                             찜한 오프라인 행사가 없습니다.
                           </div>
                         ) : (
-                                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                          <div className="grid grid-cols-2 gap-3 md:gap-4">
                             {offlineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}
@@ -280,7 +282,7 @@ export default function BookmarksPage() {
                             찜한 온라인 행사가 없습니다.
                           </div>
                         ) : (
-                                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                          <div className="grid grid-cols-2 gap-3 md:gap-4">
                             {onlineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}

@@ -231,6 +231,7 @@ export default function EditEventPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [hostId, setHostId] = useState<string>("");
   const [coHosts, setCoHosts] = useState<Channel[]>([]);
+  const [eventBaseId, setEventBaseId] = useState<number | null>(null);
 
   // Search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -339,9 +340,11 @@ export default function EditEventPage() {
           const { data: event, error: eventError } = await supabase
             .from("offline_events")
             .select(`
-              id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
+              id, event_id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
               reservation_starts_at, reservation_ends_at, is_reservation_always,
-              offline_event_channels ( channels ( id, name, type, image_url, owner_id ) ),
+              events (
+                event_channels ( channels ( id, name, type, image_url, owner_id ) )
+              ),
               offline_event_locations ( location )
             `)
             .eq("id", eventId)
@@ -350,8 +353,9 @@ export default function EditEventPage() {
           if (eventError) throw eventError;
 
           if (event) {
-            // Verify if the logged in user is the owner of the first channel
-            const eventHost = event.offline_event_channels?.[0]?.channels as any;
+            setEventBaseId(event.event_id);
+            const eventObj = event.events as any;
+            const eventHost = eventObj?.event_channels?.[0]?.channels as any;
             if (eventHost && eventHost.owner_id !== session.user.id) {
               toast.error("수정 권한이 없습니다.");
               router.push(`/events/${eventId}`);
@@ -415,8 +419,8 @@ export default function EditEventPage() {
               setLocations(event.offline_event_locations.map((l: any) => l.location));
             }
 
-            if (event.offline_event_channels) {
-              const mappedChannels = event.offline_event_channels
+            if (eventObj && eventObj.event_channels) {
+              const mappedChannels = eventObj.event_channels
                 .map((ec: any) => ec.channels)
                 .filter(Boolean);
 
@@ -568,23 +572,24 @@ export default function EditEventPage() {
 
       if (eventError) throw eventError;
 
-      // 2. Update offline_event_channels (Delete then Insert)
+      if (!eventBaseId) throw new Error("기본 행사 정보를 찾을 수 없습니다.");
+
+      // 2. Update event_channels (Delete then Insert)
       const { data: deletedChannels, error: deleteChannelError } = await supabase
-        .from("offline_event_channels")
+        .from("event_channels")
         .delete()
-        .eq("event_id", eventId)
+        .eq("event_id", eventBaseId)
         .select();
 
       if (deleteChannelError) throw deleteChannelError;
-      console.log("Deleted channels from DB:", deletedChannels);
 
       const channelRelations = [
-        { event_id: eventId, channel_id: parseInt(hostId) },
-        ...coHosts.map(ch => ({ event_id: eventId, channel_id: ch.id }))
+        { event_id: eventBaseId, channel_id: parseInt(hostId) },
+        ...coHosts.map(ch => ({ event_id: eventBaseId, channel_id: ch.id }))
       ];
 
       const { error: relationError } = await supabase
-        .from("offline_event_channels")
+        .from("event_channels")
         .insert(channelRelations);
 
       if (relationError) throw relationError;

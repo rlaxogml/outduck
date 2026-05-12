@@ -11,6 +11,7 @@ import type { User } from "@supabase/supabase-js";
 
 type EventDetail = {
   id: number;
+  event_id: number;
   title: string;
   description: string;
   start_date: string;
@@ -53,21 +54,25 @@ export default function EventDetailPage() {
       const { data, error } = await supabase
         .from("offline_events")
         .select(`
-          id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
-          offline_event_channels ( channels ( id, name, type, image_url, owner_id ) ),
-          offline_event_images ( id, image_url, order ),
+          id, event_id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
+          events (
+            event_channels ( channels ( id, name, type, image_url, owner_id ) ),
+            event_images ( id, image_url, order )
+          ),
           offline_event_locations ( location )
         `)
         .eq("id", eventId)
         .maybeSingle();
         
       if (data) {
-        const channels = (data.offline_event_channels || [])
+        const eventObj = data.events as any;
+        const channels = (eventObj?.event_channels || [])
           .map((ec: any) => ec.channels)
           .filter(Boolean);
           
         setEvent({
           id: data.id,
+          event_id: data.event_id,
           title: data.title,
           description: data.description,
           start_date: data.start_date,
@@ -78,7 +83,7 @@ export default function EventDetailPage() {
           image_url: data.image_url,
           reservation_type: data.reservation_type,
           channels,
-          images: (data.offline_event_images || []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
+          images: (eventObj?.event_images || []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
         });
       }
       setIsLoading(false);
@@ -89,17 +94,17 @@ export default function EventDetailPage() {
 
   useEffect(() => {
     const checkBookmark = async () => {
-      if (!user || !eventId) return;
+      if (!user || !event?.event_id) return;
       const { data } = await supabase
         .from("event_bookmarks")
         .select("id")
         .eq("user_id", user.id)
-        .eq("offline_event_id", eventId)
+        .eq("event_id", event.event_id)
         .maybeSingle();
       setIsBookmarked(!!data);
     };
     checkBookmark();
-  }, [user, eventId]);
+  }, [user, event?.event_id]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -118,18 +123,20 @@ export default function EventDetailPage() {
     setHeartAnim(true);
     setTimeout(() => setHeartAnim(false), 300);
 
+    if (!event?.event_id) return;
+
     if (isBookmarked) {
       await supabase
         .from("event_bookmarks")
         .delete()
         .eq("user_id", user.id)
-        .eq("offline_event_id", eventId);
+        .eq("event_id", event.event_id);
       setIsBookmarked(false);
       toast("관심 행사가 해제되었습니다");
     } else {
       await supabase
         .from("event_bookmarks")
-        .insert({ user_id: user.id, offline_event_id: eventId });
+        .insert({ user_id: user.id, event_id: event.event_id });
       setIsBookmarked(true);
       toast("관심 행사가 저장되었습니다");
     }
@@ -139,15 +146,22 @@ export default function EventDetailPage() {
     if (!window.confirm("정말 이 행사를 삭제하시겠습니까? (관련 위치 및 공동 주최 정보도 함께 삭제됩니다)")) return;
 
     try {
-      // First delete dependent records manually to satisfy foreign key constraints
+      if (!event?.event_id) throw new Error("이벤트 정보를 찾을 수 없습니다.");
+
+      // 1. Manually delete specific child records satisfying manual referential cleanup
       await supabase.from("offline_event_locations").delete().eq("offline_event_id", eventId);
-      await supabase.from("offline_event_channels").delete().eq("event_id", eventId);
-      await supabase.from("event_links").delete().eq("offline_event_id", eventId);
-      await supabase.from("event_bookmarks").delete().eq("offline_event_id", eventId);
-      await supabase.from("offline_event_images").delete().eq("offline_event_id", eventId);
+      await supabase.from("event_channels").delete().eq("event_id", event.event_id);
+      await supabase.from("event_links").delete().eq("event_id", event.event_id);
+      await supabase.from("event_bookmarks").delete().eq("event_id", event.event_id);
+      await supabase.from("event_images").delete().eq("event_id", event.event_id);
       
-      const { error } = await supabase.from("offline_events").delete().eq("id", eventId);
-      if (error) throw error;
+      // 2. Delete offline specific row
+      const { error: delOffErr } = await supabase.from("offline_events").delete().eq("id", eventId);
+      if (delOffErr) throw delOffErr;
+
+      // 3. Finally delete underlying universal event record
+      const { error: delBaseErr } = await supabase.from("events").delete().eq("id", event.event_id);
+      if (delBaseErr) throw delBaseErr;
       
       toast.success("행사가 삭제되었습니다.");
       router.push("/");

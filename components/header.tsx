@@ -301,7 +301,7 @@ export function Header() {
     <header className="border-b border-border bg-background w-full">
       {/* Top bar: Logo and Login (Wrapper spans full width) */}
       <div className="border-b border-border/50">
-        <div className="mx-auto max-w-6xl w-full flex items-center justify-between px-3.5 md:px-4 py-2 md:py-3">
+        <div className="mx-auto max-w-7xl w-full flex items-center justify-between px-3.5 md:px-4 py-2 md:py-3">
           <div
             className="flex items-center gap-2 md:gap-3 cursor-pointer flex-shrink-0"
             onClick={() => router.push("/")}
