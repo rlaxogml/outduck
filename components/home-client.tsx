@@ -130,11 +130,11 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
           {/* Organizer Section */}
           <OrganizerSection user={user} />
 
-          {/* Mini Calendar Section */}
-          <MiniCalendar user={user} />
-
           {/* Favorite Channels */}
           <FavoriteChannels />
+
+          {/* Mini Calendar Section */}
+          <MiniCalendar user={user} />
 
           {/* Tabs */}
           <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />

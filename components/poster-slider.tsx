@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import useEmblaCarousel from "embla-carousel-react";
 import { EmblaCarouselType } from "embla-carousel";
+import Autoplay from "embla-carousel-autoplay";
 
 import { supabase } from "@/lib/supabase/client";
 
@@ -40,7 +41,13 @@ export function PosterSlider() {
     loop: true,
     align: "center",
     containScroll: false,
-  });
+  }, [
+    Autoplay({
+      delay: 4000,
+      stopOnInteraction: false,
+      stopOnMouseEnter: true,
+    })
+  ]);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);

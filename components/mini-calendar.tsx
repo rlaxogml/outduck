@@ -9,6 +9,7 @@ import Link from "next/link";
 
 interface WeeklyEvent {
   id: number;
+  baseEventId?: number;
   title: string;
   startDateValue: string;
   endDateValue: string | null;
@@ -21,7 +22,10 @@ interface WeeklyEvent {
 export function MiniCalendar({ user }: { user: User | null }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [events, setEvents] = useState<WeeklyEvent[]>([]);
+  const [allEvents, setAllEvents] = useState<WeeklyEvent[]>([]);
+  const [bookmarkedEventIds, setBookmarkedEventIds] = useState<number[]>([]);
+  const [subscribedChannelIds, setSubscribedChannelIds] = useState<number[]>([]);
+  const [activeFilter, setActiveFilter] = useState<"all" | "subscribed" | "bookmarked">("all");
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -151,16 +155,9 @@ export function MiniCalendar({ user }: { user: User | null }) {
 
         const combined = [...formattedOffline, ...formattedOnline];
 
-        let finalEvents = combined;
-        if (user) {
-          finalEvents = combined.filter(ev => {
-            const isBookmarked = bookmarkedEventIds.includes((ev as any).baseEventId);
-            const isSubscribed = ev.channels.some(ch => subscribedChannelIds.includes(ch.id));
-            return isBookmarked || isSubscribed;
-          });
-        }
-
-        setEvents(finalEvents);
+        setAllEvents(combined);
+        setBookmarkedEventIds(bookmarkedEventIds);
+        setSubscribedChannelIds(subscribedChannelIds);
       } catch (error) {
         console.error("Fail load mini cal:", error);
       } finally {
@@ -171,8 +168,20 @@ export function MiniCalendar({ user }: { user: User | null }) {
     fetchWeeklyEvents();
   }, [weekStart, weekEnd, user]);
 
+  const filteredEvents = allEvents.filter(ev => {
+    if (activeFilter === "all") return true;
+    if (!user) return false;
+    if (activeFilter === "bookmarked") {
+      return ev.baseEventId && bookmarkedEventIds.includes(ev.baseEventId);
+    }
+    if (activeFilter === "subscribed") {
+      return ev.channels.some(ch => subscribedChannelIds.includes(ch.id));
+    }
+    return true;
+  });
+
   const getEventsForDate = (dateStr: string) => {
-    return events.filter(e => {
+    return filteredEvents.filter(e => {
       const start = e.startDateValue;
       const end = e.endDateValue || start;
       return dateStr >= start && dateStr <= end;
@@ -204,11 +213,54 @@ export function MiniCalendar({ user }: { user: User | null }) {
 
     <div className="mt-4 mb-10 px-2 sm:px-4 mx-auto max-w-6xl">
 
-        <div className="flex items-center gap-2 mb-3.5 ml-1">
-          <div className="w-1.5 h-5 bg-primary rounded-full" />
-          <h2 className="text-base md:text-lg font-bold text-foreground">
-            이번 주 일정
-          </h2>
+        <div className="flex flex-row items-center justify-between gap-2 mb-3.5 ml-1">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-5 bg-primary rounded-full" />
+            <h2 className="text-base md:text-lg font-bold text-foreground">
+              이번 주 일정
+            </h2>
+          </div>
+
+          {/* Filters */}
+          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg text-xs">
+            <button
+              onClick={() => setActiveFilter("all")}
+              className={cn(
+                "px-2.5 py-1 font-medium rounded-md transition-all whitespace-nowrap",
+                activeFilter === "all" 
+                  ? "bg-background text-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              전체
+            </button>
+            <button
+              onClick={() => setActiveFilter("subscribed")}
+              className={cn(
+                "px-2.5 py-1 font-medium rounded-md transition-all whitespace-nowrap",
+                activeFilter === "subscribed" 
+                  ? "bg-background text-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground",
+                !user && "opacity-50 cursor-not-allowed"
+              )}
+              disabled={!user}
+            >
+              구독
+            </button>
+            <button
+              onClick={() => setActiveFilter("bookmarked")}
+              className={cn(
+                "px-2.5 py-1 font-medium rounded-md transition-all whitespace-nowrap",
+                activeFilter === "bookmarked" 
+                  ? "bg-background text-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground",
+                !user && "opacity-50 cursor-not-allowed"
+              )}
+              disabled={!user}
+            >
+              찜한 행사
+            </button>
+          </div>
         </div>
 
         {/* Calendar Grid (Matching Full Calendar Style) */}
