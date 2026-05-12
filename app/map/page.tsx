@@ -25,7 +25,8 @@ export default function MapPage() {
 
 function MapContent() {
   const searchParams = useSearchParams();
-  const eventIdParam = searchParams.get("eventId");
+  const initialEventId = searchParams.get("eventId");
+  const [focusedEventId, setFocusedEventId] = useState<string | null>(initialEventId);
 
   const [isScriptLoaded, setIsScriptLoaded] = useState(() => {
     return typeof window !== "undefined" && !!window.kakao && !!window.kakao.maps;
@@ -305,6 +306,10 @@ function MapContent() {
   // Filter events
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
+      if (focusedEventId) {
+        return String(event.id) === String(focusedEventId);
+      }
+
       // 1. Category Filters
       let catMatched = true;
       if (selectedCategories.length > 0) {
@@ -326,7 +331,7 @@ function MapContent() {
 
       return catMatched && intMatched;
     });
-  }, [events, selectedCategories, interactionFilter, userSubscribedChannelIds, userBookmarkedEventIds]);
+  }, [events, selectedCategories, interactionFilter, userSubscribedChannelIds, userBookmarkedEventIds, focusedEventId]);
 
   const toggleCategory = (categoryId: string) => {
     setSelectedCategories(prev => {
@@ -389,7 +394,7 @@ function MapContent() {
           openOverlayRef.current = null;
           setDrawnMarkersCount(0);
 
-          const targetEvent = filteredEvents.find((ev) => String(ev.id) === String(eventIdParam));
+          const targetEvent = filteredEvents.find((ev) => String(ev.id) === String(focusedEventId));
 
           const initializeMapAndPlaceMarkers = (centerCoords: any, level: number, initialLoad: boolean) => {
             if (initialLoad) {
@@ -503,7 +508,7 @@ function MapContent() {
                     yAnchor: 1.35,
                   });
 
-                  if (String(event.id) === String(eventIdParam)) {
+                  if (String(event.id) === String(focusedEventId)) {
                     targetCoords.push(coords);
                     targetOverlays.push(infoOverlay);
                   }
@@ -609,7 +614,7 @@ function MapContent() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [isScriptLoaded, loading, filteredEvents, eventIdParam]);
+  }, [isScriptLoaded, loading, filteredEvents, focusedEventId]);
 
   if (!process.env.NEXT_PUBLIC_KAKAO_MAP_KEY) {
     return (
@@ -667,6 +672,18 @@ function MapContent() {
               {/* Expandable Content Body */}
               {isSidebarExpanded && (
                 <div className="animate-in fade-in slide-in-from-top-1 duration-200 flex flex-col bg-white/10 dark:bg-black/10">
+                  {/* Focus Event Filter Pill */}
+                  {focusedEventId && (
+                    <div className="p-2 sm:p-3 border-b border-pink-200/40 bg-pink-50/30 dark:bg-pink-950/20">
+                      <button
+                        onClick={() => setFocusedEventId(null)}
+                        className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-xl border border-pink-400/50 bg-white dark:bg-pink-950/40 text-pink-600 dark:text-pink-300 text-[10px] sm:text-[11px] font-bold shadow-sm transition-all active:scale-[0.98]"
+                      >
+                        <span className="truncate mr-1">선택 행사만 보기</span>
+                        <span className="bg-pink-100 dark:bg-pink-800 px-1.5 py-0.5 rounded-md shrink-0 text-[10px]">✕</span>
+                      </button>
+                    </div>
+                  )}
                   {/* 빠른 필터 Section */}
                   <div className="p-2.5 sm:p-4 border-b border-primary/10">
                     <h4 className="text-[10px] sm:text-[11px] font-bold text-foreground/70 mb-2">빠른 필터</h4>

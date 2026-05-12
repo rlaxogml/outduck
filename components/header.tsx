@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
 import type { User } from "@supabase/supabase-js";
-import { Calendar, Heart, MapPinned, Star, Search, X, House } from "lucide-react";
+import { Calendar, Heart, MapPinned, Star, Search, X, House, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -41,29 +42,29 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // 색상은 여기서 쉽게 변경할 수 있습니다.
-  const activeGradientStyle = {
-    background: "linear-gradient(to right, #3b82f6, #a855f7)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    fontWeight: "bold"
-  } as const;
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const getNavStyle = (path: string) => {
-    const isActive = pathname === path;
+    // Default logic: check if mounted. If not yet mounted (SSR/Hydration phase), assume we are on the Home page for the static initial render to ensure correct visible highlight immediately.
+    const isActive = isMounted ? (pathname === path) : (path === "/");
+
     if (isActive) {
       return {
         isActive,
         button: "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-bold transition-colors min-w-[44px] sm:min-w-fit",
         icon: "h-[18px] w-[18px] sm:h-4 sm:w-4 text-blue-500 flex-shrink-0",
-        text: activeGradientStyle,
+        textClassName: "bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-600 font-bold whitespace-nowrap",
       };
     }
     return {
       isActive,
-      button: "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-medium text-muted-foreground hover:text-foreground transition-colors min-w-[44px] sm:min-w-fit",
-      icon: "h-[18px] w-[18px] sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0",
-      text: {}
+      // Inactive: Switched to high-contrast bold dark charcoal text as requested.
+      button: "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-bold text-slate-900 dark:text-slate-100 hover:text-foreground transition-colors min-w-[44px] sm:min-w-fit",
+      icon: "h-[18px] w-[18px] sm:h-4 sm:w-4 text-slate-800 dark:text-slate-300 flex-shrink-0",
+      textClassName: "font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap"
     };
   };
 
@@ -301,19 +302,33 @@ export function Header() {
     <header className="border-b border-border bg-background w-full">
       {/* Top bar: Logo and Login (Wrapper spans full width) */}
       <div className="border-b border-border/50">
-        <div className="mx-auto max-w-7xl w-full flex items-center justify-between px-3.5 md:px-4 py-2 md:py-3">
+        <div className="mx-auto max-w-7xl w-full flex items-center justify-between md:grid md:grid-cols-[1fr_auto_1fr] px-3.5 md:px-4 py-2 md:py-3">
           <div
-            className="flex items-center gap-2 md:gap-3 cursor-pointer flex-shrink-0"
+            className="flex items-center gap-2 md:gap-3 cursor-pointer flex-shrink-0 justify-self-start"
             onClick={() => router.push("/")}
           >
-            <div className="flex h-9 w-9 md:h-12 md:w-12 items-center justify-center rounded-full border-2 md:border-[2.5px] border-foreground">
-              <Star className="h-4 w-4 md:h-6 md:w-6" />
-            </div>
-            <span className="text-lg md:text-2xl font-extrabold tracking-tight hidden sm:inline">아이콘</span>
+            <Image 
+              src="/logo.png" 
+              alt="Icon" 
+              width={120} 
+              height={120} 
+              className="h-11 w-11 md:h-14 md:w-14 object-contain flex-shrink-0" 
+              priority 
+              unoptimized
+            />
+            <Image 
+              src="/logo-text.png" 
+              alt="Logo" 
+              width={250} 
+              height={100} 
+              className="h-12 md:h-15 w-auto object-contain flex-shrink-0" 
+              priority 
+              unoptimized
+            />
           </div>
 
-          {/* Integrated Search Bar */}
-          <div className="relative flex-1 max-w-2xl mx-3 md:mx-8">
+          {/* Integrated Search Bar: Explicit fixed width overrides to force CSS Grid 'auto' expansion */}
+          <div className="relative w-full md:w-[500px] lg:w-[700px] xl:w-[850px] max-w-3xl md:max-w-4xl mx-3 md:mx-auto md:px-4">
             <div className="relative flex w-full items-center">
               <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
               <input
@@ -405,7 +420,7 @@ export function Header() {
             )}
           </div>
 
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 justify-self-end">
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -439,48 +454,64 @@ export function Header() {
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex items-center justify-around sm:justify-center gap-2 sm:gap-6 border-t border-border px-3.5 py-2 sm:py-2.5 flex-nowrap overflow-x-auto no-scrollbar">
-        <button
-          onClick={() => router.push("/")}
-          className={getNavStyle("/").button}
-        >
-          <House className={getNavStyle("/").icon} />
-          <span style={getNavStyle("/").text}>홈</span>
-        </button>
-        <span className="text-border shrink-0 select-none">|</span>
-        <button
-          onClick={() => router.push("/calendar")}
-          className={getNavStyle("/calendar").button}
-        >
-          <Calendar className={getNavStyle("/calendar").icon} />
-          <span style={getNavStyle("/calendar").text}>캘린더</span>
-        </button>
-        <span className="text-border shrink-0 select-none">|</span>
-        <button
-          onClick={() => router.push("/map")}
-          className={getNavStyle("/map").button}
-        >
-          <MapPinned className={getNavStyle("/map").icon} />
-          <span style={getNavStyle("/map").text}>지도</span>
-        </button>
-        <span className="text-border shrink-0 select-none">|</span>
-        <button
-          onClick={() => router.push("/subscriptions")}
-          className={getNavStyle("/subscriptions").button}
-        >
-          <Star className={getNavStyle("/subscriptions").icon} />
-          <span style={getNavStyle("/subscriptions").text}>구독 행사</span>
-        </button>
-        <span className="text-border shrink-0 select-none">|</span>
-        <button
-          onClick={() => router.push("/bookmarks")}
-          className={getNavStyle("/bookmarks").button}
-        >
-          <Heart className={getNavStyle("/bookmarks").icon} />
-          <span style={getNavStyle("/bookmarks").text}>찜한 행사</span>
-        </button>
-      </nav>
+      {/* Navigation Container */}
+      <div className="border-t border-border w-full relative">
+        <div className="mx-auto max-w-7xl w-full relative flex items-center justify-center">
+          {/* Main Scrollable Nav - Increased vertical padding for lux room, and bumped right guard to detach neighbor elements */}
+          <nav className="flex items-center justify-around sm:justify-center gap-2 sm:gap-6 px-3.5 py-2.5 sm:py-3.5 w-full overflow-x-auto no-scrollbar pr-28 sm:pr-0">
+            <button
+              onClick={() => router.push("/")}
+              className={getNavStyle("/").button}
+            >
+              <House className={getNavStyle("/").icon} />
+              <span className={getNavStyle("/").textClassName}>홈</span>
+            </button>
+            <span className="text-border shrink-0 select-none">|</span>
+            <button
+              onClick={() => router.push("/calendar")}
+              className={getNavStyle("/calendar").button}
+            >
+              <Calendar className={getNavStyle("/calendar").icon} />
+              <span className={getNavStyle("/calendar").textClassName}>캘린더</span>
+            </button>
+            <span className="text-border shrink-0 select-none">|</span>
+            <button
+              onClick={() => router.push("/map")}
+              className={getNavStyle("/map").button}
+            >
+              <MapPinned className={getNavStyle("/map").icon} />
+              <span className={getNavStyle("/map").textClassName}>지도</span>
+            </button>
+            <span className="text-border shrink-0 select-none">|</span>
+            <button
+              onClick={() => router.push("/subscriptions")}
+              className={getNavStyle("/subscriptions").button}
+            >
+              <Star className={getNavStyle("/subscriptions").icon} />
+              <span className={getNavStyle("/subscriptions").textClassName}>구독 행사</span>
+            </button>
+            <span className="text-border shrink-0 select-none">|</span>
+            <button
+              onClick={() => router.push("/bookmarks")}
+              className={getNavStyle("/bookmarks").button}
+            >
+              <Heart className={getNavStyle("/bookmarks").icon} />
+              <span className={getNavStyle("/bookmarks").textClassName}>찜한 행사</span>
+            </button>
+          </nav>
+
+          {/* Floating Action Button: Pushed visibly inward to fully detach from edge and made slightly lusher */}
+          <div className="absolute right-6 md:right-8 top-1/2 -translate-y-1/2 z-10 flex items-center">
+            <button
+              onClick={() => router.push("/apply")}
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0"
+            >
+              <PlusCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+              <span className="text-[10px] sm:text-[11px] font-bold whitespace-nowrap">주최자 등록</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
     </header>
   );

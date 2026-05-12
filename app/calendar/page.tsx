@@ -75,6 +75,12 @@ function CalendarContent() {
   }, []);
 
   useEffect(() => {
+    if (user) {
+      setActiveFilters(["subscribed"]);
+    }
+  }, [user]);
+
+  useEffect(() => {
     const fetchEventsAndUserData = async () => {
       try {
         setLoading(true);
@@ -332,7 +338,7 @@ function CalendarContent() {
                 <button
                   onClick={() => toggleFilter("all")}
                   className={cn(
-                    "px-3.5 py-2 text-sm font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
+                    "flex items-center justify-center w-[110px] sm:w-[130px] py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
                     activeFilters.includes("all")
                       ? "bg-slate-300 text-slate-950 border-slate-700"
                       : "bg-card border-slate-300 text-slate-600 hover:bg-muted/60"
@@ -348,7 +354,7 @@ function CalendarContent() {
                     key={item.id}
                     onClick={() => toggleFilter(item.id)}
                     className={cn(
-                      "px-3.5 py-2 text-sm font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
+                      "flex items-center justify-center w-[110px] sm:w-[130px] py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
                       activeFilters.includes(item.id)
                         ? "bg-indigo-100 text-indigo-800 border-indigo-500"
                         : "bg-card border-slate-300 text-slate-600 hover:bg-muted/60"
@@ -358,8 +364,8 @@ function CalendarContent() {
                   </button>
                 ))}
 
-                {/* Separator */}
-                <div className="h-5 w-px bg-border/60 mx-1 shrink-0 hidden sm:block" />
+                {/* Visual Separator Line */}
+                <div className="h-5 w-[1.5px] bg-slate-300/80 dark:bg-slate-600/80 mx-2 shrink-0 block" />
 
                 {[
                   { id: "online", label: "온라인" },
@@ -369,7 +375,7 @@ function CalendarContent() {
                     key={cat.id}
                     onClick={() => toggleFilter(cat.id)}
                     className={cn(
-                      "px-3.5 py-2 text-sm font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
+                      "flex items-center justify-center w-[110px] sm:w-[130px] py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
                       activeFilters.includes(cat.id)
                         ? "bg-slate-300 text-slate-950 border-slate-700"
                         : "bg-card border-slate-300 text-slate-600 hover:bg-muted/60"
@@ -390,7 +396,7 @@ function CalendarContent() {
                     key={cat.id}
                     onClick={() => toggleFilter(cat.id)}
                     className={cn(
-                      "px-3.5 py-2 text-sm font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
+                      "flex items-center justify-center w-[110px] sm:w-[130px] py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold rounded-full border-2 transition-all whitespace-nowrap shadow-sm",
                       activeFilters.includes(cat.id)
                         ? cat.activeClass
                         : "bg-card border-slate-300 text-slate-600 hover:bg-muted/60"

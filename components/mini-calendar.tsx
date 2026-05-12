@@ -23,6 +23,11 @@ export function MiniCalendar({ user }: { user: User | null }) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [events, setEvents] = useState<WeeklyEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const getWeekDates = (baseDate: Date) => {
     const dates = [];
@@ -182,6 +187,18 @@ export function MiniCalendar({ user }: { user: User | null }) {
 
   const dayNames = ["월", "화", "수", "목", "금", "토", "일"];
   const currentDayEvents = getEventsForDate(selectedDate || "");
+
+  if (!mounted) {
+    return (
+      <div className="mt-4 mb-10 px-2 sm:px-4 mx-auto max-w-6xl animate-pulse">
+        <div className="flex items-center gap-2 mb-3.5 ml-1">
+          <div className="w-1.5 h-5 bg-muted-foreground/20 rounded-full" />
+          <div className="h-5 bg-muted-foreground/20 rounded w-24" />
+        </div>
+        <div className="w-full h-32 rounded-xl bg-muted-foreground/10 border border-slate-200 dark:border-slate-800" />
+      </div>
+    );
+  }
 
   return (
 

@@ -9,12 +9,12 @@ import { supabase } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { PosterSlider } from "@/components/poster-slider";
+import { OrganizerSection } from "@/components/organizer-section";
+import { FavoriteChannels } from "@/components/favorite-channels";
+import { MiniCalendar } from "@/components/mini-calendar";
 import dynamic from "next/dynamic";
 
 const GoogleAd = dynamic(() => import("@/components/google-ad").then(m => m.GoogleAd), { ssr: false });
-const OrganizerSection = dynamic(() => import("@/components/organizer-section").then(m => m.OrganizerSection), { ssr: false });
-const FavoriteChannels = dynamic(() => import("@/components/favorite-channels").then(m => m.FavoriteChannels), { ssr: false });
-const MiniCalendar = dynamic(() => import("@/components/mini-calendar").then(m => m.MiniCalendar), { ssr: false });
 
 type Event = {
   id: number;

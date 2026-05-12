@@ -7,43 +7,35 @@ import { cn } from "@/lib/utils";
 import useEmblaCarousel from "embla-carousel-react";
 import { EmblaCarouselType } from "embla-carousel";
 
-const posters = [
-  {
-    id: 1,
-    title: "인기 행사 1",
-    description: "광고용, 초기에는 인기행사 홍보용",
-    bgColor: "bg-gradient-to-br from-blue-400 to-blue-600",
-  },
-  {
-    id: 2,
-    title: "인기 행사 2",
-    description: "신규 오픈 이벤트",
-    bgColor: "bg-gradient-to-br from-purple-400 to-purple-600",
-  },
-  {
-    id: 3,
-    title: "인기 행사 3",
-    description: "특별 할인 이벤트",
-    bgColor: "bg-gradient-to-br from-pink-400 to-pink-600",
-  },
-  {
-    id: 4,
-    title: "인기 행사 4",
-    description: "한정판 굿즈 출시",
-    bgColor: "bg-gradient-to-br from-orange-400 to-orange-600",
-  },
-  {
-    id: 5,
-    title: "인기 행사 5",
-    description: "콜라보 이벤트",
-    bgColor: "bg-gradient-to-br from-green-400 to-green-600",
-  },
-];
+import { supabase } from "@/lib/supabase/client";
+
+type Poster = {
+  id: number;
+  title: string | null;
+  description: string | null;
+  image_url: string | null;
+  link_url: string | null;
+  order: number;
+  is_active: boolean;
+  start_date: string | null;
+  end_date: string | null;
+};
 
 const numberWithinRange = (number: number, min: number, max: number) =>
   Math.min(Math.max(number, min), max);
 
+const fallbackGradients = [
+  "bg-gradient-to-br from-blue-400 to-blue-600",
+  "bg-gradient-to-br from-purple-400 to-purple-600",
+  "bg-gradient-to-br from-pink-400 to-pink-600",
+  "bg-gradient-to-br from-orange-400 to-orange-600",
+  "bg-gradient-to-br from-green-400 to-green-600",
+];
+
 export function PosterSlider() {
+  const [posters, setPosters] = useState<Poster[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: true,
     align: "center",
@@ -52,6 +44,38 @@ export function PosterSlider() {
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
+
+  useEffect(() => {
+    const fetchPosters = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("posters")
+          .select("*")
+          .eq("is_active", true)
+          .order("order", { ascending: true });
+
+        if (error) throw error;
+
+        const now = new Date();
+        const validPosters = (data || []).filter((p: any) => {
+          const start = p.start_date ? new Date(p.start_date) : null;
+          const end = p.end_date ? new Date(p.end_date) : null;
+          
+          if (start && start > now) return false;
+          if (end && end < now) return false;
+          
+          return true;
+        });
+
+        setPosters(validPosters);
+      } catch (err) {
+        console.error("Poster load failed:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPosters();
+  }, []);
 
   const onSelect = useCallback((emblaApi: EmblaCarouselType) => {
     setSelectedIndex(emblaApi.selectedScrollSnap());
@@ -80,85 +104,68 @@ export function PosterSlider() {
         });
       }
 
-      // The normalized slide distance from center. 0 is active, 1 is neighbor.
       const slideDistance = Math.abs(diffToTarget * scrollSnapList.length);
-      
-      // Inverse calculation: t goes from 1 (center) to 0 (far away).
-      // We scale the decay such that side slides get notably affected.
       const t = numberWithinRange(1 - (slideDistance * 0.65), 0, 1);
 
       const innerNode = slideNode.querySelector(".poster-inner") as HTMLElement;
-      const titleNode = slideNode.querySelector(".poster-title") as HTMLElement;
-      const descNode = slideNode.querySelector(".poster-desc") as HTMLElement;
  
       if (innerNode) {
-        const scale = 0.9 + (t * 0.1); // Scale down to 90%
-        
+        const scale = 0.9 + (t * 0.1);
         innerNode.style.transform = `scale(${scale})`;
-        innerNode.style.opacity = ""; // Reset manual opacity override
-        innerNode.style.filter = "";  // Reset legacy blur/brightness override
-        // Elevate index for centered slide so overlap looks proper if scale increases
         innerNode.style.zIndex = t > 0.8 ? "10" : "0";
-      }
-      
-      // Subtle inner content animation linked to tween factor
-      if (titleNode) {
-        titleNode.style.transform = `translateY(${(1 - t) * 10}px)`;
-        titleNode.style.opacity = `${0.5 + (t * 0.5)}`;
-      }
-      if (descNode) {
-        descNode.style.transform = `translateY(${(1 - t) * 20}px)`;
-        descNode.style.opacity = `${t}`;
       }
     });
   }, []);
 
   useEffect(() => {
-    if (!emblaApi) return;
+    if (!emblaApi || posters.length === 0) return;
 
     onSelect(emblaApi);
     setScrollSnaps(emblaApi.scrollSnapList());
     
-    // Core Tween events: run on every scroll and reInit
     setTweenNodes(emblaApi);
     emblaApi.on("select", onSelect);
     emblaApi.on("scroll", setTweenNodes);
     emblaApi.on("reInit", onSelect);
     emblaApi.on("reInit", setTweenNodes);
-  }, [emblaApi, onSelect, setTweenNodes]);
+  }, [emblaApi, posters, onSelect, setTweenNodes]);
+
+  // Safeguards: Avoid rendering flash and hide if empty.
+  if (isLoading) {
+    return (
+      <div className="w-full max-w-[950px] mx-auto aspect-[21/9] px-4 mb-4 animate-pulse bg-muted/50 rounded-3xl" />
+    );
+  }
+
+  if (posters.length === 0) {
+    return null; // Hide slider completely if zero active records found
+  }
 
   return (
     /* Contained within normal 6xl container limits */
     <div className="w-full relative overflow-hidden py-2 group">
       <div className="overflow-visible" ref={emblaRef}>
         <div className="flex items-center touch-pan-y">
-          {posters.map((poster) => (
+          {posters.map((poster, index) => (
             <div
               key={poster.id}
               className="flex-[0_0_100%] md:flex-[0_0_75%] min-[1152px]:flex-[0_0_950px] min-w-0 px-2 md:px-4 relative"
-              style={{
-                // Optimization for smooth scale/opacity adjustments
-                backfaceVisibility: "hidden",
-              }}
+              style={{ backfaceVisibility: "hidden" }}
             >
               <div
+                onClick={() => poster.link_url && window.open(poster.link_url, "_blank")}
                 className={cn(
-                  "poster-inner relative w-full aspect-[21/9] flex flex-col items-center justify-center text-white rounded-2xl md:rounded-3xl shadow-lg cursor-pointer will-change-transform",
-                  poster.bgColor
+                  "poster-inner relative w-full aspect-[21/9] flex flex-col items-center justify-center text-white rounded-2xl md:rounded-3xl shadow-lg will-change-transform bg-cover bg-center overflow-hidden",
+                  poster.link_url ? "cursor-pointer" : "cursor-default",
+                  !poster.image_url && fallbackGradients[index % fallbackGradients.length]
                 )}
                 style={{
+                  backgroundImage: poster.image_url ? `url(${poster.image_url})` : undefined,
                   transition: "transform 0.2s ease-out, opacity 0.2s ease-out, filter 0.2s ease-out",
                   transformOrigin: "center center",
                 }}
               >
-                <div className="flex flex-col items-center justify-center p-6 text-center pointer-events-none">
-                  <h2 className="poster-title font-black tracking-tight mb-1.5 text-xl md:text-2xl lg:text-3xl transition-all duration-300 ease-out">
-                    {poster.title}
-                  </h2>
-                  <p className="poster-desc text-sm md:text-base lg:text-lg font-medium transition-all duration-300 ease-out">
-                    {poster.description}
-                  </p>
-                </div>
+                {/* Dynamic Poster Canvas with support for transparent PNG background images or fallback gradients */}
               </div>
             </div>
           ))}
