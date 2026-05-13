@@ -18,6 +18,7 @@ type Channel = {
 const channelTypeLabel: Record<string, string> = {
   game: "게임",
   youtuber: "유튜버",
+  festival: "동인 행사",
 };
 
 function getChannelTypeText(type: string | null) {

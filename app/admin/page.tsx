@@ -30,7 +30,7 @@ type ChannelRequest = {
   type: string;
   is_team: boolean;
   team_id: number | null;
-  mcn: string | null;
+  company: string | null;
   links: string | null;
   image_url: string | null;
   status: "pending" | "approved" | "rejected";
@@ -126,7 +126,7 @@ export default function AdminPage() {
             team_id: request.team_id,
             owner_id: request.user_id,
             links: request.links,
-            mcn: request.mcn
+            company: request.company
           }]);
 
         if (insertError) {
@@ -236,7 +236,7 @@ export default function AdminPage() {
                       </Badge>
                     </div>
                     <div className="flex flex-wrap gap-x-3 mt-1.5 text-xs text-muted-foreground">
-                      <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : "게임"}</div>
+                      <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "동인 행사" : "게임"}</div>
                       <div className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> {new Date(req.created_at).toLocaleDateString()}</div>
                     </div>
                   </div>
@@ -244,8 +244,8 @@ export default function AdminPage() {
                 <div className="space-y-3 mb-6 flex-1 bg-muted/20 rounded-2xl p-4 border border-border/50">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <div className="text-[10px] font-bold text-muted-foreground mb-1">소속사 (MCN)</div>
-                      <div className="font-semibold flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 opacity-50" /> {req.mcn || <span className="text-muted-foreground font-normal italic">없음</span>}</div>
+                      <div className="text-[10px] font-bold text-muted-foreground mb-1">소속사</div>
+                      <div className="font-semibold flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 opacity-50" /> {req.company || <span className="text-muted-foreground font-normal italic">없음</span>}</div>
                     </div>
                     {!req.is_team && (
                       <div>

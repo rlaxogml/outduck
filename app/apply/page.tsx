@@ -53,7 +53,7 @@ export default function ApplyPage() {
   const [type, setType] = useState<string>("");
   const [teamId, setTeamId] = useState<string>("none");
   const [links, setLinks] = useState("");
-  const [mcn, setMcn] = useState("");
+  const [company, setCompany] = useState("");
   const [openTeamPopover, setOpenTeamPopover] = useState(false);
   const [teamSearch, setTeamSearch] = useState("");
   
@@ -165,7 +165,7 @@ export default function ApplyPage() {
         type: isYoutuberType ? "youtuber" : type,
         is_team: type === "youtuber_team",
         team_id: type === "youtuber" && teamId !== "none" ? parseInt(teamId) : null,
-        mcn: isYoutuberType ? mcn.trim() || null : null,
+        company: isYoutuberType ? company.trim() || null : null,
         links: links.trim() || null,
         image_url: imageUrl,
         status: "pending",
@@ -356,6 +356,7 @@ export default function ApplyPage() {
                           <SelectItem value="game">게임</SelectItem>
                           <SelectItem value="youtuber">유튜버</SelectItem>
                           <SelectItem value="youtuber_team">유튜버 단체 팀</SelectItem>
+                          <SelectItem value="festival">동인 행사</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -433,12 +434,12 @@ export default function ApplyPage() {
                         )}
 
                         <div className="space-y-2 animate-in fade-in duration-300">
-                          <Label htmlFor="mcn" className="text-base font-semibold">소속사 (MCN)</Label>
+                          <Label htmlFor="company" className="text-base font-semibold">소속사</Label>
                           <Input
-                            id="mcn"
+                            id="company"
                             placeholder="소속 없음"
-                            value={mcn}
-                            onChange={(e) => setMcn(e.target.value)}
+                            value={company}
+                            onChange={(e) => setCompany(e.target.value)}
                             className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20"
                           />
                         </div>

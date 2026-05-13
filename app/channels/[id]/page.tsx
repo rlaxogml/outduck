@@ -22,7 +22,7 @@ type OfflineEvent = {
   channels: { id: number; name: string; image_url: string }[];
 };
 
-type ChannelType = "game" | "youtuber";
+type ChannelType = "game" | "youtuber" | "festival";
 
 type Channel = {
   id: number;
@@ -37,6 +37,7 @@ type Channel = {
 const channelTypeLabel: Record<ChannelType, string> = {
   game: "게임",
   youtuber: "유튜버",
+  festival: "동인 행사",
 };
 
 function getChannelTypeText(type: string | null) {

@@ -81,6 +81,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
       } else {
         const catMap: Record<string, string> = {
           game: "게임",
+          festival: "동인 행사",
         };
         result = result.filter(e => e.category === catMap[activeCategory]);
       }

@@ -86,8 +86,8 @@ export function OrganizerSection({ user }: { user: User | null }) {
             if (!type) return "기타";
             const t = type.trim().toLowerCase();
             if (t === "game") return "게임";
-
             if (t === "youtuber") return "유튜버";
+            if (t === "festival") return "동인 행사";
             return "기타";
           };
 

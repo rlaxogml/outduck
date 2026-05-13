@@ -732,7 +732,7 @@ function MapContent() {
                         {[
                           { id: "game", label: "게임", activeClass: "bg-blue-100 text-blue-800 border-2 border-blue-500 shadow-sm" },
                           { id: "youtuber", label: "유튜버", activeClass: "bg-red-100 text-red-800 border-2 border-red-500 shadow-sm" },
-
+                          { id: "festival", label: "동인 행사", activeClass: "bg-amber-100 text-amber-800 border-2 border-amber-500 shadow-sm" },
                         ].map((cat) => (
                           <button
                             key={cat.id}

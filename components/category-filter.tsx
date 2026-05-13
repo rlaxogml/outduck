@@ -7,6 +7,7 @@ const categories = [
   { id: "all", label: "전체" },
   { id: "game", label: "게임" },
   { id: "youtuber", label: "유튜버" },
+  { id: "festival", label: "동인 행사" },
   { id: "always", label: "상시" },
 ];
 

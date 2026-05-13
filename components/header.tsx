@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase/client";
 
-type ChannelType = "game" | "youtuber";
+type ChannelType = "game" | "youtuber" | "festival";
 
 type ChannelSearchItem = {
   id: number;
@@ -32,6 +32,7 @@ const RECENT_CHANNELS_STORAGE_KEY = "recent-searched-channels";
 const channelTypeLabel: Record<ChannelType, string> = {
   game: "게임",
   youtuber: "유튜버",
+  festival: "동인 행사",
 };
 
 const sanitizeSearchText = (value: string) => {

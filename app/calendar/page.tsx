@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 const categoryLabelMap: Record<string, string> = {
   game: "게임",
   youtuber: "유튜버",
+  festival: "동인 행사",
 };
 
 const imageColors = [
@@ -173,6 +174,7 @@ function CalendarContent() {
           const t = type.trim().toLowerCase();
           if (t === "game") return "게임";
           if (t === "youtuber") return "유튜버";
+          if (t === "festival") return "동인 행사";
           return "기타";
         };
 
@@ -281,7 +283,7 @@ function CalendarContent() {
     if (activeFilters.includes("all")) return true;
 
     const activeModes = activeFilters.filter(f => f === "online" || f === "offline");
-    const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber");
+    const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber" || f === "festival");
     const activeInteractions = activeFilters.filter(f => f === "subscribed" || f === "bookmarks");
 
     const modeMatched = activeModes.length === 0 || activeModes.includes(event.eventType);
@@ -391,6 +393,7 @@ function CalendarContent() {
                 {[
                   { id: "game", label: "게임", activeClass: "bg-blue-100 text-blue-800 border-blue-500 shadow-sm" },
                   { id: "youtuber", label: "유튜버", activeClass: "bg-red-100 text-red-800 border-red-500 shadow-sm" },
+                  { id: "festival", label: "동인 행사", activeClass: "bg-amber-100 text-amber-800 border-amber-500 shadow-sm" },
                 ].map((cat) => (
                   <button
                     key={cat.id}
