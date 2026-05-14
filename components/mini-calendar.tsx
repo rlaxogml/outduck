@@ -30,6 +30,14 @@ export function MiniCalendar({ user }: { user: User | null }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    if (user) {
+      setActiveFilter("subscribed");
+    } else {
+      setActiveFilter("all");
+    }
+  }, [user]);
+
+  useEffect(() => {
     setMounted(true);
   }, []);
 
@@ -131,7 +139,7 @@ export function MiniCalendar({ user }: { user: User | null }) {
           title: e.title,
           startDateValue: e.start_date,
           endDateValue: e.end_date,
-          eventType: "offline",
+          eventType: "offline" as const,
           dateStr: formatOfflineEventDate(e.start_date, e.end_date),
           location: e.offline_event_locations?.[0]?.location || "장소 정보 없음",
           channels: e.events?.event_channels?.map((c: any) => c.channels).filter(Boolean) || []
@@ -146,7 +154,7 @@ export function MiniCalendar({ user }: { user: User | null }) {
             title: e.title,
             startDateValue: sDate || "",
             endDateValue: eDate,
-            eventType: "online",
+            eventType: "online" as const,
             dateStr: formatOnlineEventDate(e.start_at, e.end_at),
             location: "온라인",
             channels: e.events?.event_channels?.map((c: any) => c.channels).filter(Boolean) || []
@@ -219,6 +227,13 @@ export function MiniCalendar({ user }: { user: User | null }) {
             <h2 className="text-base md:text-lg font-bold text-foreground">
               이번 주 일정
             </h2>
+            <Link 
+              href="/calendar" 
+              className="ml-1.5 flex items-center gap-0.5 text-[11px] md:text-xs font-semibold text-muted-foreground hover:text-primary transition-all group bg-muted/40 hover:bg-primary/10 px-2 py-0.5 md:py-1 rounded-full border border-border/30 hover:border-primary/20"
+            >
+              전체보기
+              <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
 
           {/* Filters */}

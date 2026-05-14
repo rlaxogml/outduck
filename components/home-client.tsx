@@ -24,7 +24,7 @@ type Event = {
   category: string;
   imageColor: string;
   imageUrl?: string;
-  reservationType: "자유입장" | "예약필수" | "예약우대" | "티켓팅" | undefined;
+  reservationType: "자유 입장" | "예약 필수" | "티켓팅" | "휴무" | undefined;
   channels: { id: number; name: string; image_url: string }[];
   isAlways: boolean;
   createdAt: string;
@@ -149,33 +149,38 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
           />
 
           {/* Event Grid */}
-          <section className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-              {filteredEvents.slice(0, visibleCount).map((event, index) => (
-                <EventCard
-                  key={event.id}
-                  id={event.id}
-                  title={event.title}
-                  date={event.date}
-                  location={event.location}
-                  category={event.category}
-                  imageColor={event.imageColor}
-                  imageUrl={event.imageUrl}
-                  reservationType={event.reservationType}
-                  channels={event.channels}
-                  user={user}
-                  eventType={activeTab}
-                  isRightCard={index % 2 === 1}
-                  isPriority={index < 4}
-                />
-              ))}
-            </div>
-
-            {filteredEvents.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                해당 카테고리의 행사가 없습니다.
+          <section className="p-4 min-h-[650px]">
+            <div
+              key={`${activeTab}-${activeCategory}-${sortType}`}
+              className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out"
+            >
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                {filteredEvents.slice(0, visibleCount).map((event, index) => (
+                  <EventCard
+                    key={event.id}
+                    id={event.id}
+                    title={event.title}
+                    date={event.date}
+                    location={event.location}
+                    category={event.category}
+                    imageColor={event.imageColor}
+                    imageUrl={event.imageUrl}
+                    reservationType={event.reservationType}
+                    channels={event.channels}
+                    user={user}
+                    eventType={activeTab}
+                    isRightCard={index % 2 === 1}
+                    isPriority={index < 4}
+                  />
+                ))}
               </div>
-            )}
+
+              {filteredEvents.length === 0 && (
+                <div className="text-center py-24 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
+                  해당 카테고리의 행사가 없습니다.
+                </div>
+              )}
+            </div>
 
             {visibleCount < filteredEvents.length && (
               <div className="mt-8 flex justify-center">

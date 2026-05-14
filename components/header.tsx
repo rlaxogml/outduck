@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 import { Calendar, Heart, MapPinned, Star, Search, X, House, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
 import {
   DropdownMenu,
@@ -55,21 +56,22 @@ export function Header() {
     if (isActive) {
       return {
         isActive,
-        button: "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-bold transition-colors min-w-[44px] sm:min-w-fit",
-        icon: "h-[18px] w-[18px] sm:h-4 sm:w-4 text-blue-500 flex-shrink-0",
-        textClassName: "bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-600 font-bold whitespace-nowrap",
+        button: "group flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-extrabold transition-all duration-200 min-w-[44px] sm:min-w-fit px-3 py-1.5 rounded-full bg-blue-100/80 dark:bg-blue-950/60 shadow-sm scale-[1.03]",
+        icon: "h-[18px] w-[18px] sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400 flex-shrink-0",
+        textClassName: "bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 whitespace-nowrap",
       };
     }
     return {
       isActive,
-      // Inactive: Switched to high-contrast bold dark charcoal text as requested.
-      button: "flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-bold text-slate-900 dark:text-slate-100 hover:text-foreground transition-colors min-w-[44px] sm:min-w-fit",
-      icon: "h-[18px] w-[18px] sm:h-4 sm:w-4 text-slate-800 dark:text-slate-300 flex-shrink-0",
-      textClassName: "font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap"
+      // Inactive: High-visibility interactive state with bolder hover effects and noticeable scaling.
+      button: "group flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-bold text-slate-900 dark:text-slate-100 min-w-[44px] sm:min-w-fit px-3 py-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-950 dark:hover:text-white hover:scale-[1.06] hover:shadow-sm active:scale-[0.96] transition-all duration-200 cursor-pointer",
+      icon: "h-[18px] w-[18px] sm:h-4 sm:w-4 text-slate-800 dark:text-slate-300 group-hover:text-slate-950 dark:group-hover:text-white group-hover:scale-110 transition-all duration-200 flex-shrink-0",
+      textClassName: "font-bold text-slate-900 dark:text-slate-100 group-hover:text-slate-950 dark:group-hover:text-white whitespace-nowrap"
     };
   };
 
   const [user, setUser] = useState<User | null>(null);
+  const [hasChannel, setHasChannel] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState<ChannelSearchItem[]>([]);
   const [lastValidResults, setLastValidResults] = useState<ChannelSearchItem[]>([]);
@@ -84,19 +86,51 @@ export function Header() {
   const hasTypedInput = searchText.trim().length > 0;
 
   useEffect(() => {
+    const checkUserChannel = async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("channels")
+          .select("id")
+          .eq("owner_id", userId)
+          .limit(1);
+        
+        if (!error && data && data.length > 0) {
+          setHasChannel(true);
+        } else {
+          setHasChannel(false);
+        }
+      } catch {
+        setHasChannel(false);
+      }
+    };
+
     const syncSession = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
+      const currentUser = session?.user ?? null;
+      setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+      
+      if (currentUser) {
+        await checkUserChannel(currentUser.id);
+      } else {
+        setHasChannel(false);
+      }
     };
 
     syncSession();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+      
+      if (currentUser) {
+        await checkUserChannel(currentUser.id);
+      } else {
+        setHasChannel(false);
+      }
     });
 
     return () => {
@@ -459,7 +493,10 @@ export function Header() {
       <div className="border-t border-border w-full relative">
         <div className="mx-auto max-w-7xl w-full relative flex items-center justify-center">
           {/* Main Scrollable Nav - Increased vertical padding for lux room, and bumped right guard to detach neighbor elements */}
-          <nav className="flex items-center justify-around sm:justify-center gap-2 sm:gap-6 px-3.5 py-2.5 sm:py-3.5 w-full overflow-x-auto no-scrollbar pr-28 sm:pr-0">
+          <nav className={cn(
+            "flex items-center justify-around sm:justify-center gap-2 sm:gap-6 px-3.5 py-2.5 sm:py-3.5 w-full overflow-x-auto no-scrollbar sm:pr-0",
+            !hasChannel ? "pr-28" : "pr-3.5"
+          )}>
             <button
               onClick={() => router.push("/")}
               className={getNavStyle("/").button}
@@ -502,15 +539,17 @@ export function Header() {
           </nav>
 
           {/* Floating Action Button: Pushed visibly inward to fully detach from edge and made slightly lusher */}
-          <div className="absolute right-6 md:right-8 top-1/2 -translate-y-1/2 z-10 flex items-center">
-            <button
-              onClick={() => router.push("/apply")}
-              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0"
-            >
-              <PlusCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
-              <span className="text-[10px] sm:text-[11px] font-bold whitespace-nowrap">주최자 등록</span>
-            </button>
-          </div>
+          {!hasChannel && (
+            <div className="absolute right-6 md:right-8 top-1/2 -translate-y-1/2 z-10 flex items-center">
+              <button
+                onClick={() => router.push("/apply")}
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full shadow-md hover:shadow-lg transition-all active:scale-95 flex-shrink-0"
+              >
+                <PlusCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                <span className="text-[10px] sm:text-[11px] font-bold whitespace-nowrap">주최자 계정 신청</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

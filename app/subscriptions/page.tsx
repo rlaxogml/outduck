@@ -267,7 +267,7 @@ export default function SubscriptionsPage() {
               {/* Tabs */}
               <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-              <div className="p-4">
+              <div className="p-4 min-h-[600px]">
                 {loading ? (
                   <div className="grid grid-cols-2 gap-3 md:gap-4">
                     {Array.from({ length: 4 }).map((_, i) => (
@@ -293,11 +293,14 @@ export default function SubscriptionsPage() {
                     ))}
                   </div>
                 ) : (
-                  <>
+                  <div
+                    key={activeTab}
+                    className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out"
+                  >
                     {activeTab === "offline" && (
                       <>
                         {offlineEvents.length === 0 ? (
-                          <div className="text-center py-12 text-muted-foreground">
+                          <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
                             구독한 채널의 오프라인 행사가 없습니다.
                           </div>
                         ) : (
@@ -327,7 +330,7 @@ export default function SubscriptionsPage() {
                     {activeTab === "online" && (
                       <>
                         {onlineEvents.length === 0 ? (
-                          <div className="text-center py-12 text-muted-foreground">
+                          <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
                             구독한 채널의 온라인 행사가 없습니다.
                           </div>
                         ) : (
@@ -353,7 +356,7 @@ export default function SubscriptionsPage() {
                         )}
                       </>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </>

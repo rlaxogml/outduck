@@ -46,24 +46,30 @@ export function CategoryFilter({
         </div>
       </div>
 
-      <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg self-end md:self-auto">
+      <div className="relative flex items-center bg-muted/50 p-1 rounded-xl self-end md:self-auto w-[180px] h-9 border border-border/30 select-none">
+        {/* Sliding pill background */}
+        <div
+          className={cn(
+            "absolute top-[4px] bottom-[4px] left-[4px] w-[calc(50%-4px)] bg-background rounded-lg shadow-sm border border-border/10 transition-transform duration-300 ease-out z-0",
+            sortType === "recent" ? "translate-x-0" : "translate-x-full"
+          )}
+        />
         <button
           className={cn(
-            "px-3 py-1 text-[12px] font-medium rounded-md transition-all",
+            "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
             sortType === "recent"
-              ? "bg-background text-foreground shadow-sm"
+              ? "text-foreground"
               : "text-muted-foreground hover:text-foreground"
           )}
           onClick={() => onSortChange("recent")}
         >
           최근 등록
         </button>
-        <div className="w-[1px] h-3 bg-border mx-0.5" />
         <button
           className={cn(
-            "px-3 py-1 text-[12px] font-medium rounded-md transition-all",
+            "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
             sortType === "upcoming"
-              ? "bg-background text-foreground shadow-sm"
+              ? "text-foreground"
               : "text-muted-foreground hover:text-foreground"
           )}
           onClick={() => onSortChange("upcoming")}

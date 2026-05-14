@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/header";
 import { supabase } from "@/lib/supabase/client";
-import { MapPin, Search, Filter, Gamepad2, Video, Tv, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { MapPin, Search, Filter, Gamepad2, Video, Tv, Check, ChevronDown, ChevronUp, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,7 +37,8 @@ function MapContent() {
   const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>([]);
   const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing">("all");
+  const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing" | "within_weeks">("all");
+  const [weeksThreshold, setWeeksThreshold] = useState<number>(2);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [drawnMarkersCount, setDrawnMarkersCount] = useState(0);
   const [isMapReady, setIsMapReady] = useState(false);
@@ -49,6 +50,20 @@ function MapContent() {
   const openOverlayRef = useRef<any>(null);
   const overlayRevealTimerRef = useRef<number | null>(null);
   const userIdRef = useRef<string | null>(null);
+
+  const handleResetBounds = () => {
+    const map = mapRef.current;
+    if (!map || typeof window === "undefined" || !window.kakao || !markersRef.current || markersRef.current.length === 0) return;
+    
+    const kakao = window.kakao;
+    const bounds = new kakao.maps.LatLngBounds();
+    
+    markersRef.current.forEach((marker: any) => {
+      bounds.extend(marker.getPosition());
+    });
+    
+    map.setBounds(bounds);
+  };
 
   const cleanKey = (process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || "").trim();
 
@@ -327,6 +342,14 @@ function MapContent() {
       } else if (interactionFilter === "ongoing") {
         const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
         intMatched = !event.rawStartDate || event.rawStartDate <= today;
+      } else if (interactionFilter === "within_weeks") {
+        const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+        const todayMs = new Date(todayStr).getTime();
+        const numWeeks = parseInt(weeksThreshold as any) || 0;
+        const cutoffMs = todayMs + (numWeeks * 7 * 24 * 60 * 60 * 1000);
+        const cutoffStr = new Date(cutoffMs).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+        
+        intMatched = event.rawStartDate && event.rawStartDate >= todayStr && event.rawStartDate <= cutoffStr;
       }
 
       return catMatched && intMatched;
@@ -343,7 +366,7 @@ function MapContent() {
     });
   };
 
-  const toggleInteractionFilter = (filter: "subscribed" | "bookmarks" | "ongoing") => {
+  const toggleInteractionFilter = (filter: "subscribed" | "bookmarks" | "ongoing" | "within_weeks") => {
     if ((filter === "subscribed" || filter === "bookmarks") && !user) {
       alert("로그인이 필요한 기능입니다.");
       return;
@@ -437,6 +460,27 @@ function MapContent() {
               }
             });
 
+            kakao.maps.event.addListener(map, "zoom_changed", () => {
+              if (!isMounted) return;
+              if (openOverlayRef.current) {
+                const cNode = openOverlayRef.current.getContent();
+                if (cNode && cNode.querySelector) {
+                  const isZoomedOut = map.getLevel() > 3;
+                  const dBtn = cNode.querySelector(".detail-btn");
+                  const zBtn = cNode.querySelector(".zoom-btn");
+                  if (dBtn && zBtn) {
+                    if (isZoomedOut) {
+                      dBtn.className = "detail-btn col-span-8 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer";
+                      zBtn.style.display = "flex";
+                    } else {
+                      dBtn.className = "detail-btn col-span-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer";
+                      zBtn.style.display = "none";
+                    }
+                  }
+                }
+              }
+            });
+
             const targetCoords: any[] = [];
             const targetOverlays: any[] = [];
 
@@ -484,7 +528,12 @@ function MapContent() {
                         <span class="truncate font-medium text-blue-600 dark:text-blue-400">${activeLocation}</span>
                       </p>
                     </div>
-                    <button class="detail-btn mt-3.5 w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-opacity active:scale-[0.98] shadow-sm">상세 보기</button>
+                    <div class="grid grid-cols-10 gap-2 mt-3.5 w-full select-none">
+                      <button class="detail-btn col-span-8 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer">상세 보기</button>
+                      <button class="zoom-btn col-span-2 h-10 bg-background dark:bg-slate-900 border border-border/80 hover:bg-muted text-foreground rounded-xl transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                      </button>
+                    </div>
                   `;
 
                   infoContent.querySelector(".close-btn")?.addEventListener("click", (e) => {
@@ -502,10 +551,19 @@ function MapContent() {
                     window.location.href = `/events/${event.id}`;
                   });
 
+                  infoContent.querySelector(".zoom-btn")?.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    map.setLevel(3, {
+                      anchor: coords,
+                      animate: { duration: 320 }
+                    });
+                  });
+
                   const infoOverlay = new kakao.maps.CustomOverlay({
                     position: coords,
                     content: infoContent,
                     yAnchor: 1.35,
+                    zIndex: 20,
                   });
 
                   if (String(event.id) === String(focusedEventId)) {
@@ -522,12 +580,27 @@ function MapContent() {
                     if (openOverlayRef.current) openOverlayRef.current.setMap(null);
                     openOverlayRef.current = null;
 
-                    animateToMarker(coords, () => {
-                      if (!isMounted) return;
-                      overlayRevealTimerRef.current = null;
-                      infoOverlay.setMap(map);
-                      openOverlayRef.current = infoOverlay;
-                    });
+                    // 1. Smoothly pan to the marker without zooming
+                    map.panTo(coords);
+
+                    // 2. Update and synchronize popup buttons for correct scale view
+                    if (!isMounted) return;
+                    const currentLevel = map.getLevel();
+                    const isZoomedOut = currentLevel > 3;
+                    const dBtn = infoContent.querySelector(".detail-btn") as HTMLButtonElement;
+                    const zBtn = infoContent.querySelector(".zoom-btn") as HTMLButtonElement;
+                    if (dBtn && zBtn) {
+                      if (isZoomedOut) {
+                        dBtn.className = "detail-btn col-span-8 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer";
+                        zBtn.style.display = "flex";
+                      } else {
+                        dBtn.className = "detail-btn col-span-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer";
+                        zBtn.style.display = "none";
+                      }
+                    }
+
+                    infoOverlay.setMap(map);
+                    openOverlayRef.current = infoOverlay;
                   });
 
                   markersRef.current.push(marker);
@@ -567,6 +640,18 @@ function MapContent() {
                 if (targetCoords.length === 1) {
                   map.setCenter(targetCoords[0]);
                   map.setLevel(3);
+                  
+                  // Ensure startup popup matches level 3 styling on first load
+                  const cNode = targetOverlays[0].getContent();
+                  if (cNode && cNode.querySelector) {
+                    const dBtn = cNode.querySelector(".detail-btn");
+                    const zBtn = cNode.querySelector(".zoom-btn");
+                    if (dBtn && zBtn) {
+                      dBtn.className = "detail-btn col-span-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer";
+                      zBtn.style.display = "none";
+                    }
+                  }
+
                   targetOverlays[0].setMap(map);
                   openOverlayRef.current = targetOverlays[0];
                 } else {
@@ -664,7 +749,7 @@ function MapContent() {
               >
                 <div className="flex items-center gap-1.5">
                   <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-foreground" />
-                  <h3 className="text-[12px] sm:text-[13px] font-bold text-foreground tracking-tight">필터 설정</h3>
+                  <h3 className="text-[13px] sm:text-[14px] font-extrabold text-foreground tracking-tight">필터 설정</h3>
                 </div>
                 {isSidebarExpanded ? <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />}
               </div>
@@ -677,7 +762,7 @@ function MapContent() {
                     <div className="p-2 sm:p-3 border-b border-pink-200/40 bg-pink-50/30 dark:bg-pink-950/20">
                       <button
                         onClick={() => setFocusedEventId(null)}
-                        className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-xl border border-pink-400/50 bg-white dark:bg-pink-950/40 text-pink-600 dark:text-pink-300 text-[10px] sm:text-[11px] font-bold shadow-sm transition-all active:scale-[0.98]"
+                        className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-xl border border-pink-400/50 bg-white dark:bg-pink-950/40 text-pink-600 dark:text-pink-300 text-[11px] sm:text-[12px] font-extrabold shadow-sm transition-all active:scale-[0.98]"
                       >
                         <span className="truncate mr-1">선택 행사만 보기</span>
                         <span className="bg-pink-100 dark:bg-pink-800 px-1.5 py-0.5 rounded-md shrink-0 text-[10px]">✕</span>
@@ -686,9 +771,9 @@ function MapContent() {
                   )}
                   {/* 빠른 필터 Section */}
                   <div className="p-2.5 sm:p-4 border-b border-primary/10">
-                    <h4 className="text-[10px] sm:text-[11px] font-bold text-foreground/70 mb-2">빠른 필터</h4>
-                    <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
-                      <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                    <h4 className="text-[11px] sm:text-[12px] font-bold text-foreground/70 mb-2.5">빠른 필터</h4>
+                    <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                      <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                         {[
                           { id: "all", label: "전체" },
                           { id: "subscribed", label: "구독 행사" },
@@ -698,7 +783,7 @@ function MapContent() {
                             key={item.id}
                             onClick={() => item.id === "all" ? setInteractionFilter("all") : toggleInteractionFilter(item.id as any)}
                             className={cn(
-                              "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[10px] sm:text-[11px] font-bold border transition-all px-0.5 whitespace-nowrap",
+                              "flex items-center justify-center py-2 sm:py-2.5 rounded-full text-[12px] sm:text-[13px] font-bold border transition-all px-0.5 whitespace-nowrap shadow-sm",
                               interactionFilter === item.id
                                 ? item.id === "all"
                                   ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
@@ -715,8 +800,8 @@ function MapContent() {
 
                   {/* 장르 및 주제 Section */}
                   <div className="p-2.5 sm:p-4 border-b border-primary/10">
-                    <h4 className="text-[10px] sm:text-[11px] font-bold text-muted-foreground mb-2">장르 및 주제</h4>
-                    <div className="flex flex-col gap-1 sm:gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                    <h4 className="text-[11px] sm:text-[12px] font-bold text-muted-foreground mb-2.5">장르 및 주제</h4>
+                    <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                       <button
                         onClick={() => setSelectedCategories([])}
                         className={cn(
@@ -751,19 +836,98 @@ function MapContent() {
                     </div>
                   </div>
 
-                  {/* 추가 필터 (진행 중) */}
+                  {/* 진행 기간 Section */}
                   <div className="p-2.5 sm:p-4">
-                    <button
-                      onClick={() => toggleInteractionFilter("ongoing")}
-                      className={cn(
-                        "flex items-center justify-center py-1.5 sm:py-2 rounded-full text-[10px] sm:text-[11px] font-bold border transition-all w-full shadow-sm",
-                        interactionFilter === "ongoing"
-                          ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
-                          : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
-                      )}
-                    >
-                      진행 중
-                    </button>
+                    <h4 className="text-[11px] sm:text-[12px] font-bold text-muted-foreground mb-2.5">진행 기간</h4>
+                    <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                      <button
+                        onClick={() => toggleInteractionFilter("ongoing")}
+                        className={cn(
+                          "flex items-center justify-center py-2 sm:py-2.5 rounded-full text-[12px] sm:text-[13px] font-bold border transition-all w-full shadow-sm",
+                          interactionFilter === "ongoing"
+                            ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
+                            : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                        )}
+                      >
+                        진행 중
+                      </button>
+
+                      <div
+                        onClick={() => toggleInteractionFilter("within_weeks")}
+                        className={cn(
+                          "flex items-center justify-center py-2 sm:py-2.5 px-3 rounded-full text-[12px] sm:text-[13px] font-bold border transition-all w-full shadow-sm cursor-pointer select-none gap-0.5 group",
+                          interactionFilter === "within_weeks"
+                            ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
+                            : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                        )}
+                      >
+                        {/* Custom Stepper Buttons (Placed on the left of the number) */}
+                        <div className="flex flex-col justify-center gap-0 shrink-0 ml-0.5 mr-1" onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            type="button" 
+                            className="hover:text-blue-600 active:scale-75 transition-all"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const current = parseInt(weeksThreshold as any) || 2;
+                              setWeeksThreshold(Math.min(52, current + 1));
+                              if (interactionFilter !== "within_weeks") {
+                                setInteractionFilter("within_weeks");
+                              }
+                            }}
+                          >
+                            <ChevronUp className="h-3 w-3" />
+                          </button>
+                          <button 
+                            type="button" 
+                            className="hover:text-blue-600 active:scale-75 transition-all -mt-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const current = parseInt(weeksThreshold as any) || 2;
+                              setWeeksThreshold(Math.max(1, current - 1));
+                              if (interactionFilter !== "within_weeks") {
+                                setInteractionFilter("within_weeks");
+                              }
+                            }}
+                          >
+                            <ChevronDown className="h-3 w-3" />
+                          </button>
+                        </div>
+
+                        {/* Underlined Number Input */}
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={weeksThreshold}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const valStr = e.target.value.replace(/[^0-9]/g, "");
+                            const val = parseInt(valStr);
+                            if (!isNaN(val) && val > 0) {
+                              setWeeksThreshold(Math.min(52, val));
+                              if (interactionFilter !== "within_weeks") {
+                                setInteractionFilter("within_weeks");
+                              }
+                            } else if (valStr === "") {
+                              setWeeksThreshold("" as any);
+                            }
+                          }}
+                          onBlur={() => {
+                            if (!weeksThreshold) {
+                              setWeeksThreshold(2);
+                            }
+                          }}
+                          className={cn(
+                            "w-5 sm:w-6 text-center bg-transparent focus:outline-none p-0 m-0 shrink-0 border-b border-dashed transition-all leading-none h-4 sm:h-4.5 translate-y-[0.5px] mr-1",
+                            interactionFilter === "within_weeks"
+                              ? "text-slate-950 border-slate-950 focus:border-slate-950 font-extrabold text-[12px] sm:text-[13px]"
+                              : "text-slate-800 dark:text-slate-100 border-slate-400 group-hover:border-slate-600 focus:border-slate-800 font-bold text-[12px] sm:text-[13px]"
+                          )}
+                        />
+
+                        <span className="shrink-0 tracking-tight">주 이내</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -791,6 +955,18 @@ function MapContent() {
               className={cn("w-full h-[650px] bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")}
               style={{ height: "650px", width: "100%" }}
             />
+
+            {/* Bottom Right Floating Fit Bounds Action Button */}
+            {isMapReady && drawnMarkersCount > 0 && (
+              <button
+                onClick={handleResetBounds}
+                className="absolute bottom-4 right-4 z-40 flex h-10 items-center gap-2 rounded-xl border border-border bg-background/90 backdrop-blur-sm px-3.5 font-bold text-foreground shadow-xl hover:bg-accent hover:text-accent-foreground hover:border-border/80 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]"
+                title="지도를 맞추어 모든 행사 한눈에 보기"
+              >
+                <Maximize2 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span className="text-xs tracking-tight">전체 보기</span>
+              </button>
+            )}
           </div>
         </main>
       </div>

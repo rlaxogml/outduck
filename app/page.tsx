@@ -11,7 +11,7 @@ type Event = {
   category: string;
   imageColor: string;
   imageUrl?: string;
-  reservationType: "자유입장" | "예약필수" | "예약우대" | "티켓팅" | undefined;
+  reservationType: "자유 입장" | "예약 필수" | "티켓팅" | "휴무" | undefined;
   channels: { id: number; name: string; image_url: string }[];
   isAlways: boolean;
   createdAt: string;
