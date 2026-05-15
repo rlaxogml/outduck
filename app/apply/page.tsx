@@ -57,6 +57,10 @@ export default function ApplyPage() {
   const [openTeamPopover, setOpenTeamPopover] = useState(false);
   const [teamSearch, setTeamSearch] = useState("");
   
+  // Company specific state
+  const [contact, setContact] = useState("");
+  const [businessNumber, setBusinessNumber] = useState("");
+  
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -64,6 +68,19 @@ export default function ApplyPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // Reset form state on mode switch to prevent cross-contamination
+  useEffect(() => {
+    setName("");
+    setType("");
+    setTeamId("none");
+    setLinks("");
+    setCompany("");
+    setContact("");
+    setBusinessNumber("");
+    setImageUrl(null);
+    setImagePath(null);
+  }, [mode]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -98,6 +115,24 @@ export default function ApplyPage() {
       fetchTeams();
     }
   }, [mode]);
+
+  const formatPhoneNumber = (value: string) => {
+    const clean = value.replace(/[^0-9]/g, "");
+    
+    // Handle Seoul area code (02)
+    if (clean.startsWith("02")) {
+      if (clean.length < 3) return clean;
+      if (clean.length < 6) return `${clean.slice(0, 2)}-${clean.slice(2)}`;
+      if (clean.length < 10) return `${clean.slice(0, 2)}-${clean.slice(2, 5)}-${clean.slice(5)}`;
+      return `${clean.slice(0, 2)}-${clean.slice(2, 6)}-${clean.slice(6, 10)}`;
+    }
+    
+    // Handle standard prefixes (010, 031, 070, etc.)
+    if (clean.length < 4) return clean;
+    if (clean.length < 7) return `${clean.slice(0, 3)}-${clean.slice(3)}`;
+    if (clean.length < 11) return `${clean.slice(0, 3)}-${clean.slice(3, 6)}-${clean.slice(6)}`;
+    return `${clean.slice(0, 3)}-${clean.slice(3, 7)}-${clean.slice(7, 11)}`;
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -143,14 +178,6 @@ export default function ApplyPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name.trim()) {
-      toast.error("이름을 입력해주세요.");
-      return;
-    }
-    if (!type) {
-      toast.error("유형을 선택해주세요.");
-      return;
-    }
     if (!user) {
       toast.error("로그인 정보가 확인되지 않습니다.");
       return;
@@ -158,24 +185,71 @@ export default function ApplyPage() {
 
     setIsSubmitting(true);
     try {
-      const isYoutuberType = type === "youtuber" || type === "youtuber_team";
-      const insertData = {
-        user_id: user.id,
-        name: name.trim(),
-        type: isYoutuberType ? "youtuber" : type,
-        is_team: type === "youtuber_team",
-        team_id: type === "youtuber" && teamId !== "none" ? parseInt(teamId) : null,
-        company: isYoutuberType ? company.trim() || null : null,
-        links: links.trim() || null,
-        image_url: imageUrl,
-        status: "pending",
-      };
+      if (mode === "admin") {
+        if (!name.trim()) {
+          toast.error("회사명을 입력해주세요.");
+          setIsSubmitting(false);
+          return;
+        }
+        if (!contact.trim()) {
+          toast.error("연락처를 입력해주세요.");
+          setIsSubmitting(false);
+          return;
+        }
+        if (!businessNumber.trim()) {
+          toast.error("사업자등록번호를 입력해주세요.");
+          setIsSubmitting(false);
+          return;
+        }
 
-      const { error } = await supabase
-        .from("channel_requests")
-        .insert([insertData]);
+        const insertData = {
+          user_id: user.id,
+          name: name.trim(),
+          image_url: imageUrl,
+          contact: contact.trim(),
+          business_number: businessNumber.trim(),
+          request_type: "company",
+          status: "pending",
+        };
 
-      if (error) throw error;
+        const { error } = await supabase
+          .from("channel_requests")
+          .insert([insertData]);
+
+        if (error) throw error;
+      } else {
+        // mode === "organizer"
+        if (!name.trim()) {
+          toast.error("이름을 입력해주세요.");
+          setIsSubmitting(false);
+          return;
+        }
+        if (!type) {
+          toast.error("유형을 선택해주세요.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        const isYoutuberType = type === "youtuber" || type === "youtuber_team";
+        const insertData = {
+          user_id: user.id,
+          name: name.trim(),
+          type: isYoutuberType ? "youtuber" : type,
+          is_team: type === "youtuber_team",
+          team_id: type === "youtuber" && teamId !== "none" ? parseInt(teamId) : null,
+          company: isYoutuberType ? company.trim() || null : null,
+          links: links.trim() || null,
+          image_url: imageUrl,
+          request_type: "organizer",
+          status: "pending",
+        };
+
+        const { error } = await supabase
+          .from("channel_requests")
+          .insert([insertData]);
+
+        if (error) throw error;
+      }
 
       setIsSuccess(true);
       toast.success("신청이 성공적으로 접수되었습니다.");
@@ -263,17 +337,115 @@ export default function ApplyPage() {
         )}
 
         {mode === "admin" && (
-          <div className="flex flex-col items-center justify-center pt-20 space-y-6 animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center">
-              <AlertCircle className="w-10 h-10 text-muted-foreground" />
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <button 
+              onClick={() => setMode("selection")}
+              className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground mb-6 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" /> 신청 유형 다시 선택
+            </button>
+            
+            <div className="bg-background border border-border rounded-3xl p-6 sm:p-10 shadow-xl">
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-8">관리자(회사) 신청서</h2>
+              
+              <form onSubmit={handleSubmit} className="space-y-8">
+                
+                {/* Profile Image Section */}
+                <div className="space-y-4">
+                  <Label className="text-base font-semibold">회사 로고 / 프로필 이미지</Label>
+                  <div className="flex items-center gap-6">
+                    <div className="relative w-24 h-24 flex-shrink-0 bg-muted rounded-2xl overflow-hidden group border-2 border-dashed border-muted-foreground/20 flex items-center justify-center">
+                      {imageUrl ? (
+                        <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Building2 className="w-8 h-8 text-muted-foreground/40" />
+                      )}
+                      {isUploading && (
+                        <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 space-y-2">
+                      <div className="relative">
+                        <input
+                          type="file"
+                          id="image-upload-admin"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                          disabled={isUploading}
+                        />
+                        <label htmlFor="image-upload-admin">
+                          <Button type="button" variant="outline" className="cursor-pointer rounded-xl" asChild disabled={isUploading}>
+                            <span>
+                              <Upload className="w-4 h-4 mr-2" /> {imageUrl ? "이미지 변경" : "이미지 업로드"}
+                            </span>
+                          </Button>
+                        </label>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">회사 공식 로고 또는 대표 이미지입니다.<br/>(정사각형 비율 권장)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Basic Fields */}
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-name" className="text-base font-semibold">회사명 <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="admin-name"
+                      placeholder="정식 회사명 또는 단체명을 입력하세요"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contact" className="text-base font-semibold">연락처 <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="contact"
+                      placeholder="담당자 연락처 또는 회사 대표 번호"
+                      value={contact}
+                      onChange={(e) => setContact(formatPhoneNumber(e.target.value))}
+                      maxLength={13}
+                      className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="businessNumber" className="text-base font-semibold">사업자등록번호 <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="businessNumber"
+                      placeholder="사업자등록번호(단체의 경우 고유번호 등)를 입력하세요"
+                      value={businessNumber}
+                      onChange={(e) => setBusinessNumber(e.target.value)}
+                      className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <div className="pt-4">
+                  <Button 
+                    type="submit" 
+                    className="w-full h-14 text-lg font-bold rounded-xl bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-500/20 text-white"
+                    disabled={isSubmitting || isUploading}
+                  >
+                    {isSubmitting ? (
+                      <><Loader2 className="w-5 h-5 animate-spin mr-2" /> 처리 중...</>
+                    ) : (
+                      "관리자 신청 완료하기"
+                    )}
+                  </Button>
+                </div>
+              </form>
             </div>
-            <div className="text-center">
-              <h2 className="text-2xl font-bold mb-2">준비 중입니다.</h2>
-              <p className="text-muted-foreground">관리자(회사) 신청 서비스는 현재 준비 중입니다.<br/>빠른 시일 내에 찾아뵙겠습니다.</p>
-            </div>
-            <Button variant="outline" className="mt-4 rounded-xl" onClick={() => setMode("selection")}>
-              <ArrowLeft className="w-4 h-4 mr-2" /> 뒤로가기
-            </Button>
           </div>
         )}
 

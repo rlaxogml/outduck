@@ -82,6 +82,8 @@ function CalendarContent() {
   }, [user]);
 
   useEffect(() => {
+    let ignore = false;
+
     const fetchEventsAndUserData = async () => {
       try {
         setLoading(true);
@@ -141,6 +143,8 @@ function CalendarContent() {
           onlineQuery
         ]);
 
+        if (ignore) return;
+
         let bookmarks: number[] = [];
         let subscriptions: number[] = [];
 
@@ -149,6 +153,8 @@ function CalendarContent() {
             supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id),
             supabase.from("favorites").select("channel_id").eq("user_id", user.id),
           ]);
+
+          if (ignore) return;
 
           if (bookmarksData) {
             bookmarks = bookmarksData
@@ -160,8 +166,10 @@ function CalendarContent() {
           }
         }
 
-        setUserBookmarkedEventIds(bookmarks);
-        setUserSubscribedChannelIds(subscriptions);
+        if (!ignore) {
+          setUserBookmarkedEventIds(bookmarks);
+          setUserSubscribedChannelIds(subscriptions);
+        }
 
         const extractChannels = (eventChannels: any[]) => {
           return (eventChannels || [])
@@ -243,24 +251,31 @@ function CalendarContent() {
         });
 
         const combined = [...formattedOffline, ...formattedOnline];
-        setEvents(combined);
+        
+        if (!ignore) {
+          setEvents(combined);
 
-        // If highlight param is passed, set selectedDate to that event's startDate
-        if (highlightId) {
-          const highlightEvent = combined.find(e => e.id === highlightId);
-          if (highlightEvent && highlightEvent.startDateValue) {
-            setSelectedDate(new Date(highlightEvent.startDateValue));
-            setCurrentMonth(new Date(highlightEvent.startDateValue));
+          // If highlight param is passed, set selectedDate to that event's startDate
+          if (highlightId) {
+            const highlightEvent = combined.find(e => e.id === highlightId);
+            if (highlightEvent && highlightEvent.startDateValue) {
+              setSelectedDate(new Date(highlightEvent.startDateValue));
+              setCurrentMonth(new Date(highlightEvent.startDateValue));
+            }
           }
         }
       } catch (error) {
-        console.error("캘린더 데이터를 불러오는 중 오류 발생:", error);
+        if (!ignore) console.error("캘린더 데이터를 불러오는 중 오류 발생:", error);
       } finally {
-        setLoading(false);
+        if (!ignore) setLoading(false);
       }
     };
 
     fetchEventsAndUserData();
+
+    return () => {
+      ignore = true;
+    };
   }, [user, highlightId]);
 
   const toggleFilter = (id: string) => {

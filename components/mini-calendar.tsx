@@ -73,6 +73,8 @@ export function MiniCalendar({ user }: { user: User | null }) {
   const weekEnd = sortedWeekDates[6].toLocaleDateString("sv-SE");
 
   useEffect(() => {
+    let ignore = false;
+
     const fetchWeeklyEvents = async () => {
       try {
         setLoading(true);
@@ -85,6 +87,7 @@ export function MiniCalendar({ user }: { user: User | null }) {
             supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id),
             supabase.from("favorites").select("channel_id").eq("user_id", user.id),
           ]);
+          if (ignore) return;
           if (bData) {
             bookmarkedEventIds = bData.map(d => d.event_id).filter(Boolean);
           }
@@ -114,6 +117,8 @@ export function MiniCalendar({ user }: { user: User | null }) {
             .lte("start_at", weekEnd)
             .or(`end_at.gte.${weekStart},end_at.is.null`)
         ]);
+
+        if (ignore) return;
 
         const allRawOffline = offRes.data || [];
         const allRawOnline = onRes.data || [];
@@ -163,17 +168,23 @@ export function MiniCalendar({ user }: { user: User | null }) {
 
         const combined = [...formattedOffline, ...formattedOnline];
 
-        setAllEvents(combined);
-        setBookmarkedEventIds(bookmarkedEventIds);
-        setSubscribedChannelIds(subscribedChannelIds);
+        if (!ignore) {
+          setAllEvents(combined);
+          setBookmarkedEventIds(bookmarkedEventIds);
+          setSubscribedChannelIds(subscribedChannelIds);
+        }
       } catch (error) {
-        console.error("Fail load mini cal:", error);
+        if (!ignore) console.error("Fail load mini cal:", error);
       } finally {
-        setLoading(false);
+        if (!ignore) setLoading(false);
       }
     };
 
     fetchWeeklyEvents();
+
+    return () => {
+      ignore = true;
+    };
   }, [weekStart, weekEnd, user]);
 
   const filteredEvents = allEvents.filter(ev => {

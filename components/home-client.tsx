@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
 import { EventTabs } from "@/components/event-tabs";
 import { CategoryFilter } from "@/components/category-filter";
@@ -37,6 +38,7 @@ interface HomeClientProps {
 }
 
 export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeClientProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
   const [activeCategory, setActiveCategory] = useState("all");
   const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
@@ -52,22 +54,48 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
   }, [activeTab, activeCategory, sortType]);
 
   useEffect(() => {
+    const checkCompanyUser = async (userId: string) => {
+      try {
+        const { data } = await supabase
+          .from("companies")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (data) {
+          router.replace("/company");
+        }
+      } catch (err) {
+        console.error("Company user check failed:", err);
+      }
+    };
+
     const syncSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
+        const currentUser = session?.user ?? null;
+        setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+
+        if (currentUser) {
+          await checkCompanyUser(currentUser.id);
+        }
       } catch (err) {
         console.error(err);
       }
     };
     syncSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+      
+      if (currentUser) {
+        await checkCompanyUser(currentUser.id);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [router]);
 
   const filteredEvents = (() => {
     let result = activeTab === "offline" ? offlineEvents : onlineEvents;

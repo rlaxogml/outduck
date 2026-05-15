@@ -34,6 +34,9 @@ type ChannelRequest = {
   links: string | null;
   image_url: string | null;
   status: "pending" | "approved" | "rejected";
+  request_type?: "organizer" | "company";
+  contact?: string | null;
+  business_number?: string | null;
 };
 
 export default function AdminPage() {
@@ -116,24 +119,41 @@ export default function AdminPage() {
       if (updateError) throw updateError;
 
       if (action === "approve") {
-        const { error: insertError } = await supabase
-          .from("channels")
-          .insert([{
-            name: request.name,
-            type: request.type,
-            image_url: request.image_url,
-            is_team: request.is_team,
-            team_id: request.team_id,
-            owner_id: request.user_id,
-            links: request.links,
-            company: request.company
-          }]);
+        if (request.request_type === "company") {
+          const { error: insertError } = await supabase
+            .from("companies")
+            .insert([{
+              user_id: request.user_id,
+              name: request.name,
+              profile_image_url: request.image_url
+            }]);
 
-        if (insertError) {
-          console.error("Channel insert error:", insertError);
-          toast.warning("상태는 변경되었으나 채널 생성 실패: " + insertError.message);
+          if (insertError) {
+            console.error("Company insert error:", insertError);
+            toast.warning("상태는 변경되었으나 회사 생성 실패: " + insertError.message);
+          } else {
+            toast.success("관리자(회사)가 승인되어 즉시 등록되었습니다!");
+          }
         } else {
-          toast.success("채널이 승인되어 시스템에 즉시 등록되었습니다!");
+          const { error: insertError } = await supabase
+            .from("channels")
+            .insert([{
+              name: request.name,
+              type: request.type,
+              image_url: request.image_url,
+              is_team: request.is_team,
+              team_id: request.team_id,
+              owner_id: request.user_id,
+              links: request.links,
+              company: request.company
+            }]);
+
+          if (insertError) {
+            console.error("Channel insert error:", insertError);
+            toast.warning("상태는 변경되었으나 채널 생성 실패: " + insertError.message);
+          } else {
+            toast.success("채널이 승인되어 시스템에 즉시 등록되었습니다!");
+          }
         }
       } else {
         toast.success("신청 건을 거절 처리했습니다.");
@@ -236,31 +256,50 @@ export default function AdminPage() {
                       </Badge>
                     </div>
                     <div className="flex flex-wrap gap-x-3 mt-1.5 text-xs text-muted-foreground">
-                      <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "동인 행사" : "게임"}</div>
+                      {req.request_type === "company" ? (
+                        <div className="flex items-center font-bold text-orange-500"><Building2 className="w-3 h-3 mr-1" /> 관리자(회사)</div>
+                      ) : (
+                        <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "동인 행사" : "게임"}</div>
+                      )}
                       <div className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> {new Date(req.created_at).toLocaleDateString()}</div>
                     </div>
                   </div>
                 </div>
                 <div className="space-y-3 mb-6 flex-1 bg-muted/20 rounded-2xl p-4 border border-border/50">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="text-[10px] font-bold text-muted-foreground mb-1">소속사</div>
-                      <div className="font-semibold flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 opacity-50" /> {req.company || <span className="text-muted-foreground font-normal italic">없음</span>}</div>
-                    </div>
-                    {!req.is_team && (
+                  {req.request_type === "company" ? (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <div className="text-[10px] font-bold text-muted-foreground mb-1">소속 팀</div>
-                        <div className="font-semibold flex items-center gap-1.5"><Users className="w-3.5 h-3.5 opacity-50" /> {req.team_id ? (teams[req.team_id] || "...") : <span className="text-muted-foreground font-normal italic">없음</span>}</div>
+                        <div className="text-[10px] font-bold text-muted-foreground mb-1">연락처</div>
+                        <div className="font-semibold flex items-center gap-1.5">{req.contact || "미기재"}</div>
                       </div>
-                    )}
-                  </div>
-                  {req.links && (
-                    <div className="pt-2 border-t border-border/40">
-                      <div className="text-[10px] font-bold text-muted-foreground mb-1">링크</div>
-                      <div className="text-xs bg-background/80 rounded-lg p-2 break-all flex items-start gap-2">
-                        <ExternalLink className="w-3 h-3 mt-0.5 shrink-0 opacity-50" /> <span className="whitespace-pre-wrap">{req.links}</span>
+                      <div>
+                        <div className="text-[10px] font-bold text-muted-foreground mb-1">사업자등록번호</div>
+                        <div className="font-semibold flex items-center gap-1.5">{req.business_number || "미기재"}</div>
                       </div>
                     </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-[10px] font-bold text-muted-foreground mb-1">소속사</div>
+                          <div className="font-semibold flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 opacity-50" /> {req.company || <span className="text-muted-foreground font-normal italic">없음</span>}</div>
+                        </div>
+                        {!req.is_team && (
+                          <div>
+                            <div className="text-[10px] font-bold text-muted-foreground mb-1">소속 팀</div>
+                            <div className="font-semibold flex items-center gap-1.5"><Users className="w-3.5 h-3.5 opacity-50" /> {req.team_id ? (teams[req.team_id] || "...") : <span className="text-muted-foreground font-normal italic">없음</span>}</div>
+                          </div>
+                        )}
+                      </div>
+                      {req.links && (
+                        <div className="pt-2 border-t border-border/40">
+                          <div className="text-[10px] font-bold text-muted-foreground mb-1">링크</div>
+                          <div className="text-xs bg-background/80 rounded-lg p-2 break-all flex items-start gap-2">
+                            <ExternalLink className="w-3 h-3 mt-0.5 shrink-0 opacity-50" /> <span className="whitespace-pre-wrap">{req.links}</span>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className="flex gap-2">

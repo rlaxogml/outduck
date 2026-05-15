@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
-type ReservationType = "예약필수" | "예약우대" | "자유입장" | "티켓팅";
+type ReservationType = "예약 필수" | "예약 우대" | "자유 입장" | "티켓팅" | "휴무" | "예약필수" | "예약우대" | "자유입장";
 
 interface EventCardProps {
   id: number;
@@ -20,7 +20,7 @@ interface EventCardProps {
   category: string;
   imageColor: string;
   imageUrl?: string;
-  reservationType?: ReservationType;
+  reservationType?: string; // Allow any string for safety
   channels?: { id: number; name: string; image_url: string }[];
   user: User | null;
   eventType: "offline" | "online";
@@ -29,11 +29,15 @@ interface EventCardProps {
   isPriority?: boolean;
 }
 
-const reservationBadgeColors: Record<ReservationType, string> = {
+const reservationBadgeColors: Record<string, string> = {
+  "예약 필수": "bg-red-500 text-white",
   "예약필수": "bg-red-500 text-white",
+  "예약 우대": "bg-orange-500 text-white",
   "예약우대": "bg-orange-500 text-white",
+  "자유 입장": "bg-green-500 text-white",
   "자유입장": "bg-green-500 text-white",
   "티켓팅": "bg-purple-500 text-white",
+  "휴무": "bg-slate-500 text-white",
 };
 
 const categoryBadgeColors: Record<string, string> = {
