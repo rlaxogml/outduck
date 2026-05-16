@@ -349,12 +349,12 @@ function MapContent() {
         const cutoffMs = todayMs + (numWeeks * 7 * 24 * 60 * 60 * 1000);
         const cutoffStr = new Date(cutoffMs).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
         
-        intMatched = event.rawStartDate && event.rawStartDate >= todayStr && event.rawStartDate <= cutoffStr;
+        intMatched = !event.rawStartDate || event.rawStartDate <= cutoffStr;
       }
 
       return catMatched && intMatched;
     });
-  }, [events, selectedCategories, interactionFilter, userSubscribedChannelIds, userBookmarkedEventIds, focusedEventId]);
+  }, [events, selectedCategories, interactionFilter, userSubscribedChannelIds, userBookmarkedEventIds, focusedEventId, weeksThreshold]);
 
   const toggleCategory = (categoryId: string) => {
     setSelectedCategories(prev => {
