@@ -246,10 +246,28 @@ export function Header() {
   };
 
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
+    // 강제로 Supabase 관련 로컬 스토리지 키 먼저 삭제
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('sb-')) {
+        localStorage.removeItem(key);
+      }
+    }
+
+    // 상태 바로 초기화
     setUser(null);
-    window.location.reload();
+
+    // 로그아웃 API는 백그라운드에서 호출 (await 하지 않음 - 무한 대기 방지)
+    supabase.auth.signOut().catch((error) => {
+      console.error("Logout error:", error);
+    });
+
+    // 즉시 새로고침하여 홈으로
+    if (window.location.pathname === "/") {
+      window.location.reload();
+    } else {
+      window.location.href = "/";
+    }
   };
 
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
@@ -457,7 +475,7 @@ export function Header() {
 
           <div className="flex-shrink-0 justify-self-end">
             {user ? (
-              <DropdownMenu>
+              <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Avatar className="h-8 w-8 md:h-11 md:w-11 border border-border cursor-pointer hover:opacity-80 transition-opacity">
                     <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />
@@ -467,8 +485,8 @@ export function Header() {
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuLabel>{userName}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/mypage')} className="cursor-pointer">
-                    마이페이지
+                  <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
+                    설정
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10">

@@ -100,6 +100,8 @@ export default function CompanyPage() {
   const [newChanIsTeam, setNewChanIsTeam] = useState(false);
   const [newChanImageUrl, setNewChanImageUrl] = useState<string | null>(null);
   const [newChanTeamId, setNewChanTeamId] = useState("none");
+  const [teamSearchText, setTeamSearchText] = useState("");
+  const [isTeamSearchFocused, setIsTeamSearchFocused] = useState(false);
   const [allTeams, setAllTeams] = useState<{ id: number; name: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -107,8 +109,35 @@ export default function CompanyPage() {
   // Assign Owner Dialog States
   const [isOwnerOpen, setIsOwnerOpen] = useState(false);
   const [targetChan, setTargetChan] = useState<Channel | null>(null);
-  const [newOwnerId, setNewOwnerId] = useState("");
+  const [transferCode, setTransferCode] = useState<string | null>(null);
+  const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
+
+  useEffect(() => {
+    if (!transferCode || !codeExpiresAt) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const diff = Math.floor((codeExpiresAt - now) / 1000);
+      
+      if (diff <= 0) {
+        clearInterval(interval);
+        toast.error("10분이 경과하여 코드가 만료되었습니다.");
+        setIsOwnerOpen(false);
+        setTransferCode(null);
+        setCodeExpiresAt(null);
+        setTargetChan(null);
+      } else {
+        setTimeLeft(diff);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [transferCode, codeExpiresAt]);
 
   useEffect(() => {
     const initialize = async () => {
@@ -407,6 +436,7 @@ export default function CompanyPage() {
       setNewChanImageUrl(null);
       setNewChanIsTeam(false);
       setNewChanTeamId("none");
+      setTeamSearchText("");
       setIsCreateOpen(false);
       
       await fetchChannelsAndEvents(company.name);
@@ -418,30 +448,48 @@ export default function CompanyPage() {
     }
   };
 
-  const handleAssignOwner = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!targetChan || !company) return;
+  const generateRandomCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
 
+  const hashString = async (str: string) => {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  };
+
+  const handleGenerateTransferCode = async () => {
+    if (!targetChan) return;
     setIsAssigning(true);
     try {
-      const assignedId = newOwnerId.trim() === "" ? null : newOwnerId.trim();
-      
+      const code = generateRandomCode();
+      const codeHash = await hashString(code);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
+
       const { error } = await supabase
-        .from("channels")
-        .update({ owner_id: assignedId })
-        .eq("id", targetChan.id);
+        .from("owner_transfer_codes")
+        .insert({
+          channel_id: targetChan.id,
+          code_hash: codeHash,
+          expires_at: expiresAt,
+          is_used: false
+        });
 
       if (error) throw error;
 
-      toast.success("채널 권한이 성공적으로 업데이트되었습니다.");
-      setIsOwnerOpen(false);
-      setNewOwnerId("");
-      setTargetChan(null);
-
-      await fetchChannelsAndEvents(company.name);
+      setTransferCode(code);
+      setCodeExpiresAt(Date.now() + 10 * 60 * 1000);
+      setTimeLeft(10 * 60);
+      toast.success("권한 위임 코드가 생성되었습니다.");
     } catch (err: any) {
       console.error(err);
-      toast.error("권한 부여 실패: " + err.message);
+      toast.error("코드 생성 실패: " + err.message);
     } finally {
       setIsAssigning(false);
     }
@@ -620,11 +668,11 @@ export default function CompanyPage() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setTargetChan(channel);
-                          setNewOwnerId(channel.owner_id || "");
+                          setTransferCode(null);
                           setIsOwnerOpen(true);
                         }}
                         className="absolute -bottom-1 -right-1 bg-slate-900 hover:bg-orange-600 text-white p-1 rounded-full border-2 border-white transition-all duration-200 shadow-md cursor-pointer scale-95 group-hover:scale-105 active:scale-90 z-10"
-                        title="오너 권한 관리"
+                        title="권한 관리"
                       >
                         <Settings className="w-3 h-3" />
                       </button>
@@ -702,7 +750,12 @@ export default function CompanyPage() {
       {/* Dialog Modals */}
 
       {/* 1. Create Channel Modal */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+      <Dialog open={isCreateOpen} onOpenChange={(open) => {
+        setIsCreateOpen(open);
+        if (!open) {
+          setTeamSearchText("");
+        }
+      }}>
         <DialogContent className="sm:max-w-[460px] rounded-3xl shadow-2xl">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-xl md:text-2xl font-extrabold flex items-center gap-2">
@@ -792,20 +845,45 @@ export default function CompanyPage() {
                 <div className="min-h-[68px] flex flex-col justify-end">
                   {!newChanIsTeam && (
                     <div className="space-y-2 animate-in fade-in duration-300">
-                      <Label htmlFor="teamSelect" className="font-bold text-xs md:text-sm">소속 팀</Label>
-                      <Select value={newChanTeamId} onValueChange={setNewChanTeamId}>
-                        <SelectTrigger id="teamSelect" className="h-11 rounded-xl bg-muted/20 border-border/60">
-                          <SelectValue placeholder="소속 없음" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          <SelectItem value="none">소속 없음</SelectItem>
-                          {allTeams.map((t) => (
-                            <SelectItem key={t.id} value={t.id.toString()}>
-                              {t.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="teamSearch" className="font-bold text-xs md:text-sm">소속 팀 검색</Label>
+                      <div className="relative">
+                        <Input
+                          id="teamSearch"
+                          value={teamSearchText}
+                          onChange={(e) => {
+                            setTeamSearchText(e.target.value);
+                            setNewChanTeamId("none"); // Reset ID when typing
+                          }}
+                          onFocus={() => setIsTeamSearchFocused(true)}
+                          onBlur={() => setTimeout(() => setIsTeamSearchFocused(false), 150)}
+                          placeholder="소속 없음"
+                          className="h-11 rounded-xl bg-muted/20 border-border/60"
+                          autoComplete="off"
+                        />
+                        {isTeamSearchFocused && teamSearchText.trim().length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
+                            {allTeams.filter(t => t.name.toLowerCase().includes(teamSearchText.toLowerCase())).length > 0 ? (
+                              allTeams
+                                .filter(t => t.name.toLowerCase().includes(teamSearchText.toLowerCase()))
+                                .map(t => (
+                                  <div 
+                                    key={t.id}
+                                    className="px-3 py-2 hover:bg-muted cursor-pointer text-sm font-medium"
+                                    onClick={() => {
+                                      setNewChanTeamId(t.id.toString());
+                                      setTeamSearchText(t.name);
+                                      setIsTeamSearchFocused(false);
+                                    }}
+                                  >
+                                    {t.name}
+                                  </div>
+                                ))
+                            ) : (
+                              <div className="px-3 py-2 text-sm text-muted-foreground text-center">결과가 없습니다.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -822,44 +900,61 @@ export default function CompanyPage() {
       </Dialog>
 
       {/* 2. Assign Owner Rights Dialog */}
-      <Dialog open={isOwnerOpen} onOpenChange={setIsOwnerOpen}>
-        <DialogContent className="rounded-3xl max-w-[420px] shadow-2xl">
+      <Dialog open={isOwnerOpen} onOpenChange={(open) => {
+        setIsOwnerOpen(open);
+        if (!open) {
+          setTransferCode(null);
+          setCodeExpiresAt(null);
+          setTargetChan(null);
+        }
+      }}>
+        <DialogContent 
+          className="rounded-3xl max-w-[420px] shadow-2xl"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg md:text-xl font-extrabold text-foreground">
-              <Key className="w-5 h-5 text-orange-600" /> 오너 권한 위임
+              <Key className="w-5 h-5 text-orange-600" /> 권한 위임
             </DialogTitle>
             <DialogDescription className="text-xs md:text-sm leading-relaxed mt-1">
-              '<strong>{targetChan?.name}</strong>' 채널을 직접 가꾸고 이벤트를 개설할 멤버의 **유저 UUID(UID)**를 할당합니다. <br/>
-              (값을 비우면 소속사의 공용 관리 하로 회수됩니다.)
+              '<strong>{targetChan?.name}</strong>' 채널의 권한을 위임할 수 있는 일회용 코드를 생성합니다.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleAssignOwner} className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="ownerUid" className="font-bold text-xs text-muted-foreground flex items-center gap-1">
-                <UserCircle className="w-3.5 h-3.5" /> 대상 사용자 고유 UUID (User ID)
-              </Label>
-              <Input
-                id="ownerUid"
-                value={newOwnerId}
-                onChange={e => setNewOwnerId(e.target.value)}
-                placeholder="예: 550e8400-e29b-41d4-a716-446655440000"
-                className="font-mono text-xs md:text-sm h-11 rounded-xl border-orange-500/10 focus:border-orange-500"
-              />
-              <p className="text-[10px] text-muted-foreground leading-relaxed font-medium">
-                🚨 정확한 ID를 입력하세요. 권한 위임 시 해당 유저는 본 채널 자격으로 모든 스케줄 등록 및 수정을 전적으로 책임지게 됩니다.
-              </p>
-            </div>
-
-            <DialogFooter className="gap-2 pt-2 flex-row">
-              <Button type="button" variant="ghost" className="rounded-xl font-bold flex-1 shadow-sm" onClick={() => setIsOwnerOpen(false)}>
-                취소
-              </Button>
-              <Button type="submit" className="rounded-xl font-bold bg-orange-600 hover:bg-orange-700 text-white flex-1 shadow-md" disabled={isAssigning}>
-                {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : "위임 확정하기"}
-              </Button>
-            </DialogFooter>
-          </form>
+          <div className="space-y-4 pt-4">
+            {transferCode ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted/50 rounded-xl border border-border flex flex-col items-center gap-2">
+                  <p className="text-sm font-semibold text-muted-foreground">생성된 위임 코드</p>
+                  <p className="text-3xl font-mono font-black tracking-widest text-orange-600 select-all">
+                    {transferCode}
+                  </p>
+                  {timeLeft !== null && (
+                    <div className="mt-1 text-xs font-bold px-3 py-1 bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-full animate-pulse">
+                      남은 시간: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed font-medium text-center bg-orange-500/10 p-3 rounded-xl text-orange-700 dark:text-orange-400">
+                  🚨 이 코드는 생성 후 <strong>10분간 유효</strong>하며, 한 번만 사용할 수 있습니다. <br/>
+                  위임받을 사용자에게 이 코드를 전달해주세요. 창을 닫으면 코드를 다시 볼 수 없습니다.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4 text-center">
+                <p className="text-sm text-muted-foreground font-medium">
+                  아래 버튼을 눌러 8자리 보안 코드를 생성하세요.
+                </p>
+                <Button 
+                  onClick={handleGenerateTransferCode} 
+                  className="w-full rounded-xl font-bold bg-orange-600 hover:bg-orange-700 text-white h-12 shadow-md" 
+                  disabled={isAssigning}
+                >
+                  {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : "위임 코드 생성하기"}
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
