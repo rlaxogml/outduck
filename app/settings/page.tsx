@@ -10,8 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { User } from "@supabase/supabase-js";
-import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound } from "lucide-react";
+import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft } from "lucide-react";
 import { toast } from "sonner"; // Assuming sonner is available, or use alert
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Users } from "lucide-react";
 
 type Tab = "account" | "notifications" | "advanced";
 
@@ -39,6 +42,29 @@ export default function SettingsPage() {
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [isCapsLockOn, setIsCapsLockOn] = useState(false);
 
+  // Channel Management State
+  const [ownedChannels, setOwnedChannels] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+
+  const fetchOwnedChannelsAndTeams = async (userId: string) => {
+    const [{ data: channelsData }, { data: teamsData }] = await Promise.all([
+      supabase.from("channels").select("*").eq("owner_id", userId).order("name"),
+      supabase.from("channels").select("id, name").eq("is_team", true).order("name")
+    ]);
+    setOwnedChannels(channelsData || []);
+    setTeams(teamsData || []);
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tab = searchParams.get("tab");
+      if (tab === "account" || tab === "notifications" || tab === "advanced") {
+        setActiveTab(tab as Tab);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -56,6 +82,7 @@ export default function SettingsPage() {
           setUser(currentUser);
           setName(currentUser.user_metadata?.name || "");
           setAvatarUrl(currentUser.user_metadata?.avatar_url || "");
+          fetchOwnedChannelsAndTeams(currentUser.id);
         }
 
         // Fetch counts
@@ -155,10 +182,30 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateNotifications = async () => {
+  const handleToggleNotifyNewEvent = async (checked: boolean) => {
+    setNotifyNewEvent(checked);
     if (!user) return;
-    setIsUpdatingNotifications(true);
+    try {
+      const { error } = await supabase
+        .from("notifications")
+        .upsert(
+          { 
+            user_id: user.id, 
+            notify_new_event: checked, 
+            notify_bookmark_notice: notifyBookmarkNotice 
+          },
+          { onConflict: 'user_id' }
+        );
+      if (error) throw error;
+      toast.success("새 행사 알림 설정이 업데이트되었습니다.");
+    } catch (error) {
+      toast.error("알림 설정 저장에 실패했습니다.");
+    }
+  };
 
+  const handleToggleNotifyBookmarkNotice = async (checked: boolean) => {
+    setNotifyBookmarkNotice(checked);
+    if (!user) return;
     try {
       const { error } = await supabase
         .from("notifications")
@@ -166,21 +213,14 @@ export default function SettingsPage() {
           { 
             user_id: user.id, 
             notify_new_event: notifyNewEvent, 
-            notify_bookmark_notice: notifyBookmarkNotice 
+            notify_bookmark_notice: checked 
           },
           { onConflict: 'user_id' }
         );
-
-      if (error) {
-        // Fallback for different schema if standard one fails
-        console.warn("Notifications table might not have expected schema:", error);
-      }
-      
-      alert("알림 설정이 저장되었습니다.");
-    } catch (error: any) {
-      alert("알림 설정 저장에 실패했습니다.");
-    } finally {
-      setIsUpdatingNotifications(false);
+      if (error) throw error;
+      toast.success("공지 알림 설정이 업데이트되었습니다.");
+    } catch (error) {
+      toast.error("알림 설정 저장에 실패했습니다.");
     }
   };
 
@@ -199,8 +239,9 @@ export default function SettingsPage() {
       if (error) throw error;
 
       if (data?.success) {
-        alert("권한 위임이 완료되었습니다.");
+        toast.success("권한 위임이 완료되었습니다.");
         setOwnerCode("");
+        if (user) fetchOwnedChannelsAndTeams(user.id);
       } else {
         alert(data?.message || "유효하지 않은 코드입니다.");
       }
@@ -236,7 +277,18 @@ export default function SettingsPage() {
         {/* Sidebar */}
         <aside className="w-full md:w-64 shrink-0">
           <div className="sticky top-24 space-y-1">
-            <h2 className="px-4 text-lg font-bold tracking-tight mb-4">설정</h2>
+            <div className="mb-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.back()}
+                className="h-12 w-12 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground mb-3 -ml-3"
+                title="뒤로 가기"
+              >
+                <ChevronLeft className="size-8 animate-in fade-in duration-300" />
+              </Button>
+              <h2 className="px-4 text-lg font-bold tracking-tight">설정</h2>
+            </div>
             
             <button
               onClick={() => setActiveTab("account")}
@@ -285,7 +337,7 @@ export default function SettingsPage() {
                 <p className="text-muted-foreground text-sm">프로필 정보와 활동 내역을 확인합니다.</p>
               </div>
 
-              <div className="border border-border rounded-2xl p-6 bg-card shadow-sm space-y-8">
+              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-8">
                 {/* Profile Image & Name */}
                 <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
                   <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
@@ -354,7 +406,7 @@ export default function SettingsPage() {
                 <p className="text-muted-foreground text-sm">받고 싶은 알림을 선택하세요.</p>
               </div>
 
-              <div className="border border-border rounded-2xl p-6 bg-card shadow-sm space-y-8">
+              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-8">
                 <div className="space-y-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="space-y-0.5">
@@ -363,7 +415,7 @@ export default function SettingsPage() {
                     </div>
                     <Switch 
                       checked={notifyNewEvent} 
-                      onCheckedChange={setNotifyNewEvent} 
+                      onCheckedChange={handleToggleNotifyNewEvent} 
                     />
                   </div>
                   <div className="h-px w-full bg-border" />
@@ -374,20 +426,9 @@ export default function SettingsPage() {
                     </div>
                     <Switch 
                       checked={notifyBookmarkNotice} 
-                      onCheckedChange={setNotifyBookmarkNotice} 
+                      onCheckedChange={handleToggleNotifyBookmarkNotice} 
                     />
                   </div>
-                </div>
-
-                <div className="flex justify-end pt-4">
-                  <Button 
-                    onClick={handleUpdateNotifications} 
-                    disabled={isUpdatingNotifications}
-                    className="h-10 px-6 font-semibold"
-                  >
-                    {isUpdatingNotifications ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                    설정 저장
-                  </Button>
                 </div>
               </div>
             </div>
@@ -400,7 +441,7 @@ export default function SettingsPage() {
                 <p className="text-muted-foreground text-sm">특수 권한 및 관리자 기능을 설정합니다.</p>
               </div>
 
-              <div className="border border-border rounded-2xl p-6 bg-card shadow-sm space-y-6">
+              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="ownerCode" className="text-base font-semibold flex items-center gap-2">
                     <KeyRound className="h-4 w-4" />
@@ -419,7 +460,7 @@ export default function SettingsPage() {
                         onKeyDown={(e) => setIsCapsLockOn(e.getModifierState("CapsLock"))}
                         onKeyUp={(e) => setIsCapsLockOn(e.getModifierState("CapsLock"))}
                         placeholder="코드를 입력하세요"
-                        className="h-11"
+                        className="h-11 border-neutral-400 dark:border-neutral-500"
                       />
                       <Button 
                         onClick={handleVerifyOwnerCode} 
@@ -435,10 +476,297 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Channel Management Section */}
+              {ownedChannels.length > 0 && (
+                <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-6">
+                  <div>
+                    <h4 className="text-xl font-bold tracking-tight mb-1 flex items-center gap-2">
+                      <Settings2 className="h-5 w-5" /> 채널 관리
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      오너 권한을 가진 채널의 프로필 및 정보를 관리합니다.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-6">
+                    {ownedChannels.map(channel => (
+                      <ChannelSettingsCard 
+                        key={channel.id} 
+                        channel={channel} 
+                        teams={teams}
+                        onUpdated={() => fetchOwnedChannelsAndTeams(user!.id)} 
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; teams: any[]; onUpdated: () => void }) {
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState<string>(channel.team_id ? String(channel.team_id) : "none");
+  const [linksForm, setLinksForm] = useState<any[]>([]);
+  const [imageUrl, setImageUrl] = useState(channel.image_url || "");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    if (channel.company) {
+      const fetchCompanyLogo = async () => {
+        const { data } = await supabase
+          .from("companies")
+          .select("logo_url")
+          .eq("name", channel.company)
+          .maybeSingle();
+        if (data?.logo_url) {
+          setCompanyLogo(data.logo_url);
+        }
+      };
+      fetchCompanyLogo();
+    } else {
+      setCompanyLogo(null);
+    }
+  }, [channel.company]);
+
+  useEffect(() => {
+    let initial: any[] = [];
+    let parsedLinks = channel.links;
+    if (typeof channel.links === 'string') {
+      try {
+        parsedLinks = JSON.parse(channel.links);
+      } catch (e) {
+        parsedLinks = null;
+      }
+    }
+    if (Array.isArray(parsedLinks) && parsedLinks.length > 0) {
+      initial = parsedLinks.map((l: any) => ({ ...l, id: Math.random().toString() }));
+    } else if (parsedLinks && typeof parsedLinks === 'object' && Object.keys(parsedLinks).length > 0) {
+      initial = Object.entries(parsedLinks).map(([k, v]) => ({ id: Math.random().toString(), name: k, url: v as string }));
+    }
+    if (initial.length === 0) initial = [{ id: Math.random().toString(), name: "", url: "" }];
+    setLinksForm(initial);
+  }, [channel]);
+
+  const handleUpdate = async () => {
+    setIsUpdating(true);
+    try {
+      const finalLinks = linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url }));
+      const { error } = await supabase
+        .from("channels")
+        .update({
+          team_id: teamId === "none" ? null : Number(teamId),
+          links: finalLinks.length > 0 ? finalLinks : null,
+          image_url: imageUrl || null
+        })
+        .eq("id", channel.id);
+      
+      if (error) throw error;
+      toast.success("채널 정보가 업데이트되었습니다.");
+      onUpdated();
+    } catch (e: any) {
+      toast.error("업데이트 실패: " + e.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("channels")
+        .delete()
+        .eq("id", channel.id);
+      if (error) throw error;
+      toast.success("채널이 완전히 삭제되었습니다.");
+      setShowDeleteDialog(false);
+      onUpdated();
+    } catch (e: any) {
+      toast.error("삭제 실패: " + e.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `chan-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `channel-images/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("event_images")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("event_images")
+        .getPublicUrl(filePath);
+
+      setImageUrl(publicUrl);
+      toast.success("이미지 업로드 완료");
+    } catch (err: any) {
+      toast.error("업로드 실패: " + err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="border border-slate-300 dark:border-slate-700 rounded-xl p-5 bg-muted/10 space-y-6 relative overflow-hidden">
+      <div className="flex items-center gap-4">
+        <Avatar className="h-16 w-16 border border-slate-300 dark:border-slate-700 bg-background shadow-sm">
+          <AvatarImage src={imageUrl} className="object-cover" />
+          <AvatarFallback className="text-xl font-bold bg-muted">{channel.name.slice(0, 1)}</AvatarFallback>
+        </Avatar>
+        <div>
+          <h4 className="text-lg font-bold">{channel.name}</h4>
+          <p className="text-sm text-muted-foreground">{channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "행사" : "게임"} 채널</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label className="text-sm font-semibold">프로필 이미지 변경</Label>
+          <div className="flex items-center gap-3">
+            <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={isUploading} className="max-w-xs h-10 border-neutral-300 dark:border-neutral-600" />
+            {isUploading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold flex items-center gap-1"><Building2 className="w-4 h-4"/> 소속사</Label>
+            {channel.company ? (
+              <div className="flex items-center gap-3 bg-white dark:bg-background px-3 py-1.5 rounded-xl border border-neutral-300 dark:border-neutral-600 h-10 select-none w-fit max-w-full">
+                <Avatar className="h-6 w-6 border shadow-xs bg-background shrink-0">
+                  <AvatarImage src={companyLogo || undefined} className="object-cover" />
+                  <AvatarFallback className="text-[10px] font-bold bg-muted-foreground/10 flex items-center justify-center">
+                    {channel.company.slice(0, 1)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-bold text-foreground truncate">{channel.company}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-white dark:bg-background px-3 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-600 text-muted-foreground text-xs h-10 select-none w-fit">
+                <Building2 className="w-4 h-4 text-muted-foreground/60" />
+                <span>소속사 없음</span>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold flex items-center gap-1"><Users className="w-4 h-4"/> 소속 팀</Label>
+            <Select value={teamId} onValueChange={setTeamId}>
+              <SelectTrigger className="h-10 border-neutral-300 dark:border-neutral-600">
+                <SelectValue placeholder="소속 팀 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">소속 없음</SelectItem>
+                {teams.map(team => (
+                  <SelectItem key={team.id} value={String(team.id)}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold flex items-center gap-1"><LinkIcon className="w-4 h-4"/> SNS 링크</Label>
+          <div className="space-y-2">
+            {linksForm.map((link, index) => (
+              <div key={link.id} className="flex flex-col sm:flex-row items-start gap-2 animate-in fade-in duration-200">
+                <Input
+                  placeholder="링크 이름 (예: 유튜브)"
+                  value={link.name}
+                  onChange={(e) => {
+                    const newForm = [...linksForm];
+                    newForm[index].name = e.target.value;
+                    setLinksForm(newForm);
+                  }}
+                  className="h-10 sm:flex-[1] border-neutral-300 dark:border-neutral-600"
+                />
+                <Input
+                  placeholder="https://"
+                  value={link.url}
+                  onChange={(e) => {
+                    const newForm = [...linksForm];
+                    newForm[index].url = e.target.value;
+                    setLinksForm(newForm);
+                  }}
+                  className="h-10 sm:flex-[2] border-neutral-300 dark:border-neutral-600"
+                />
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setLinksForm(linksForm.filter(l => l.id !== link.id))}
+                  className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setLinksForm([...linksForm, { id: Math.random().toString(), name: "", url: "" }])}
+              className="border-dashed border-neutral-300 dark:border-neutral-600"
+            >
+              <Plus className="h-4 w-4 mr-1" /> 링크 추가
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center pt-4 border-t border-slate-300 dark:border-slate-700">
+        <Button variant="ghost" size="sm" onClick={() => setShowDeleteDialog(true)} className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-bold px-3 h-9">
+          <Trash2 className="w-4 h-4 mr-1.5" />
+          채널 삭제
+        </Button>
+        <Button onClick={handleUpdate} disabled={isUpdating} className="font-bold px-6 h-9">
+          {isUpdating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+          저장
+        </Button>
+      </div>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-[400px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="w-5 h-5" />
+              채널 삭제 경고
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-sm leading-relaxed text-foreground/80">
+              정말로 <strong className="text-foreground">{channel.name}</strong> 채널을 삭제하시겠습니까?<br/><br/>
+              한 번 삭제하면 <strong>되돌릴 수 없으며</strong>, 채널과 연관된 데이터가 영구적으로 삭제됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting} className="rounded-xl font-semibold">취소</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting} className="rounded-xl font-semibold">
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              삭제하기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

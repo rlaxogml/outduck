@@ -294,8 +294,32 @@ export default function AdminPage() {
                       {req.links && (
                         <div className="pt-2 border-t border-border/40">
                           <div className="text-[10px] font-bold text-muted-foreground mb-1">링크</div>
-                          <div className="text-xs bg-background/80 rounded-lg p-2 break-all flex items-start gap-2">
-                            <ExternalLink className="w-3 h-3 mt-0.5 shrink-0 opacity-50" /> <span className="whitespace-pre-wrap">{req.links}</span>
+                          <div className="text-xs bg-background/80 rounded-lg p-2.5 break-all flex flex-col gap-1.5">
+                            {(() => {
+                              try {
+                                const parsed = typeof req.links === 'string' ? JSON.parse(req.links) : req.links;
+                                if (Array.isArray(parsed)) {
+                                  return parsed.map((l: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-foreground/75 shrink-0">{l.name}:</span>
+                                      <a href={l.url} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate flex items-center gap-0.5">
+                                        {l.url} <ExternalLink className="w-2.5 h-2.5 inline shrink-0 opacity-50" />
+                                      </a>
+                                    </div>
+                                  ));
+                                } else if (parsed && typeof parsed === 'object') {
+                                  return Object.entries(parsed).map(([k, v]: any, i) => (
+                                    <div key={i} className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-foreground/75 shrink-0">{k}:</span>
+                                      <a href={v} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate flex items-center gap-0.5">
+                                        {v} <ExternalLink className="w-2.5 h-2.5 inline shrink-0 opacity-50" />
+                                      </a>
+                                    </div>
+                                  ));
+                                }
+                              } catch (e) {}
+                              return <span className="whitespace-pre-wrap">{String(req.links)}</span>;
+                            })()}
                           </div>
                         </div>
                       )}

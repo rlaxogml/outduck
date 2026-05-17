@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
-import { Star, Calendar, ShoppingBag } from "lucide-react";
+import { Star, Calendar, ShoppingBag, Link2, Settings2 } from "lucide-react";
 import { EventCard } from "@/components/event-card";
 
 type OfflineEvent = {
@@ -32,6 +32,7 @@ type Channel = {
   team_id: number | null;
   is_team: boolean;
   owner_id?: string | null;
+  links?: any;
 };
 
 const channelTypeLabel: Record<ChannelType, string> = {
@@ -64,6 +65,23 @@ export default function ChannelProfilePage() {
   const channelId = useMemo(() => Number(params.id), [params.id]);
 
   const [channel, setChannel] = useState<Channel | null>(null);
+  const parsedLinks = useMemo(() => {
+    if (!channel || !channel.links) return [];
+    let links = channel.links;
+    if (typeof links === 'string') {
+      try {
+        links = JSON.parse(links);
+      } catch (e) {
+        return [];
+      }
+    }
+    if (Array.isArray(links)) {
+      return links.filter(l => l.name?.trim() && l.url?.trim());
+    } else if (typeof links === 'object') {
+      return Object.entries(links).map(([name, url]) => ({ name, url: url as string })).filter(l => l.name.trim() && l.url.trim());
+    }
+    return [];
+  }, [channel]);
   const [teamChannel, setTeamChannel] = useState<Channel | null>(null);
   const [memberChannels, setMemberChannels] = useState<Channel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,6 +92,7 @@ export default function ChannelProfilePage() {
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [isLoadingSubscribe, setIsLoadingSubscribe] = useState(false);
   const [isMemberListOpen, setIsMemberListOpen] = useState(false);
+  const [isManageMenuOpen, setIsManageMenuOpen] = useState(false);
   const [offlineEvents, setOfflineEvents] = useState<OfflineEvent[]>([]);
   const [onlineEvents, setOnlineEvents] = useState<OfflineEvent[]>([]);
 
@@ -90,7 +109,7 @@ export default function ChannelProfilePage() {
 
       const { data: channelData, error: channelError } = await supabase
         .from("channels")
-        .select("id, name, type, image_url, team_id, is_team, owner_id")
+        .select("id, name, type, image_url, team_id, is_team, owner_id, links")
         .eq("id", channelId)
         .maybeSingle();
 
@@ -297,6 +316,8 @@ export default function ChannelProfilePage() {
                   </span>
                 </div>
 
+
+
                 {!channel.is_team && channel.team_id && teamChannel && (
                   <Link
                     href={`/channels/${teamChannel.id}`}
@@ -314,40 +335,91 @@ export default function ChannelProfilePage() {
               </div>
             </div>
 
-            <button
-              onClick={async () => {
-                if (!user) { alert("로그인이 필요해요!"); return; }
-                if (isLoadingSubscribe) return;
-                setIsLoadingSubscribe(true);
-                const previousSubscribed = isSubscribed;
-                setIsSubscribed(!previousSubscribed);
-                setFavoriteCount((prev) => previousSubscribed ? prev - 1 : prev + 1);
-                try {
-                  if (previousSubscribed) {
-                    await supabase.from("favorites").delete().eq("channel_id", channelId).eq("user_id", user.id);
-                  } else {
-                    await supabase.from("favorites").insert({ channel_id: channelId, user_id: user.id });
+            {isOwner ? (
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                {isManageMenuOpen && (
+                  <div className="flex gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <Link
+                      href="/events/new"
+                      className="inline-flex items-center justify-center rounded-full h-11 px-5 font-bold text-sm bg-primary text-primary-foreground hover:bg-primary/95 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                    >
+                      행사 등록
+                    </Link>
+                    <Link
+                      href="/settings?tab=advanced"
+                      className="inline-flex items-center justify-center rounded-full h-11 px-5 font-bold text-sm bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-all hover:scale-105 active:scale-95 shadow-sm"
+                    >
+                      프로필 수정
+                    </Link>
+                  </div>
+                )}
+                <button
+                  onClick={() => setIsManageMenuOpen(!isManageMenuOpen)}
+                  className={`flex items-center justify-center rounded-full h-11 px-6 font-semibold transition-all duration-300 hover:scale-105 active:scale-95 shadow-sm ${
+                    isManageMenuOpen 
+                      ? "bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900" 
+                      : "bg-gradient-to-r from-indigo-500 to-blue-600 text-white"
+                  }`}
+                >
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  채널 관리
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={async () => {
+                  if (!user) { alert("로그인이 필요해요!"); return; }
+                  if (isLoadingSubscribe) return;
+                  setIsLoadingSubscribe(true);
+                  const previousSubscribed = isSubscribed;
+                  setIsSubscribed(!previousSubscribed);
+                  setFavoriteCount((prev) => previousSubscribed ? prev - 1 : prev + 1);
+                  try {
+                    if (previousSubscribed) {
+                      await supabase.from("favorites").delete().eq("channel_id", channelId).eq("user_id", user.id);
+                    } else {
+                      await supabase.from("favorites").insert({ channel_id: channelId, user_id: user.id });
+                    }
+                  } catch {
+                    setIsSubscribed(previousSubscribed);
+                    setFavoriteCount((prev) => previousSubscribed ? prev + 1 : prev - 1);
+                  } finally {
+                    setIsLoadingSubscribe(false);
                   }
-                } catch {
-                  setIsSubscribed(previousSubscribed);
-                  setFavoriteCount((prev) => previousSubscribed ? prev + 1 : prev - 1);
-                } finally {
-                  setIsLoadingSubscribe(false);
-                }
-              }}
-              disabled={isLoadingSubscribe}
-              className={`flex items-center justify-center rounded-full h-11 font-semibold transition-all duration-500 hover:scale-105 active:scale-95 shadow-sm disabled:opacity-90 disabled:pointer-events-none ${isSubscribed
-                ? "px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40"
-                : "px-6 bg-muted text-muted-foreground border border-border hover:bg-muted/80"
-                }`}
-            >
-              <Star className={`h-5 w-5 transition-all duration-300 ${isSubscribed ? "fill-white text-white" : "text-muted-foreground"}`} />
-              <span className={`transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap ${isSubscribed ? "max-w-0 opacity-0 ml-0" : "max-w-[100px] opacity-100 ml-2"
-                }`}>
-                찜하기
-              </span>
-            </button>
+                }}
+                disabled={isLoadingSubscribe}
+                className={`flex items-center justify-center rounded-full h-11 font-semibold transition-all duration-500 hover:scale-105 active:scale-95 shadow-sm disabled:opacity-90 disabled:pointer-events-none ${isSubscribed
+                  ? "px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40"
+                  : "px-6 bg-muted text-muted-foreground border border-border hover:bg-muted/80"
+                  }`}
+              >
+                <Star className={`h-5 w-5 transition-all duration-300 ${isSubscribed ? "fill-white text-white" : "text-muted-foreground"}`} />
+                <span className={`transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap ${isSubscribed ? "max-w-0 opacity-0 ml-0" : "max-w-[100px] opacity-100 ml-2"
+                  }`}>
+                  찜하기
+                </span>
+              </button>
+            )}
           </div>
+
+          {parsedLinks.length > 0 && (
+            <div className="mt-5 border-t border-border pt-5 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-300">
+              {parsedLinks.map((link: any, idx: number) => (
+                <div key={idx} className="flex items-start sm:items-center gap-1.5 text-sm">
+                  <span className="text-muted-foreground select-none">•</span>
+                  <span className="font-semibold text-foreground">{link.name} :</span>
+                  <a
+                    href={link.url.startsWith("http") ? link.url : `https://${link.url}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                  >
+                    {link.url}
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
 
           {channel.is_team && memberChannels.length > 0 && (
             <div className="mt-5 border-t border-border pt-5">

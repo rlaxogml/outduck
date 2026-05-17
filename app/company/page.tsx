@@ -32,11 +32,18 @@ import {
   Upload,
   Calendar,
   Globe,
-  UserCircle
+  UserCircle,
+  Link as LinkIcon,
+  Trash2
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { EventTabs } from "@/components/event-tabs";
 import { EventCard } from "@/components/event-card";
+
+type ChannelLink = {
+  name: string;
+  url: string;
+};
 
 type Company = {
   id: number;
@@ -53,6 +60,7 @@ type Channel = {
   is_team: boolean;
   owner_id: string | null;
   company: string | null;
+  links: ChannelLink[] | null;
 };
 
 type Event = {
@@ -113,6 +121,12 @@ export default function CompanyPage() {
   const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
+
+  // Links Dialog States
+  const [isLinksOpen, setIsLinksOpen] = useState(false);
+  const [linksTargetChan, setLinksTargetChan] = useState<Channel | null>(null);
+  const [linksForm, setLinksForm] = useState<(ChannelLink & { id: string })[]>([]);
+  const [isSavingLinks, setIsSavingLinks] = useState(false);
 
   useEffect(() => {
     if (!transferCode || !codeExpiresAt) {
@@ -495,6 +509,30 @@ export default function CompanyPage() {
     }
   };
 
+  const handleSaveLinks = async () => {
+    if (!linksTargetChan) return;
+    setIsSavingLinks(true);
+    try {
+      const finalLinks = linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url }));
+      const { error } = await supabase
+        .from("channels")
+        .update({ links: finalLinks.length > 0 ? finalLinks : null })
+        .eq("id", linksTargetChan.id);
+
+      if (error) throw error;
+
+      toast.success("링크가 성공적으로 저장되었습니다.");
+      setIsLinksOpen(false);
+      if (company) {
+        await fetchChannelsAndEvents(company.name);
+      }
+    } catch (err: any) {
+      toast.error("링크 저장 실패: " + err.message);
+    } finally {
+      setIsSavingLinks(false);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("로그아웃 되었습니다.");
@@ -675,6 +713,36 @@ export default function CompanyPage() {
                         title="권한 관리"
                       >
                         <Settings className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLinksTargetChan(channel);
+                          
+                          let initial: (ChannelLink & { id: string })[] = [];
+                          let parsedLinks = channel.links;
+                          if (typeof channel.links === 'string') {
+                            try {
+                              parsedLinks = JSON.parse(channel.links);
+                            } catch (e) {
+                              parsedLinks = null;
+                            }
+                          }
+                          if (Array.isArray(parsedLinks) && parsedLinks.length > 0) {
+                            initial = parsedLinks.map(l => ({ ...l, id: Math.random().toString() }));
+                          } else if (parsedLinks && typeof parsedLinks === 'object' && Object.keys(parsedLinks).length > 0) {
+                            initial = Object.entries(parsedLinks).map(([k, v]) => ({ id: Math.random().toString(), name: k, url: v as string }));
+                          }
+                          if (initial.length === 0) {
+                            initial = [{ id: Math.random().toString(), name: "", url: "" }];
+                          }
+                          setLinksForm(initial);
+                          setIsLinksOpen(true);
+                        }}
+                        className="absolute -bottom-1 -left-1 bg-slate-900 hover:bg-blue-600 text-white p-1 rounded-full border-2 border-white transition-all duration-200 shadow-md cursor-pointer scale-95 group-hover:scale-105 active:scale-90 z-10"
+                        title="링크 관리"
+                      >
+                        <LinkIcon className="w-3 h-3" />
                       </button>
                     </div>
 
@@ -955,6 +1023,75 @@ export default function CompanyPage() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 3. Link Management Modal */}
+      <Dialog open={isLinksOpen} onOpenChange={setIsLinksOpen}>
+        <DialogContent className="sm:max-w-[460px] rounded-3xl shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl md:text-2xl font-extrabold flex items-center gap-2">
+              <LinkIcon className="w-5 h-5 text-blue-600" /> 링크 관리
+            </DialogTitle>
+            <DialogDescription>
+              {linksTargetChan?.name} 채널의 SNS 링크를 관리합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {linksForm.map((link, index) => (
+              <div key={link.id} className="flex items-start gap-2 animate-in fade-in duration-200">
+                <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                  <Input
+                    placeholder="링크 이름 (예: 유튜브)"
+                    value={link.name}
+                    onChange={(e) => {
+                      const newForm = [...linksForm];
+                      newForm[index].name = e.target.value;
+                      setLinksForm(newForm);
+                    }}
+                    className="h-10 rounded-xl sm:flex-[1]"
+                  />
+                  <Input
+                    placeholder="https://"
+                    value={link.url}
+                    onChange={(e) => {
+                      const newForm = [...linksForm];
+                      newForm[index].url = e.target.value;
+                      setLinksForm(newForm);
+                    }}
+                    className="h-10 rounded-xl sm:flex-[2]"
+                  />
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setLinksForm(linksForm.filter(l => l.id !== link.id))}
+                  className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLinksForm([...linksForm, { id: Math.random().toString(), name: "", url: "" }])}
+              className="w-full h-10 border-dashed rounded-xl"
+            >
+              <Plus className="h-4 w-4 mr-2" /> 링크 추가
+            </Button>
+          </div>
+          <DialogFooter className="mt-6 border-t border-border/50 pt-4">
+            <Button
+              onClick={handleSaveLinks}
+              disabled={isSavingLinks}
+              className="w-full h-12 rounded-xl text-base font-bold bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isSavingLinks ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+              저장하기
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

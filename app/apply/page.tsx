@@ -30,6 +30,8 @@ import {
   Search,
   Check,
   ChevronDown,
+  Plus,
+  Trash2
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -49,10 +51,16 @@ export default function ApplyPage() {
   const [mode, setMode] = useState<"selection" | "admin" | "organizer">("selection");
   
   // Organizer form state
+  type ChannelLink = {
+    id: string;
+    name: string;
+    url: string;
+  };
+
   const [name, setName] = useState("");
   const [type, setType] = useState<string>("");
   const [teamId, setTeamId] = useState<string>("none");
-  const [links, setLinks] = useState("");
+  const [linksForm, setLinksForm] = useState<ChannelLink[]>([{ id: "default", name: "", url: "" }]);
   const [company, setCompany] = useState("");
   const [openTeamPopover, setOpenTeamPopover] = useState(false);
   const [teamSearch, setTeamSearch] = useState("");
@@ -74,7 +82,7 @@ export default function ApplyPage() {
     setName("");
     setType("");
     setTeamId("none");
-    setLinks("");
+    setLinksForm([{ id: Math.random().toString(), name: "", url: "" }]);
     setCompany("");
     setContact("");
     setBusinessNumber("");
@@ -238,7 +246,9 @@ export default function ApplyPage() {
           is_team: type === "youtuber_team",
           team_id: type === "youtuber" && teamId !== "none" ? parseInt(teamId) : null,
           company: isYoutuberType ? company.trim() || null : null,
-          links: links.trim() || null,
+          links: linksForm.filter(l => l.name.trim() || l.url.trim()).length > 0 
+            ? linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url })) 
+            : null,
           image_url: imageUrl,
           request_type: "organizer",
           status: "pending",
@@ -619,16 +629,55 @@ export default function ApplyPage() {
                     )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="links" className="text-base font-semibold">관련 링크</Label>
-                    <Textarea
-                      id="links"
-                      placeholder={"유튜브: https://...\n인스타그램: https://..."}
-                      value={links}
-                      onChange={(e) => setLinks(e.target.value)}
-                      className="min-h-[120px] text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20 py-3"
-                    />
-                    <p className="text-xs text-muted-foreground">본인 인증 및 활동 확인이 가능한 링크를 작성해주세요.</p>
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">SNS 링크 (선택)</Label>
+                    <div className="space-y-3">
+                      {linksForm.map((link, index) => (
+                        <div key={link.id} className="flex gap-2 items-start animate-in fade-in duration-200">
+                          <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                            <Input
+                              placeholder="링크 이름 (예: 유튜브)"
+                              value={link.name}
+                              onChange={(e) => {
+                                const newForm = [...linksForm];
+                                newForm[index].name = e.target.value;
+                                setLinksForm(newForm);
+                              }}
+                              className="h-11 rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20 sm:flex-[1]"
+                            />
+                            <Input
+                              placeholder="https://"
+                              value={link.url}
+                              onChange={(e) => {
+                                const newForm = [...linksForm];
+                                newForm[index].url = e.target.value;
+                                setLinksForm(newForm);
+                              }}
+                              className="h-11 rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20 sm:flex-[2]"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setLinksForm(linksForm.filter(l => l.id !== link.id))}
+                            className="h-11 w-11 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      ))}
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setLinksForm([...linksForm, { id: Math.random().toString(), name: "", url: "" }])}
+                        className="w-full h-11 border-dashed border-2 rounded-xl text-muted-foreground hover:text-foreground"
+                      >
+                        <Plus className="h-4 w-4 mr-2" /> 링크 추가하기
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">본인 인증 및 활동 확인이 가능한 링크를 등록해주세요.</p>
                   </div>
                 </div>
 
