@@ -84,7 +84,7 @@ export default function EventDetailPage() {
     return notices;
   }, [notices]);
 
-  const regularNotices = useMemo(() => {
+  const regularNotices = useMemo<any[]>(() => {
     return [];
   }, [notices]);
 
