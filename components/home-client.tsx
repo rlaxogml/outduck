@@ -54,7 +54,11 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
   }, [activeTab, activeCategory, sortType]);
 
   useEffect(() => {
+    console.log("HomeClient: Component mounted and session check starting...");
+    let isMounted = true;
+
     const checkCompanyUser = async (userId: string) => {
+      console.log("HomeClient: Checking if user is a company user:", userId);
       try {
         const { data } = await supabase
           .from("companies")
@@ -62,39 +66,52 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
           .eq("user_id", userId)
           .maybeSingle();
 
-        if (data) {
+        console.log("HomeClient: Company check complete. User has company account:", !!data);
+        if (data && isMounted) {
+          console.log("HomeClient: Redirecting company user to /company dashboard.");
           router.replace("/company");
         }
       } catch (err) {
-        console.error("Company user check failed:", err);
+        console.error("HomeClient: Company user check failed:", err);
       }
     };
 
     const syncSession = async () => {
       try {
+        console.log("HomeClient: Calling supabase.auth.getSession()...");
         const { data: { session } } = await supabase.auth.getSession();
+        console.log("HomeClient: getSession resolved.", { hasSession: !!session });
         const currentUser = session?.user ?? null;
-        setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+        if (isMounted) {
+          setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+        }
 
         if (currentUser) {
           await checkCompanyUser(currentUser.id);
         }
       } catch (err) {
-        console.error(err);
+        console.error("HomeClient: syncSession failed:", err);
       }
     };
     syncSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log("HomeClient: onAuthStateChange fired.", { event: _event, hasSession: !!session });
       const currentUser = session?.user ?? null;
-      setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+      if (isMounted) {
+        setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+      }
       
       if (currentUser) {
         await checkCompanyUser(currentUser.id);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("HomeClient: Cleaning up session synchronization useEffect.");
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   const filteredEvents = (() => {

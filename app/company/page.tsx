@@ -154,18 +154,34 @@ export default function CompanyPage() {
   }, [transferCode, codeExpiresAt]);
 
   useEffect(() => {
+    console.log("CompanyPage: Initializing...");
+    let isMounted = true;
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn("CompanyPage: Initialization safety timeout reached (5s). Forcing isLoading to false.");
+        setIsLoading(false);
+      }
+    }, 5000);
+
     const initialize = async () => {
       try {
+        console.log("CompanyPage: Fetching session...");
         const { data: { session } } = await supabase.auth.getSession();
+        console.log("CompanyPage: Session fetched.", { hasSession: !!session });
         if (!session) {
           toast.error("로그인이 필요합니다.");
-          router.replace("/");
+          if (isMounted) {
+            router.replace("/");
+          }
           return;
         }
 
-        setUser(session.user);
+        if (isMounted) {
+          setUser(session.user);
+        }
 
         // Fetch company
+        console.log("CompanyPage: Fetching company data...");
         const { data: compData, error: compError } = await supabase
           .from("companies")
           .select("*")
@@ -174,38 +190,56 @@ export default function CompanyPage() {
 
         if (compError) throw compError;
 
+        console.log("CompanyPage: Company data fetched.", { hasCompany: !!compData });
         if (!compData) {
           toast.error("관리자(회사) 권한을 가진 계정이 아닙니다.");
-          router.replace("/");
+          if (isMounted) {
+            router.replace("/");
+          }
           return;
         }
 
-        setCompany(compData);
+        if (isMounted) {
+          setCompany(compData);
+        }
 
         // Fetch associated channels and subsequently events
+        console.log("CompanyPage: Fetching channels and events...");
         await fetchChannelsAndEvents(compData.name);
         
         // Fetch all available Teams for individual member affiliation
+        console.log("CompanyPage: Fetching teams...");
         const { data: allTeamsData } = await supabase
           .from("channels")
           .select("id, name")
           .eq("is_team", true)
           .order("name");
         
-        if (allTeamsData) {
+        if (allTeamsData && isMounted) {
           setAllTeams(allTeamsData);
         }
         
       } catch (err: any) {
-        console.error("Initialization Error:", err);
+        console.error("CompanyPage: Initialization Error:", err);
         toast.error("데이터 로드 중 오류가 발생했습니다.");
-        router.replace("/");
+        if (isMounted) {
+          router.replace("/");
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
+        clearTimeout(safetyTimeout);
+        console.log("CompanyPage: Initialization completed.");
       }
     };
 
     initialize();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeout);
+    };
   }, [router]);
 
   const fetchChannelsAndEvents = async (compName: string) => {
@@ -720,16 +754,16 @@ export default function CompanyPage() {
                           setLinksTargetChan(channel);
                           
                           let initial: (ChannelLink & { id: string })[] = [];
-                          let parsedLinks = channel.links;
-                          if (typeof channel.links === 'string') {
+                          let parsedLinks: any = channel.links;
+                          if (typeof parsedLinks === 'string') {
                             try {
-                              parsedLinks = JSON.parse(channel.links);
+                              parsedLinks = JSON.parse(parsedLinks);
                             } catch (e) {
                               parsedLinks = null;
                             }
                           }
                           if (Array.isArray(parsedLinks) && parsedLinks.length > 0) {
-                            initial = parsedLinks.map(l => ({ ...l, id: Math.random().toString() }));
+                            initial = parsedLinks.map((l: any) => ({ ...l, id: Math.random().toString() }));
                           } else if (parsedLinks && typeof parsedLinks === 'object' && Object.keys(parsedLinks).length > 0) {
                             initial = Object.entries(parsedLinks).map(([k, v]) => ({ id: Math.random().toString(), name: k, url: v as string }));
                           }

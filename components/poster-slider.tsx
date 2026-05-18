@@ -53,6 +53,15 @@ export function PosterSlider() {
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
 
   useEffect(() => {
+    console.log("PosterSlider: Fetching posters...");
+    let isMounted = true;
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn("PosterSlider: Loading safety timeout reached (15s). Forcing isLoading to false.");
+        setIsLoading(false);
+      }
+    }, 15000);
+
     const fetchPosters = async () => {
       try {
         const { data, error } = await supabase
@@ -61,7 +70,12 @@ export function PosterSlider() {
           .eq("is_active", true)
           .order("order", { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+          console.error("PosterSlider: Supabase select error:", error);
+          throw error;
+        }
+
+        console.log("PosterSlider: Posters fetched. Count:", data?.length);
 
         const now = new Date();
         const validPosters = (data || []).filter((p: any) => {
@@ -74,14 +88,25 @@ export function PosterSlider() {
           return true;
         });
 
-        setPosters(validPosters);
+        if (isMounted) {
+          setPosters(validPosters);
+        }
       } catch (err) {
-        console.error("Poster load failed:", err);
+        console.error("PosterSlider: Poster load failed:", err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
+        clearTimeout(safetyTimeout);
+        console.log("PosterSlider: Fetch completed.");
       }
     };
     fetchPosters();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   const onSelect = useCallback((emblaApi: EmblaCarouselType) => {

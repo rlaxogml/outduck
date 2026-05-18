@@ -34,6 +34,8 @@ export default async function Home() {
     { auth: { persistSession: false } }
   );
 
+  const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+
   const offlineQuery = supabase
     .from("offline_events")
     .select(`
@@ -58,6 +60,7 @@ export default async function Home() {
         location
       )
     `)
+    .or(`end_date.gte.${todayStr},end_date.is.null`)
     .order("start_date", { ascending: true });
 
   const onlineQuery = supabase
@@ -80,6 +83,7 @@ export default async function Home() {
         )
       )
     `)
+    .or(`end_at.gte.${todayStr},end_at.is.null`)
     .order("start_at", { ascending: true });
 
   const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
@@ -126,8 +130,6 @@ export default async function Home() {
     if (t === "festival") return "동인 행사";
     return "기타";
   };
-
-  const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 
   let offlineEvents: Event[] = [];
   if (offlineData) {

@@ -28,6 +28,7 @@ export function MiniCalendar({ user }: { user: User | null }) {
   const [activeFilter, setActiveFilter] = useState<"all" | "subscribed" | "bookmarked">("all");
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [hasTimedOut, setHasTimedOut] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -73,7 +74,15 @@ export function MiniCalendar({ user }: { user: User | null }) {
   const weekEnd = sortedWeekDates[6].toLocaleDateString("sv-SE");
 
   useEffect(() => {
+    console.log("MiniCalendar: Fetching weekly events...", { weekStart, weekEnd, hasUser: !!user });
     let ignore = false;
+    const safetyTimeout = setTimeout(() => {
+      if (!ignore) {
+        console.warn("MiniCalendar: Loading safety timeout reached (15s). Forcing loading to false.");
+        setHasTimedOut(true);
+        setLoading(false);
+      }
+    }, 15000);
 
     const fetchWeeklyEvents = async () => {
       try {
@@ -83,6 +92,7 @@ export function MiniCalendar({ user }: { user: User | null }) {
         let subscribedChannelIds: number[] = [];
 
         if (user) {
+          console.log("MiniCalendar: Fetching bookmarks and subscriptions for user:", user.id);
           const [{ data: bData }, { data: fData }] = await Promise.all([
             supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id),
             supabase.from("favorites").select("channel_id").eq("user_id", user.id),
@@ -94,8 +104,13 @@ export function MiniCalendar({ user }: { user: User | null }) {
           if (fData) {
             subscribedChannelIds = fData.map(f => f.channel_id).filter(Boolean);
           }
+          console.log("MiniCalendar: User subscriptions fetched.", {
+            bookmarksCount: bookmarkedEventIds.length,
+            subscriptionsCount: subscribedChannelIds.length
+          });
         }
 
+        console.log("MiniCalendar: Fetching offline and online events from weekStart to weekEnd...");
         const offlineQuery = supabase
           .from("offline_events")
           .select(`
@@ -122,6 +137,10 @@ export function MiniCalendar({ user }: { user: User | null }) {
 
         const allRawOffline = offRes.data || [];
         const allRawOnline = onRes.data || [];
+        console.log("MiniCalendar: Offline/Online events fetched.", {
+          offlineCount: allRawOffline.length,
+          onlineCount: allRawOnline.length
+        });
 
         const formatOfflineEventDate = (start: string, end: string | null) => {
           return end
@@ -172,18 +191,23 @@ export function MiniCalendar({ user }: { user: User | null }) {
           setAllEvents(combined);
           setBookmarkedEventIds(bookmarkedEventIds);
           setSubscribedChannelIds(subscribedChannelIds);
+          setHasTimedOut(false);
         }
       } catch (error) {
-        if (!ignore) console.error("Fail load mini cal:", error);
+        if (!ignore) console.error("MiniCalendar: Fail load mini cal:", error);
       } finally {
         if (!ignore) setLoading(false);
+        clearTimeout(safetyTimeout);
+        console.log("MiniCalendar: Fetch weekly events finished.");
       }
     };
 
     fetchWeeklyEvents();
 
     return () => {
+      console.log("MiniCalendar: Cleaning up fetch weekly events useEffect.");
       ignore = true;
+      clearTimeout(safetyTimeout);
     };
   }, [weekStart, weekEnd, user]);
 
@@ -398,7 +422,14 @@ export function MiniCalendar({ user }: { user: User | null }) {
                 <div className="flex items-center justify-center py-10 text-muted-foreground text-xs animate-pulse">로딩 중...</div>
               ) : currentDayEvents.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground bg-muted/20 border border-dashed border-muted rounded-xl">
-                  <p className="text-sm font-semibold">이 날에 진행되는 일정이 없습니다.</p>
+                  {hasTimedOut ? (
+                    <>
+                      <p className="text-sm font-semibold text-foreground">일정 정보를 불러오는 중입니다...</p>
+                      <p className="text-xs text-muted-foreground mt-1">연결이 원활하지 않아 시간이 다소 걸리고 있습니다. 잠시만 대기해주세요.</p>
+                    </>
+                  ) : (
+                    <p className="text-sm font-semibold">이 날에 진행되는 일정이 없습니다.</p>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">

@@ -33,17 +33,33 @@ export function FavoriteChannels() {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [hasTimedOut, setHasTimedOut] = useState(false);
 
   useEffect(() => {
+    console.log("FavoriteChannels: Component mounted.");
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    console.log("FavoriteChannels: Auth useEffect initialized.");
+    let isMounted = true;
+    let safetyTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn("FavoriteChannels: Loading safety timeout reached (15s). Forcing isLoading to false.");
+        setHasTimedOut(true);
+        setIsLoading(false);
+      }
+    }, 15000);
+
     const fetchFavoritesAndBookmarks = async (currentUser: any) => {
+      console.log("FavoriteChannels: Starting fetchFavoritesAndBookmarks for user:", currentUser.id);
       try {
         if (!currentUser) {
-          setChannels([]);
-          setIsLoading(false);
+          if (isMounted) {
+            setChannels([]);
+            setIsLoading(false);
+          }
+          clearTimeout(safetyTimeout);
           return;
         }
 
@@ -59,7 +75,17 @@ export function FavoriteChannels() {
             .eq("user_id", currentUser.id),
         ]);
 
-        if (!favError && favoritesData) {
+        if (favError) {
+          console.error("FavoriteChannels: Error fetching favorites:", favError);
+          throw favError;
+        }
+
+        console.log("FavoriteChannels: Favorites and Bookmarks fetched. Processing data...", {
+          favoritesCount: favoritesData?.length,
+          bookmarksCount: bookmarksData?.length
+        });
+
+        if (favoritesData) {
           const today = new Date().toISOString().split("T")[0];
           const bookmarkedEventIds = bookmarksData?.map(b => b.event_id).filter(Boolean) || [];
 
@@ -143,46 +169,99 @@ export function FavoriteChannels() {
             return timeB - timeA;
           });
 
-          setChannels([...zone1, ...zone2]);
+          if (isMounted) {
+            setChannels([...zone1, ...zone2]);
+            setHasTimedOut(false);
+          }
         }
       } catch (error) {
-        console.error("Failed to fetch user or favorites:", error);
+        console.error("FavoriteChannels: Failed to fetch user or favorites:", error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
+        clearTimeout(safetyTimeout);
+        console.log("FavoriteChannels: fetchFavoritesAndBookmarks finished.");
       }
     };
 
+    console.log("FavoriteChannels: Calling supabase.auth.getSession()...");
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("FavoriteChannels: getSession resolved.", { hasSession: !!session });
       const currentUser = session?.user ?? null;
-      setUser((prev: any) => {
-        if (currentUser === null) {
+      
+      if (!currentUser) {
+        console.log("FavoriteChannels: No user session found.");
+        if (isMounted) {
           setChannels([]);
           setIsLoading(false);
-          return null;
         }
-        if (prev?.id === currentUser.id) return prev;
+        clearTimeout(safetyTimeout);
+        return;
+      }
+
+      setUser((prev: any) => {
+        if (prev?.id === currentUser.id) {
+          console.log("FavoriteChannels: User session unchanged.");
+          clearTimeout(safetyTimeout);
+          return prev;
+        }
         fetchFavoritesAndBookmarks(currentUser);
         return currentUser;
       });
+    }).catch(err => {
+      console.error("FavoriteChannels: getSession failed:", err);
+      if (isMounted) {
+        setIsLoading(false);
+      }
+      clearTimeout(safetyTimeout);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("FavoriteChannels: onAuthStateChange fired.", { event: _event, hasSession: !!session });
       const currentUser = session?.user ?? null;
-      setUser((prev: any) => {
-        if (currentUser === null) {
+      
+      if (!currentUser) {
+        console.log("FavoriteChannels: onAuthStateChange - No user session.");
+        if (isMounted) {
           setChannels([]);
           setIsLoading(false);
-          return null;
         }
-        if (prev?.id === currentUser.id) return prev;
+        clearTimeout(safetyTimeout);
+        setUser(null);
+        return;
+      }
+
+      setUser((prev: any) => {
+        if (prev?.id === currentUser.id) {
+          console.log("FavoriteChannels: onAuthStateChange - User session unchanged.");
+          clearTimeout(safetyTimeout);
+          return prev;
+        }
         
-        setIsLoading(true);
+        if (isMounted) {
+          setIsLoading(true);
+        }
+        
+        // Reset safety timeout for new fetch
+        clearTimeout(safetyTimeout);
+        safetyTimeout = setTimeout(() => {
+          if (isMounted) {
+            console.warn("FavoriteChannels: onAuthStateChange - Safety timeout reached (15s). Forcing isLoading to false.");
+            setHasTimedOut(true);
+            setIsLoading(false);
+          }
+        }, 15000);
+
         fetchFavoritesAndBookmarks(currentUser);
         return currentUser;
       });
     });
 
     return () => {
+      console.log("FavoriteChannels: Cleaning up Auth useEffect.");
+      isMounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -226,8 +305,17 @@ export function FavoriteChannels() {
       <div className={`p-4 pt-4 pb-4 flex gap-x-3 md:gap-x-4 gap-y-4 md:gap-y-6 relative ${isExpanded ? "flex-wrap pr-4" : "flex-nowrap overflow-x-auto no-scrollbar pr-0"}`}>
         {channels.length === 0 ? (
           <div className="w-full h-[120px] flex flex-col items-center justify-center">
-            <p className="text-sm font-medium text-foreground">아직 관심 채널이 없어요</p>
-            <p className="text-xs text-muted-foreground mt-1">관심있는 채널을 찜해서 추가해보세요</p>
+            {hasTimedOut ? (
+              <>
+                <p className="text-sm font-medium text-foreground">관심 채널 정보를 불러오는 중입니다...</p>
+                <p className="text-xs text-muted-foreground mt-1">연결 상태가 늦어지고 있으니 잠시만 기다려주세요.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-foreground">아직 관심 채널이 없어요</p>
+                <p className="text-xs text-muted-foreground mt-1">관심있는 채널을 찜해서 추가해보세요</p>
+              </>
+            )}
           </div>
         ) : (
           <>
