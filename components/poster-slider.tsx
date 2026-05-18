@@ -33,9 +33,11 @@ const fallbackGradients = [
   "bg-gradient-to-br from-green-400 to-green-600",
 ];
 
+let cachedPosters: Poster[] | null = null;
+
 export function PosterSlider() {
-  const [posters, setPosters] = useState<Poster[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [posters, setPosters] = useState<Poster[]>(cachedPosters || []);
+  const [isLoading, setIsLoading] = useState(cachedPosters === null);
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: true,
@@ -88,6 +90,7 @@ export function PosterSlider() {
           return true;
         });
 
+        cachedPosters = validPosters;
         if (isMounted) {
           setPosters(validPosters);
         }

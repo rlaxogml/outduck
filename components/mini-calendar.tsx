@@ -19,14 +19,18 @@ interface WeeklyEvent {
   channels: { id: number; name: string; image_url: string }[];
 }
 
+let cachedAllEvents: WeeklyEvent[] | null = null;
+let cachedBookmarkedEventIds: number[] | null = null;
+let cachedSubscribedChannelIds: number[] | null = null;
+
 export function MiniCalendar({ user }: { user: User | null }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [allEvents, setAllEvents] = useState<WeeklyEvent[]>([]);
-  const [bookmarkedEventIds, setBookmarkedEventIds] = useState<number[]>([]);
-  const [subscribedChannelIds, setSubscribedChannelIds] = useState<number[]>([]);
+  const [allEvents, setAllEvents] = useState<WeeklyEvent[]>(cachedAllEvents || []);
+  const [bookmarkedEventIds, setBookmarkedEventIds] = useState<number[]>(cachedBookmarkedEventIds || []);
+  const [subscribedChannelIds, setSubscribedChannelIds] = useState<number[]>(cachedSubscribedChannelIds || []);
   const [activeFilter, setActiveFilter] = useState<"all" | "subscribed" | "bookmarked">("all");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(cachedAllEvents === null);
   const [mounted, setMounted] = useState(false);
   const [hasTimedOut, setHasTimedOut] = useState(false);
 
@@ -188,6 +192,10 @@ export function MiniCalendar({ user }: { user: User | null }) {
         const combined = [...formattedOffline, ...formattedOnline];
 
         if (!ignore) {
+          cachedAllEvents = combined;
+          cachedBookmarkedEventIds = bookmarkedEventIds;
+          cachedSubscribedChannelIds = subscribedChannelIds;
+
           setAllEvents(combined);
           setBookmarkedEventIds(bookmarkedEventIds);
           setSubscribedChannelIds(subscribedChannelIds);

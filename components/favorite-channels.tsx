@@ -27,10 +27,12 @@ function getChannelTypeText(type: string | null) {
   return channelTypeLabel[normalized] || "기타";
 }
 
+let cachedChannels: Channel[] | null = null;
+
 export function FavoriteChannels({ user }: { user: any }) {
-  const [channels, setChannels] = useState<Channel[]>([]);
+  const [channels, setChannels] = useState<Channel[]>(cachedChannels || []);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(cachedChannels === null);
   const [mounted, setMounted] = useState(false);
   const [hasTimedOut, setHasTimedOut] = useState(false);
 
@@ -45,6 +47,7 @@ export function FavoriteChannels({ user }: { user: any }) {
 
     if (!user) {
       console.log("FavoriteChannels: No user prop. Resetting channels.");
+      cachedChannels = null;
       setChannels([]);
       setIsLoading(false);
       return;
@@ -166,7 +169,8 @@ export function FavoriteChannels({ user }: { user: any }) {
               return (b.favoriteCreatedAt || "").localeCompare(a.favoriteCreatedAt || "");
             });
 
-            setChannels([...zone1, ...zone2]);
+            cachedChannels = [...zone1, ...zone2];
+            setChannels(cachedChannels);
             setHasTimedOut(false);
           }
         }
