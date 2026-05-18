@@ -582,12 +582,70 @@ function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; team
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      const { error } = await supabase
+      // 1. event_channels에서 해당 channel_id와 연결된 모든 event_id 조회
+      const { data: eventChannels, error: fetchErr } = await supabase
+        .from("event_channels")
+        .select("event_id")
+        .eq("channel_id", channel.id);
+      if (fetchErr) throw fetchErr;
+
+      const eventIds = (eventChannels || []).map(ec => ec.event_id).filter(Boolean) as number[];
+      let orphanEventIds: number[] = [];
+
+      if (eventIds.length > 0) {
+        // 2. 해당 행사들이 또 다른 채널과 연결되어 있는지 확인하기 위해 모든 event_channels 데이터 조회
+        const { data: allLinks, error: linksErr } = await supabase
+          .from("event_channels")
+          .select("event_id, channel_id")
+          .in("event_id", eventIds);
+        if (linksErr) throw linksErr;
+
+        // 행사 ID별로 연결된 채널 수 계산
+        const counts: Record<number, number> = {};
+        (allLinks || []).forEach(link => {
+          counts[link.event_id] = (counts[link.event_id] || 0) + 1;
+        });
+
+        // 채널이 이 채널 단 1개뿐이었던(삭제 후 0개가 될) 행사들 필터링
+        orphanEventIds = eventIds.filter(id => counts[id] === 1);
+      }
+
+      // 3. event_channels에서 해당 channel_id 연결 삭제
+      const { error: delLinksErr } = await supabase
+        .from("event_channels")
+        .delete()
+        .eq("channel_id", channel.id);
+      if (delLinksErr) throw delLinksErr;
+
+      // 4. 연결된 채널이 0개가 된 행사들은 offline_events, online_events, events에서 삭제
+      if (orphanEventIds.length > 0) {
+        const { error: delOffErr } = await supabase
+          .from("offline_events")
+          .delete()
+          .in("event_id", orphanEventIds);
+        if (delOffErr) throw delOffErr;
+
+        const { error: delOnErr } = await supabase
+          .from("online_events")
+          .delete()
+          .in("event_id", orphanEventIds);
+        if (delOnErr) throw delOnErr;
+
+        const { error: delEvErr } = await supabase
+          .from("events")
+          .delete()
+          .in("id", orphanEventIds);
+        if (delEvErr) throw delEvErr;
+      }
+
+      // 5. 마지막으로 채널 삭제
+      const { error: delChanErr } = await supabase
         .from("channels")
         .delete()
         .eq("id", channel.id);
-      if (error) throw error;
-      toast.success("채널이 완전히 삭제되었습니다.");
+      if (delChanErr) throw delChanErr;
+
+      toast.success("채널과 관련 행사가 완전히 삭제되었습니다.");
       setShowDeleteDialog(false);
       onUpdated();
     } catch (e: any) {
