@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { Heart, MapPin, Calendar, Clock, Info, User as UserIcon, X, ChevronDown, ChevronLeft } from "lucide-react";
+import { Heart, MapPin, Calendar, Clock, Info, User as UserIcon, X, ChevronDown, ChevronLeft, ExternalLink, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import ReactDOM from "react-dom";
@@ -53,9 +53,25 @@ type EventDetail = {
   location: string;
   image_url: string | null;
   reservation_type: string | null;
+  reservation_starts_at: string | null;
+  reservation_ends_at: string | null;
+  links: { link_name: string; link_url: string }[] | null;
   channels: { id: number; name: string; image_url: string; type: string; owner_id: string }[];
   images: { id: number; image_url: string; order: number }[];
   schedules: ScheduleItem[];
+};
+
+const reservationBadgeColors: Record<string, string> = {
+  "예약 필수": "bg-red-500 text-white",
+  "예약필수": "bg-red-500 text-white",
+  "예약 우대": "bg-orange-500 text-white",
+  "예약우대": "bg-orange-500 text-white",
+  "일부 예약": "bg-orange-500 text-white",
+  "일부예약": "bg-orange-500 text-white",
+  "자유 입장": "bg-green-500 text-white",
+  "자유입장": "bg-green-500 text-white",
+  "티켓팅": "bg-purple-500 text-white",
+  "휴무": "bg-slate-500 text-white",
 };
 
 export default function EventDetailPage() {
@@ -416,7 +432,7 @@ export default function EventDetailPage() {
         const { data, error } = await supabase
           .from("offline_events")
           .select(`
-            id, event_id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
+            id, event_id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type, reservation_starts_at, reservation_ends_at, links,
             events (
               event_channels ( channels ( id, name, type, image_url, owner_id ) ),
               event_images ( id, image_url, order ),
@@ -448,6 +464,16 @@ export default function EventDetailPage() {
             location: data.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
             image_url: data.image_url,
             reservation_type: data.reservation_type,
+            reservation_starts_at: data.reservation_starts_at,
+            reservation_ends_at: data.reservation_ends_at,
+            links: (() => {
+              const rawLinks = data.links as Record<string, string> | null;
+              if (!rawLinks || typeof rawLinks !== "object") return [];
+              return Object.entries(rawLinks).map(([name, url]) => ({
+                link_name: name,
+                link_url: url
+              }));
+            })(),
             channels,
             images: (eventObj?.event_images || []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
             schedules: eventObj?.event_schedules || [],
@@ -539,7 +565,6 @@ export default function EventDetailPage() {
       // 1. Manually delete specific child records satisfying manual referential cleanup
       await supabase.from("offline_event_locations").delete().eq("offline_event_id", eventId);
       await supabase.from("event_channels").delete().eq("event_id", event.event_id);
-      await supabase.from("event_links").delete().eq("event_id", event.event_id);
       await supabase.from("event_bookmarks").delete().eq("event_id", event.event_id);
       await supabase.from("event_images").delete().eq("event_id", event.event_id);
       
@@ -588,20 +613,52 @@ export default function EventDetailPage() {
     );
   }
 
-  const formatEventDate = (start: string, end: string | null) => {
-    const formatSingle = (dateStr: string) => {
-      if (!dateStr) return "";
-      const parts = dateStr.split("-");
-      if (parts.length === 3) {
-        return `${parts[1]}/${parts[2]}`;
-      }
-      return dateStr.replaceAll("-", "/");
+  const formatDateNoYear = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+      return `${month}월 ${day}일`;
+    }
+    const dotParts = dateStr.split(".");
+    if (dotParts.length === 3) {
+      const month = parseInt(dotParts[1], 10);
+      const day = parseInt(dotParts[2], 10);
+      return `${month}월 ${day}일`;
+    }
+    return dateStr;
+  };
+
+  const formatEventPeriod = (start: string, end: string | null) => {
+    if (end) {
+      return `${formatDateNoYear(start)} ~ ${formatDateNoYear(end)}`;
+    }
+    return start ? formatDateNoYear(start) : "상시 진행";
+  };
+
+  const formatReservationPeriod = (start: string | null, end: string | null) => {
+    const formatDateTime = (isoStr: string | null) => {
+      if (!isoStr) return "";
+      const date = new Date(isoStr);
+      if (isNaN(date.getTime())) return isoStr;
+      const mm = date.getMonth() + 1;
+      const dd = date.getDate();
+      const hh = String(date.getHours()).padStart(2, "0");
+      const min = String(date.getMinutes()).padStart(2, "0");
+      return `${mm}월 ${dd}일 \u00A0${hh}:${min}분`;
     };
 
-    if (end) return `${formatSingle(start)} - ${formatSingle(end)}`;
-    return start ? formatSingle(start) : "상시";
+    if (start && end) {
+      return `${formatDateTime(start)} ~ ${formatDateTime(end)}`;
+    } else if (start) {
+      return `${formatDateTime(start)} 부터`;
+    } else if (end) {
+      return `${formatDateTime(end)} 까지`;
+    }
+    return "";
   };
-  
+
   const formatTime = (time: string) => {
     if (!time) return "";
     return time.substring(0, 5); // 14:00:00 -> 14:00
@@ -779,147 +836,207 @@ export default function EventDetailPage() {
           {/* --- MAIN TAB --- */}
           {activeTab === 'main' && (
             <div className="animate-in fade-in duration-300">
-              {/* Info Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-10">
-                {/* Row 1: Location (Always Full Width) */}
+              <div className="flex flex-col select-text divide-y divide-slate-100 dark:divide-slate-800/60 pb-4">
+                
+                {/* 1. 장소 (Location) */}
                 <div 
                   onClick={() => router.push(`/map?eventId=${event.id}`)}
-                  className="flex items-center gap-3 bg-background hover:bg-blue-50/30 dark:hover:bg-blue-900/10 border border-slate-300/80 dark:border-slate-700/80 border-l-[5px] border-l-[#4f6b94] dark:border-l-[#627fa6] rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group sm:col-span-2"
+                  className="flex items-start gap-4 py-4 sm:py-5 first:pt-0 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all rounded-xl -mx-4 px-4 group"
                 >
-                  <div className="w-10 h-10 rounded-full bg-[#4f6b94]/15 dark:bg-[#627fa6]/20 flex items-center justify-center shrink-0 group-hover:bg-[#4f6b94]/25 transition-colors">
-                    <MapPin className="w-4 h-4 text-[#3a5378] dark:text-[#a0b8d6]" />
+                  <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
+                    <MapPin className="w-[22px] h-[22px] stroke-[2] group-hover:text-primary transition-colors" />
                   </div>
-                  <div>
-                    <p className="text-xs md:text-[13px] text-muted-foreground font-bold mb-0.5">장소</p>
-                    <p className="text-[15px] md:text-base text-foreground font-bold leading-snug">{event.location}</p>
+                  <div className="flex-1">
+                    <div className="inline-flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors break-keep leading-snug">
+                        {event.location}
+                      </span>
+                      <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none ml-1 opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
+                        지도보기
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Row 2 Left: Date */}
+                {/* 2. 행사 기간 (Event Period) */}
                 <div 
                   onClick={() => router.push(`/calendar?event=${event.id}`)}
-                  className={cn(
-                    "flex items-center gap-3 bg-background hover:bg-blue-50/30 dark:hover:bg-blue-900/10 border border-slate-300/80 dark:border-slate-700/80 border-l-[5px] border-l-[#4f6b94] dark:border-l-[#627fa6] rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group",
-                    (!event.start_time && !event.end_time) ? "sm:col-span-2" : "sm:col-span-1"
-                  )}
+                  className="flex items-start gap-4 py-4 sm:py-5 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all rounded-xl -mx-4 px-4 group"
                 >
-                  <div className="w-10 h-10 rounded-full bg-[#4f6b94]/15 dark:bg-[#627fa6]/20 flex items-center justify-center shrink-0 group-hover:bg-[#4f6b94]/25 transition-colors">
-                    <Calendar className="w-4 h-4 text-[#3a5378] dark:text-[#a0b8d6]" />
+                  <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
+                    <Calendar className="w-[22px] h-[22px] stroke-[2] group-hover:text-primary transition-colors" />
                   </div>
-                  <div>
-                    <p className="text-xs md:text-[13px] text-muted-foreground font-bold mb-0.5">행사 기간</p>
-                    <p className="text-[15px] md:text-base text-foreground font-bold leading-snug">
-                      {formatEventDate(event.start_date, event.end_date)}
-                    </p>
+                  <div className="flex-1 text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 leading-snug">
+                    <div className="flex items-start gap-x-3 gap-y-1.5 flex-wrap leading-snug">
+                      <div className="inline-flex items-center gap-1.5 shrink-0 mt-0.5">
+                        <span className="font-bold text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors">행사 기간</span>
+                        <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
+                          일정보기
+                        </span>
+                      </div>
+                      
+                      <div className="text-slate-700 dark:text-slate-300 font-medium group-hover:text-primary transition-colors break-keep text-[16px] md:text-[18px]">
+                        {(() => {
+                          const text = formatEventPeriod(event.start_date, event.end_date);
+                          const scheduleButton = (event.start_time || event.end_time || processedSchedules.length > 0) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsScheduleExpanded(!isScheduleExpanded);
+                              }}
+                              className="inline-flex items-center gap-1 text-[12px] font-extrabold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-850 border border-slate-300 dark:border-slate-700 px-2.5 py-1 rounded-xl shadow-[0_2px_6px_-2px_rgba(0,0,0,0.06)] transition-all active:scale-[0.98] select-none ml-3 animate-in fade-in duration-300 shrink-0"
+                            >
+                              <span>상세 일정</span>
+                              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-300", isScheduleExpanded ? "rotate-180" : "")} />
+                            </button>
+                          );
+
+                          return (
+                            <span className="inline-flex items-center gap-1.5 flex-wrap">
+                              <span>{text}</span>
+                              {scheduleButton}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Detailed times/schedules if any */}
+                    {(event.start_time || event.end_time || processedSchedules.length > 0) && isScheduleExpanded && (
+                      <div className="mt-2.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="space-y-2 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/40 max-w-md animate-in slide-in-from-top-1 duration-200">
+                          {processedSchedules.length === 0 ? (
+                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                              <Clock className="w-4 h-4 text-slate-400" />
+                              <span>
+                                {event.start_time ? formatTime(event.start_time) : ""}
+                                {event.start_time && event.end_time ? " - " : ""}
+                                {event.end_time ? formatTime(event.end_time) : ""}
+                              </span>
+                            </div>
+                          ) : (
+                            processedSchedules.map((s, idx) => {
+                              const dayOrder: Record<string, number> = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5, sun: 6 };
+                              const nextItem = processedSchedules[idx + 1];
+                              let hasGap = false;
+                              
+                              if (s.dayOfWeek && nextItem && nextItem.dayOfWeek) {
+                                const currIdx = dayOrder[s.dayOfWeek];
+                                const nextIdx = dayOrder[nextItem.dayOfWeek];
+                                if (typeof currIdx === "number" && typeof nextIdx === "number") {
+                                  hasGap = (nextIdx - currIdx > 1);
+                                }
+                              }
+
+                              return (
+                                <Fragment key={s.id}>
+                                  <div className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
+                                    <span className="font-bold text-slate-500 dark:text-slate-400 select-none w-4">{s.label}</span>
+                                    <span className={cn(
+                                      "font-semibold tracking-tight",
+                                      s.isOff ? "text-red-500 font-extrabold" : "text-slate-700 dark:text-slate-300"
+                                    )}>
+                                      {s.timeText}
+                                    </span>
+                                    {s.reservationType !== "자유 입장" && !s.isOff && (
+                                      <span className="text-[10.5px] font-bold text-slate-400 select-none tracking-tight opacity-90">
+                                        ({s.reservationType})
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  {hasGap && (
+                                    <div className="py-2 flex items-center text-[#4f6b94]/30 max-w-[140px] select-none">
+                                      <svg className="w-full h-[5px]" viewBox="0 0 120 5" preserveAspectRatio="none">
+                                        <path 
+                                          d="M 0 2.5 C 5 5, 5 0, 10 2.5 C 15 5, 15 0, 20 2.5 C 25 5, 25 0, 30 2.5 C 35 5, 35 0, 40 2.5 C 45 5, 45 0, 50 2.5 C 55 5, 55 0, 60 2.5 C 65 5, 65 0, 70 2.5 C 75 5, 75 0, 80 2.5 C 85 5, 85 0, 90 2.5 C 95 5, 95 0, 100 2.5 C 105 5, 105 0, 110 2.5 C 115 5, 115 0, 120 2.5" 
+                                          fill="none" 
+                                          stroke="currentColor" 
+                                          strokeWidth="1.5" 
+                                          strokeLinecap="round"
+                                        />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </Fragment>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Row 2 Right: Time */}
-                {(event.start_time || event.end_time || processedSchedules.length > 0) && (
-                  <div 
-                    onClick={() => {
-                      if (processedSchedules.length > 0) setIsScheduleExpanded(!isScheduleExpanded);
-                    }}
-                    className={cn(
-                      "flex items-start gap-3 bg-background border border-slate-300/80 dark:border-slate-700/80 border-l-[5px] border-l-[#4f6b94] dark:border-l-[#627fa6] rounded-2xl p-4 shadow-sm transition-all duration-200 select-none sm:col-span-1",
-                      processedSchedules.length > 0 ? "cursor-pointer hover:bg-blue-50/30 dark:hover:bg-blue-900/10" : ""
-                    )}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-[#4f6b94]/15 dark:bg-[#627fa6]/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <Clock className="w-4 h-4 text-[#3a5378] dark:text-[#a0b8d6]" />
+                {/* 3. 입장 방식 & 예약 기간 (Admission Method & Reservation Period) */}
+                {(event.reservation_type || event.reservation_starts_at || event.reservation_ends_at) && (
+                  <div className="flex items-start gap-4 py-4 sm:py-5">
+                    <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
+                      <Info className="w-[22px] h-[22px] stroke-[2]" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-0.5 gap-2">
-                        <p className="text-xs md:text-[13px] text-muted-foreground font-bold">이용 시간</p>
-                        {processedSchedules.length > 0 && (
-                          <ChevronDown className={cn("w-4 h-4 text-[#4f6b94] transition-transform duration-300 shrink-0", isScheduleExpanded ? "rotate-180" : "")} />
-                        )}
-                      </div>
+                    <div className="flex-1 text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 leading-snug flex flex-wrap items-center gap-x-6 sm:gap-x-10 gap-y-2">
+                      {event.reservation_type && (
+                        <div className="inline-flex items-center">
+                          <span className="font-bold mr-2 text-slate-900 dark:text-slate-100">입장 방식</span>
+                          <span className={cn(
+                            "px-3 py-0.5 rounded text-[14px] md:text-[15px] font-semibold select-none shadow-sm",
+                            reservationBadgeColors[event.reservation_type] || "bg-slate-500 text-white"
+                          )}>
+                            {event.reservation_type}
+                          </span>
+                        </div>
+                      )}
                       
-                      {!isScheduleExpanded || processedSchedules.length === 0 ? (
-                        <p className="text-[15px] md:text-base text-foreground font-bold leading-snug">
-                          {event.start_time ? formatTime(event.start_time) : ""}
-                          {event.start_time && event.end_time ? " - " : ""}
-                          {event.end_time ? formatTime(event.end_time) : ""}
-                          {!event.start_time && !event.end_time && processedSchedules.length > 0 ? "상세 일정 확인" : ""}
-                        </p>
-                      ) : (
-                        <div className="mt-2.5 space-y-2 animate-in slide-in-from-top-1 duration-200">
-                          {processedSchedules.map((s, idx) => {
-                            const dayOrder: Record<string, number> = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4, sat: 5, sun: 6 };
-                            const nextItem = processedSchedules[idx + 1];
-                            let hasGap = false;
-                            
-                            if (s.dayOfWeek && nextItem && nextItem.dayOfWeek) {
-                              const currIdx = dayOrder[s.dayOfWeek];
-                              const nextIdx = dayOrder[nextItem.dayOfWeek];
-                              if (typeof currIdx === "number" && typeof nextIdx === "number") {
-                                hasGap = (nextIdx - currIdx > 1);
-                              }
-                            }
+                      {event.reservation_type && (event.reservation_starts_at || event.reservation_ends_at) && (
+                        <span className="text-slate-300 dark:text-slate-700 select-none hidden sm:inline">|</span>
+                      )}
 
-                            return (
-                              <Fragment key={s.id}>
-                                <div className="flex items-center gap-3 text-sm text-foreground/90">
-                                  <span className="font-bold text-foreground/70 select-none w-4">{s.label}</span>
-                                  <span className={cn(
-                                    "font-bold tracking-tight",
-                                    s.isOff ? "text-red-500 font-black" : "text-foreground"
-                                  )}>
-                                    {s.timeText}
-                                  </span>
-                                  {s.reservationType !== "자유 입장" && !s.isOff && (
-                                    <span className="text-[10.5px] font-bold text-muted-foreground select-none tracking-tight opacity-80">
-                                      ({s.reservationType})
+                      {(event.reservation_starts_at || event.reservation_ends_at) && (
+                        <div className="flex items-start gap-x-2.5 gap-y-1.5 flex-wrap leading-snug">
+                          <span className="font-bold text-slate-900 dark:text-slate-100 shrink-0 mt-0.5">예약 기간</span>
+                          <span className="text-slate-700 dark:text-slate-300 font-medium text-[16px] md:text-[18px]">
+                            {(() => {
+                              const text = formatReservationPeriod(event.reservation_starts_at || null, event.reservation_ends_at || null);
+                              const parts = text.split(" ~ ");
+                              if (parts.length === 2) {
+                                return (
+                                  <span className="flex flex-col">
+                                    <span>{parts[0]}</span>
+                                    <span className="mt-0.5 pl-1.5">
+                                      ~ {parts[1]}
                                     </span>
-                                  )}
-                                </div>
-                                
-                                {hasGap && (
-                                  <div className="py-2 flex items-center text-[#4f6b94]/40 max-w-[140px] select-none animate-in fade-in duration-300">
-                                    <svg className="w-full h-[5px]" viewBox="0 0 120 5" preserveAspectRatio="none">
-                                      <path 
-                                        d="M 0 2.5 C 5 5, 5 0, 10 2.5 C 15 5, 15 0, 20 2.5 C 25 5, 25 0, 30 2.5 C 35 5, 35 0, 40 2.5 C 45 5, 45 0, 50 2.5 C 55 5, 55 0, 60 2.5 C 65 5, 65 0, 70 2.5 C 75 5, 75 0, 80 2.5 C 85 5, 85 0, 90 2.5 C 95 5, 95 0, 100 2.5 C 105 5, 105 0, 110 2.5 C 115 5, 115 0, 120 2.5" 
-                                        fill="none" 
-                                        stroke="currentColor" 
-                                        strokeWidth="1.5" 
-                                        strokeLinecap="round"
-                                      />
-                                    </svg>
-                                  </div>
-                                )}
-                              </Fragment>
-                            );
-                          })}
+                                  </span>
+                                );
+                              }
+                              return text;
+                            })()}
+                          </span>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
 
-                {/* Row 3 Left: Organizer */}
+                {/* 5. 주최자 (Organizer) */}
                 {event.channels.length > 0 && (
-                  <div className={cn(
-                    "flex items-center gap-3 bg-background border border-slate-300/80 dark:border-slate-700/80 border-l-[5px] border-l-[#4f6b94] dark:border-l-[#627fa6] rounded-2xl p-4 shadow-sm",
-                    (!event.reservation_type) ? "sm:col-span-2" : "sm:col-span-1"
-                  )}>
-                    <div className="w-10 h-10 rounded-full bg-[#4f6b94]/15 dark:bg-[#627fa6]/20 flex items-center justify-center shrink-0">
-                      <UserIcon className="w-4 h-4 text-[#3a5378] dark:text-[#a0b8d6]" />
+                  <div className="flex items-start gap-4 py-4 sm:py-5">
+                    <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
+                      <UserIcon className="w-[22px] h-[22px] stroke-[2]" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-xs md:text-[13px] text-muted-foreground font-bold mb-0.5">주최자</p>
-                      <div className="flex flex-wrap gap-2">
+                    <div className="flex-1 text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 leading-snug">
+                      <div className="font-bold mb-3 text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100">주최자</div>
+                      <div className="flex flex-wrap gap-2.5">
                         {event.channels.map(channel => (
                           <button 
                             key={channel.id} 
                             onClick={() => router.push(`/channels/${channel.id}`)}
-                            className="flex items-center gap-1.5 bg-background/90 hover:bg-background rounded-full pr-3 p-1 border border-border/50 shadow-sm transition-all hover:scale-[1.02]"
+                            className="inline-flex items-center gap-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-full pr-4 p-1 border border-slate-200 dark:border-slate-850 shadow-sm transition-all hover:scale-[1.02]"
                           >
-                            <Avatar className="w-6 h-6 border border-background shadow-sm">
+                            <Avatar className="w-7 h-7 border border-background shadow-sm">
                               <AvatarImage src={channel.image_url || undefined} className="object-cover bg-muted" />
-                              <AvatarFallback className="bg-muted text-[10px] font-bold">{channel.name.charAt(0)}</AvatarFallback>
+                              <AvatarFallback className="bg-muted text-[11px] font-bold">{channel.name.charAt(0)}</AvatarFallback>
                             </Avatar>
-                            <span className="text-[13px] font-bold text-foreground pr-0.5">{channel.name}</span>
+                            <span className="text-[14px] md:text-[15px] font-bold text-slate-800 dark:text-slate-200 pr-0.5">{channel.name}</span>
                           </button>
                         ))}
                       </div>
@@ -927,21 +1044,39 @@ export default function EventDetailPage() {
                   </div>
                 )}
 
-                {/* Row 3 Right: Reservation Type Card */}
-                {event.reservation_type && (
-                  <div className={cn(
-                    "flex items-center gap-3 bg-background border border-slate-300/80 dark:border-slate-700/80 border-l-[5px] border-l-[#4f6b94] dark:border-l-[#627fa6] rounded-2xl p-4 shadow-sm",
-                    (event.channels.length === 0) ? "sm:col-span-2" : "sm:col-span-1"
-                  )}>
-                    <div className="w-10 h-10 rounded-full bg-[#4f6b94]/15 dark:bg-[#627fa6]/20 flex items-center justify-center shrink-0">
-                      <Info className="w-4 h-4 text-[#3a5378] dark:text-[#a0b8d6]" />
+                {/* 6. 링크 (Links) - Optional */}
+                {event.links && event.links.filter(l => l.link_name.trim() && l.link_url.trim()).length > 0 ? (
+                  <div className="flex items-start gap-4 py-4 sm:py-5 last:pb-0">
+                    <div className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
+                      <Link2 className="w-5 h-5 stroke-[2]" />
                     </div>
-                    <div>
-                      <p className="text-xs md:text-[13px] text-muted-foreground font-bold mb-0.5">입장 방식</p>
-                      <p className="text-[15px] md:text-base text-foreground font-bold leading-snug">{event.reservation_type}</p>
+                    <div className="flex-1 text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 leading-snug">
+                      <div className="font-bold mb-3 text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100">링크</div>
+                      <div className="flex flex-col gap-4">
+                        {event.links
+                          .filter(l => l.link_name.trim() && l.link_url.trim())
+                          .map((link, idx) => (
+                            <div key={idx} className="flex items-center flex-wrap gap-x-1.5 gap-y-1 text-[16px] md:text-[18px]">
+                              <span className="font-bold text-slate-800 dark:text-slate-200 shrink-0">
+                                {link.link_name}
+                              </span>
+                              <span className="text-slate-400 dark:text-slate-500 shrink-0">:</span>
+                              <a
+                                href={link.link_url.startsWith("http") ? link.link_url : `https://${link.link_url}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-500 dark:text-blue-400 hover:underline font-medium break-all text-[16px] md:text-[18px]"
+                              >
+                                {link.link_url.replace(/^(https?:\/\/)?(www\.)?/, "")}
+                              </a>
+                            </div>
+                          ))
+                        }
+                      </div>
                     </div>
                   </div>
-                )}
+                ) : null}
+
               </div>
             </div>
           )}

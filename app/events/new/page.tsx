@@ -27,21 +27,35 @@ const TimeInputPair = ({
   minute, 
   onHourChange, 
   onMinuteChange,
-  size = "default"
+  size = "default",
+  disabled = false
 }: { 
   hour: string, 
   minute: string, 
   onHourChange: (v: string) => void, 
   onMinuteChange: (v: string) => void,
-  size?: "default" | "sm"
+  size?: "default" | "sm",
+  disabled?: boolean
 }) => {
   const hourRef = useRef<HTMLInputElement>(null);
   const minRef = useRef<HTMLInputElement>(null);
 
   const handleHourChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, "").slice(0, 2);
-    const num = parseInt(val);
-    if (num > 23) val = "23";
+    let val = e.target.value.replace(/\D/g, "");
+    
+    if (val.length === 2) {
+      const num = parseInt(val);
+      if (num > 23) {
+        const firstDigit = val.charAt(0);
+        const rest = val.slice(1);
+        onHourChange(firstDigit);
+        onMinuteChange(rest);
+        minRef.current?.focus();
+        return;
+      }
+    }
+    
+    val = val.slice(0, 2);
     onHourChange(val);
     if (val.length === 2) {
       minRef.current?.focus();
@@ -64,32 +78,42 @@ const TimeInputPair = ({
   const isSm = size === "sm";
 
   return (
-    <div className={`flex items-center justify-center bg-white dark:bg-muted/20 border-2 border-border/80 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all rounded-xl shadow-sm select-none shrink-0
+    <div className={`flex items-center justify-center border-2 transition-all rounded-xl shadow-sm select-none shrink-0
+      ${disabled 
+        ? "bg-muted/40 border-border/40 text-muted-foreground/40 cursor-not-allowed pointer-events-none" 
+        : "bg-white dark:bg-muted/20 border-border/80 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10"
+      }
       ${isSm ? "h-9.5 w-[96px] px-2" : "h-11 w-[118px] px-3"}`}
     >
       <input
         ref={hourRef}
         placeholder="__"
-        className={`bg-transparent border-0 p-0 text-center font-mono font-extrabold text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 shrink-0
+        disabled={disabled}
+        className={`bg-transparent border-0 p-0 text-center font-mono font-extrabold placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 shrink-0
+          ${disabled ? "text-muted-foreground/40 cursor-not-allowed" : "text-foreground"}
           ${isSm ? "w-[20px] text-[13.5px]" : "w-[26px] text-[16px]"}`}
         value={hour}
         onChange={handleHourChange}
         maxLength={2}
       />
-      <span className={`text-foreground/45 font-black shrink-0 select-none mx-1 relative bottom-[0.5px]
+      <span className={`font-black shrink-0 select-none mx-1 relative bottom-[0.5px]
+        ${disabled ? "text-muted-foreground/30" : "text-foreground/45"}
         ${isSm ? "text-[14px]" : "text-[17px]"}`}
       >:</span>
       <input
         ref={minRef}
         placeholder="__"
-        className={`bg-transparent border-0 p-0 text-center font-mono font-extrabold text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 shrink-0
+        disabled={disabled}
+        className={`bg-transparent border-0 p-0 text-center font-mono font-extrabold placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 shrink-0
+          ${disabled ? "text-muted-foreground/40 cursor-not-allowed" : "text-foreground"}
           ${isSm ? "w-[20px] text-[13.5px]" : "w-[26px] text-[16px]"}`}
         value={minute}
         onChange={handleMinChange}
         onKeyDown={(e) => handleKeyDown(e, true)}
         maxLength={2}
       />
-      <span className={`text-muted-foreground font-bold shrink-0 select-none ml-1
+      <span className={`font-bold shrink-0 select-none ml-1
+        ${disabled ? "text-muted-foreground/30" : "text-muted-foreground"}
         ${isSm ? "text-[11px]" : "text-[13px]"}`}
       >분</span>
     </div>
@@ -124,9 +148,21 @@ const DateInputTriple = ({
   };
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, "").slice(0, 2);
-    const num = parseInt(val);
-    if (num > 12) val = "12";
+    let val = e.target.value.replace(/\D/g, "");
+    
+    if (val.length === 2) {
+      const num = parseInt(val);
+      if (num > 12) {
+        const firstDigit = val.charAt(0);
+        const rest = val.slice(1);
+        onMonthChange(firstDigit);
+        onDayChange(rest);
+        dayRef.current?.focus();
+        return;
+      }
+    }
+    
+    val = val.slice(0, 2);
     onMonthChange(val);
     if (val.length === 2) {
       dayRef.current?.focus();
@@ -710,6 +746,13 @@ export default function NewEventPage() {
 
     setIsSubmitting(true);
     try {
+      const tzOffset = (() => {
+        const tzo = -new Date().getTimezoneOffset();
+        const dif = tzo >= 0 ? '+' : '-';
+        const pad = (n: number) => String(Math.floor(Math.abs(n))).padStart(2, '0');
+        return `${dif}${pad(tzo / 60)}:${pad(tzo % 60)}`;
+      })();
+
       if (eventType === "offline") {
         const startDate = offlineStartDate;
         const endDate = endYear && endMonth && endDay ? `${endYear}-${endMonth.padStart(2, "0")}-${endDay.padStart(2, "0")}` : "";
@@ -719,12 +762,12 @@ export default function NewEventPage() {
         const startTime = startTimeHour && startTimeMin ? `${startTimeHour.padStart(2, "0")}:${startTimeMin.padStart(2, "0")}:00` : null;
         const endTime = endTimeHour && endTimeMin ? `${endTimeHour.padStart(2, "0")}:${endTimeMin.padStart(2, "0")}:00` : null;
         
-        // Format timestamptz strings: YYYY-MM-DDTHH:mm:ssZ
+        // Format timestamptz strings: YYYY-MM-DDTHH:mm:ss+HH:MM
         const resStartsAt = (showResSchedule && !isResAlways && resStartDate && resStartHour && resStartMin) 
-          ? `${resStartDate}T${resStartHour.padStart(2, "0")}:${resStartMin.padStart(2, "0")}:00Z` 
+          ? `${resStartDate}T${resStartHour.padStart(2, "0")}:${resStartMin.padStart(2, "0")}:00${tzOffset}` 
           : null;
         const resEndsAt = (showResSchedule && !isResAlways && resEndDate && resEndHour && resEndMin) 
-          ? `${resEndDate}T${resEndHour.padStart(2, "0")}:${resEndMin.padStart(2, "0")}:00Z` 
+          ? `${resEndDate}T${resEndHour.padStart(2, "0")}:${resEndMin.padStart(2, "0")}:00${tzOffset}` 
           : null;
 
         // 0. Insert foundational event entry
@@ -740,6 +783,13 @@ export default function NewEventPage() {
         if (baseError) throw baseError;
 
         // 1. Insert into offline_events linked to base event
+        const linksObj: Record<string, string> = {};
+        eventLinks.forEach(link => {
+          if (link.link_name.trim() && link.link_url.trim()) {
+            linksObj[link.link_name.trim()] = link.link_url.trim();
+          }
+        });
+
         const { data: eventData, error: eventError } = await supabase
           .from("offline_events")
           .insert({
@@ -755,6 +805,7 @@ export default function NewEventPage() {
             reservation_ends_at: resEndsAt,
             is_reservation_always: isResAlways,
             image_url: imageUrl,
+            links: linksObj,
           })
           .select()
           .single();
@@ -785,24 +836,6 @@ export default function NewEventPage() {
           .insert(locationRelations);
 
         if (locationError) throw locationError;
-
-        // 4. Insert into event_links (event_id)
-        if (eventLinks.length > 0) {
-          const linksToInsert = eventLinks
-            .filter(link => link.link_name.trim() && link.link_url.trim())
-            .map(link => ({
-              link_name: link.link_name.trim(),
-              link_url: link.link_url.trim(),
-              event_id: baseEvent.id
-            }));
-
-          if (linksToInsert.length > 0) {
-            const { error: linksError } = await supabase
-              .from("event_links")
-              .insert(linksToInsert);
-            if (linksError) throw linksError;
-          }
-        }
 
         // 5. Insert detailed event_schedules
         const schedulesToInsert = [];
@@ -873,10 +906,10 @@ export default function NewEventPage() {
       } else {
         // Online Event Submission
         const onlineStartsAt = isOnlineAlways ? null : (onlineStartYear && onlineStartMonth && onlineStartDay
-          ? `${onlineStartYear}-${onlineStartMonth.padStart(2, "0")}-${onlineStartDay.padStart(2, "0")}T${(onlineStartHour || "00").padStart(2, "0")}:${(onlineStartMin || "00").padStart(2, "0")}:00Z`
+          ? `${onlineStartYear}-${onlineStartMonth.padStart(2, "0")}-${onlineStartDay.padStart(2, "0")}T${(onlineStartHour || "00").padStart(2, "0")}:${(onlineStartMin || "00").padStart(2, "0")}:00${tzOffset}`
           : null);
         const onlineEndsAt = isOnlineAlways ? null : (onlineEndYear && onlineEndMonth && onlineEndDay
-          ? `${onlineEndYear}-${onlineEndMonth.padStart(2, "0")}-${onlineEndDay.padStart(2, "0")}T${(onlineEndHour || "00").padStart(2, "0")}:${(onlineEndMin || "00").padStart(2, "0")}:00Z`
+          ? `${onlineEndYear}-${onlineEndMonth.padStart(2, "0")}-${onlineEndDay.padStart(2, "0")}T${(onlineEndHour || "00").padStart(2, "0")}:${(onlineEndMin || "00").padStart(2, "0")}:00${tzOffset}`
           : null);
 
         if (!isOnlineAlways && !onlineStartsAt) {
@@ -898,6 +931,13 @@ export default function NewEventPage() {
         if (baseError) throw baseError;
 
         // 1. Insert into online_events
+        const linksObj: Record<string, string> = {};
+        eventLinks.forEach(link => {
+          if (link.link_name.trim() && link.link_url.trim()) {
+            linksObj[link.link_name.trim()] = link.link_url.trim();
+          }
+        });
+
         const { data: eventData, error: eventError } = await supabase
           .from("online_events")
           .insert({
@@ -907,6 +947,7 @@ export default function NewEventPage() {
             start_at: onlineStartsAt,
             end_at: onlineEndsAt,
             image_url: imageUrl,
+            links: linksObj,
           })
           .select()
           .single();
@@ -924,24 +965,6 @@ export default function NewEventPage() {
           .insert(channelRelations);
 
         if (relationError) throw relationError;
-
-        // 3. Insert into event_links (event_id)
-        if (eventLinks.length > 0) {
-          const linksToInsert = eventLinks
-            .filter(link => link.link_name.trim() && link.link_url.trim())
-            .map(link => ({
-              link_name: link.link_name.trim(),
-              link_url: link.link_url.trim(),
-              event_id: baseEvent.id
-            }));
-
-          if (linksToInsert.length > 0) {
-            const { error: linksError } = await supabase
-              .from("event_links")
-              .insert(linksToInsert);
-            if (linksError) throw linksError;
-          }
-        }
 
         toast.success("온라인 행사가 성공적으로 등록되었습니다!");
         router.push(`/online-events/${eventData.id}`);
@@ -1443,11 +1466,12 @@ export default function NewEventPage() {
                   <div className="space-y-2.5">
                     {getVisibleDayKeys().map((dKey) => {
                       const dayData = daySchedules[dKey];
+                      const isDisabled = dayData.reservationType === "휴무";
                       return (
                         <div key={dKey} className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 px-5 bg-background border border-border/60 rounded-2xl shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)]">
                           
                           {/* Day Label */}
-                          <div className="flex items-center gap-3 shrink-0 w-full lg:w-auto">
+                          <div className={`flex items-center gap-3 shrink-0 w-full lg:w-auto transition-opacity duration-200 ${isDisabled ? "opacity-40" : ""}`}>
                             <span className="font-extrabold text-sm sm:text-[15px] text-foreground select-none">
                               {koreanDayMap[dKey]}요일
                             </span>
@@ -1455,13 +1479,14 @@ export default function NewEventPage() {
 
                           {/* Operating Hours & Reservation Dropdown */}
                           <div className="flex flex-col sm:flex-row sm:items-center gap-4 lg:gap-6 flex-1 lg:justify-end">
-                            <div className="flex items-center gap-1.5 shrink-0">
+                            <div className={`flex items-center gap-1.5 shrink-0 transition-opacity duration-200 ${isDisabled ? "opacity-40 cursor-not-allowed" : ""}`}>
                               <span className="text-[11.5px] font-black text-foreground/60 select-none shrink-0 pr-0.5">시작</span>
                               <TimeInputPair 
                                 hour={dayData.openHour} minute={dayData.openMin} 
                                 onHourChange={(val) => updateDaySchedule(dKey, "openHour", val)}
                                 onMinuteChange={(val) => updateDaySchedule(dKey, "openMin", val)}
                                 size="sm"
+                                disabled={isDisabled}
                               />
                               <span className="text-foreground/60 font-black text-base mx-1 select-none shrink-0 relative bottom-[0.5px]">~</span>
                               <span className="text-[11.5px] font-black text-foreground/60 select-none shrink-0 pr-0.5">마감</span>
@@ -1470,6 +1495,7 @@ export default function NewEventPage() {
                                 onHourChange={(val) => updateDaySchedule(dKey, "closeHour", val)}
                                 onMinuteChange={(val) => updateDaySchedule(dKey, "closeMin", val)}
                                 size="sm"
+                                disabled={isDisabled}
                               />
                             </div>
 
@@ -1480,7 +1506,7 @@ export default function NewEventPage() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {["자유 입장", "예약 필수", "티켓팅", "휴무"].map(type => (
+                                  {["자유 입장", "예약 필수", "일부 예약", "티켓팅", "휴무"].map(type => (
                                     <SelectItem key={type} value={type} className="text-xs font-bold">{type}</SelectItem>
                                   ))}
                                 </SelectContent>
@@ -1509,40 +1535,44 @@ export default function NewEventPage() {
                       </div>
                     )}
                     
-                    {dateSchedules.map((row, idx) => (
-                      <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-3.5 rounded-xl border-2 border-border/80 bg-card shadow-sm animate-in fade-in duration-300 w-full relative">
-                        
-                        {/* Left: Date Badge + Hours (Strictly Horizontal Row!) */}
-                        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-                          {/* Month/Day Static Text (No Badge) */}
-                          <span className="min-w-[100px] sm:min-w-[105px] pl-1.5 sm:pl-2 text-foreground font-extrabold text-[14.5px] tracking-tight select-none shrink-0">
-                            {(() => {
-                              const d = new Date(`${row.year}-${row.month.padStart(2, '0')}-${row.day.padStart(2, '0')}T00:00:00`);
-                              const dayMap = ["일", "월", "화", "수", "목", "금", "토"];
-                              const dayStr = !isNaN(d.getTime()) ? ` (${dayMap[d.getDay()]})` : "";
-                              return `${row.month}월 ${row.day}일${dayStr}`;
-                            })()}
-                          </span>
+                    {dateSchedules.map((row, idx) => {
+                      const isDisabled = row.reservationType === "휴무";
+                      return (
+                        <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-3.5 rounded-xl border-2 border-border/80 bg-card shadow-sm animate-in fade-in duration-300 w-full relative">
+                          
+                          {/* Left: Date Badge + Hours (Strictly Horizontal Row!) */}
+                          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                            {/* Month/Day Static Text (No Badge) */}
+                            <span className={`min-w-[100px] sm:min-w-[105px] pl-1.5 sm:pl-2 text-foreground font-extrabold text-[14.5px] tracking-tight select-none shrink-0 transition-opacity duration-200 ${isDisabled ? "opacity-40" : ""}`}>
+                              {(() => {
+                                const d = new Date(`${row.year}-${row.month.padStart(2, '0')}-${row.day.padStart(2, '0')}T00:00:00`);
+                                const dayMap = ["일", "월", "화", "수", "목", "금", "토"];
+                                const dayStr = !isNaN(d.getTime()) ? ` (${dayMap[d.getDay()]})` : "";
+                                return `${row.month}월 ${row.day}일${dayStr}`;
+                              })()}
+                            </span>
 
-                          {/* Operating Time Pair Row */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[11.5px] font-black text-foreground/60 select-none shrink-0 pl-0.5">시작</span>
-                            <TimeInputPair 
-                              hour={row.openHour} minute={row.openMin} 
-                              onHourChange={(v) => updateDateSchedule(row.id, "openHour", v)}
-                              onMinuteChange={(v) => updateDateSchedule(row.id, "openMin", v)}
-                              size="sm"
-                            />
-                            <span className="text-muted-foreground/70 font-black text-base mx-1 shrink-0 select-none relative bottom-[0.5px]">~</span>
-                            <span className="text-[11.5px] font-black text-foreground/60 select-none shrink-0">마감</span>
-                            <TimeInputPair 
-                              hour={row.closeHour} minute={row.closeMin} 
-                              onHourChange={(v) => updateDateSchedule(row.id, "closeHour", v)}
-                              onMinuteChange={(v) => updateDateSchedule(row.id, "closeMin", v)}
-                              size="sm"
-                            />
+                            {/* Operating Time Pair Row */}
+                            <div className={`flex items-center gap-1.5 shrink-0 transition-opacity duration-200 ${isDisabled ? "opacity-40 cursor-not-allowed" : ""}`}>
+                              <span className="text-[11.5px] font-black text-foreground/60 select-none shrink-0 pr-0.5">시작</span>
+                              <TimeInputPair 
+                                hour={row.openHour} minute={row.openMin} 
+                                onHourChange={(v) => updateDateSchedule(row.id, "openHour", v)}
+                                onMinuteChange={(v) => updateDateSchedule(row.id, "openMin", v)}
+                                size="sm"
+                                disabled={isDisabled}
+                              />
+                              <span className="text-muted-foreground/70 font-black text-base mx-1 shrink-0 select-none relative bottom-[0.5px]">~</span>
+                              <span className="text-[11.5px] font-black text-foreground/60 select-none shrink-0 pr-0.5">마감</span>
+                              <TimeInputPair 
+                                hour={row.closeHour} minute={row.closeMin} 
+                                onHourChange={(v) => updateDateSchedule(row.id, "closeHour", v)}
+                                onMinuteChange={(v) => updateDateSchedule(row.id, "closeMin", v)}
+                                size="sm"
+                                disabled={isDisabled}
+                              />
+                            </div>
                           </div>
-                        </div>
 
                         {/* Right: Admission Dropdown + Delete Button Group */}
                         <div className="flex items-center gap-2 shrink-0 ml-auto">
@@ -1552,7 +1582,7 @@ export default function NewEventPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {["자유 입장", "예약 필수", "티켓팅", "휴무"].map(type => (
+                                {["자유 입장", "예약 필수", "일부 예약", "티켓팅", "휴무"].map(type => (
                                   <SelectItem key={type} value={type} className="text-xs font-bold">{type}</SelectItem>
                                 ))}
                               </SelectContent>
@@ -1569,7 +1599,8 @@ export default function NewEventPage() {
                         </div>
 
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
                 </div>
               )}
@@ -1585,7 +1616,7 @@ export default function NewEventPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                {["자유 입장", "예약 필수", "티켓팅", "휴무"].map((type) => (
+                {["자유 입장", "예약 필수", "일부 예약", "티켓팅"].map((type) => (
                   <button
                     key={type}
                     type="button"
@@ -1631,7 +1662,7 @@ export default function NewEventPage() {
 
                     {/* 예약/티켓팅 링크 등록하기 button */}
                     {(() => {
-                      const targetLinkName = (reservationType === "예약 필수") ? "예약 링크" : "티켓팅 링크";
+                      const targetLinkName = (reservationType === "예약 필수" || reservationType === "일부 예약") ? "예약 링크" : "티켓팅 링크";
                       const hasTargetLink = eventLinks.some(link => link.link_name === targetLinkName);
                       if (hasTargetLink) return null;
 

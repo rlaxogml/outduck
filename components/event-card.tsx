@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
-type ReservationType = "예약 필수" | "예약 우대" | "자유 입장" | "티켓팅" | "휴무" | "예약필수" | "예약우대" | "자유입장";
+type ReservationType = "예약 필수" | "예약 우대" | "일부 예약" | "자유 입장" | "티켓팅" | "휴무" | "예약필수" | "예약우대" | "일부예약" | "자유입장";
 
 interface EventCardProps {
   id: number;
@@ -34,6 +34,8 @@ const reservationBadgeColors: Record<string, string> = {
   "예약필수": "bg-red-500 text-white",
   "예약 우대": "bg-orange-500 text-white",
   "예약우대": "bg-orange-500 text-white",
+  "일부 예약": "bg-orange-500 text-white",
+  "일부예약": "bg-orange-500 text-white",
   "자유 입장": "bg-green-500 text-white",
   "자유입장": "bg-green-500 text-white",
   "티켓팅": "bg-purple-500 text-white",
