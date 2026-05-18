@@ -262,7 +262,7 @@ export default function SubscriptionsPage() {
           {user && (
             <>
               {/* Favorite Channels section */}
-              <FavoriteChannels />
+              <FavoriteChannels user={user} />
 
               {/* Tabs */}
               <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />

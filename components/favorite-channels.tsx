@@ -27,10 +27,9 @@ function getChannelTypeText(type: string | null) {
   return channelTypeLabel[normalized] || "기타";
 }
 
-export function FavoriteChannels() {
+export function FavoriteChannels({ user }: { user: any }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [hasTimedOut, setHasTimedOut] = useState(false);
@@ -41,8 +40,20 @@ export function FavoriteChannels() {
   }, []);
 
   useEffect(() => {
-    console.log("FavoriteChannels: Auth useEffect initialized.");
+    console.log("FavoriteChannels: Auth changed or mounted.", { hasUser: !!user, mounted });
+    if (!mounted) return;
+
+    if (!user) {
+      console.log("FavoriteChannels: No user prop. Resetting channels.");
+      setChannels([]);
+      setIsLoading(false);
+      return;
+    }
+
     let isMounted = true;
+    setIsLoading(true);
+    setHasTimedOut(false);
+
     let safetyTimeout = setTimeout(() => {
       if (isMounted) {
         console.warn("FavoriteChannels: Loading safety timeout reached (15s). Forcing isLoading to false.");
@@ -54,15 +65,6 @@ export function FavoriteChannels() {
     const fetchFavoritesAndBookmarks = async (currentUser: any) => {
       console.log("FavoriteChannels: Starting fetchFavoritesAndBookmarks for user:", currentUser.id);
       try {
-        if (!currentUser) {
-          if (isMounted) {
-            setChannels([]);
-            setIsLoading(false);
-          }
-          clearTimeout(safetyTimeout);
-          return;
-        }
-
         const [{ data: favoritesData, error: favError }, { data: bookmarksData }] = await Promise.all([
           supabase
             .from("favorites")
@@ -80,96 +82,90 @@ export function FavoriteChannels() {
           throw favError;
         }
 
-        console.log("FavoriteChannels: Favorites and Bookmarks fetched. Processing data...", {
-          favoritesCount: favoritesData?.length,
-          bookmarksCount: bookmarksData?.length
-        });
+        if (isMounted) {
+          const bookmarkedEventIds = new Set((bookmarksData || []).map(b => b.event_id).filter(Boolean));
+          const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 
-        if (favoritesData) {
-          const today = new Date().toISOString().split("T")[0];
-          const bookmarkedEventIds = bookmarksData?.map(b => b.event_id).filter(Boolean) || [];
+          const zone1: Channel[] = [];
+          const zone2: Channel[] = [];
 
-          const favoriteChannels = favoritesData
-            .map((f: any) => {
-              const channel = f.channels;
-              if (!channel) return null;
+          if (favoritesData) {
+            favoritesData.forEach((fav: any) => {
+              const ch = fav.channels;
+              if (!ch) return;
 
-              let activeCount = 0;
+              let activeEventCount = 0;
               let hasBookmarkedEvent = false;
               let latestEventCreatedAt = "";
 
-              if (channel.event_channels) {
-                channel.event_channels.forEach((ec: any) => {
-                  const baseEv = ec.events;
-                  if (!baseEv) return;
+              if (ch.event_channels) {
+                ch.event_channels.forEach((ec: any) => {
+                  const ev = ec.events;
+                  if (!ev) return;
 
-                  const baseEvId = baseEv.id;
-                  const isMatchedBookmark = bookmarkedEventIds.includes(baseEvId);
+                  let isEventActive = false;
+                  let eventCreatedAt = "";
 
-                  // Handle offline variants
-                  if (baseEv.offline_events) {
-                    baseEv.offline_events.forEach((event: any) => {
-                      if (!event.end_date || event.end_date >= today) {
-                        activeCount++;
-                      }
-                      if (isMatchedBookmark) {
-                        hasBookmarkedEvent = true;
-                      }
-                      if (event.created_at && (!latestEventCreatedAt || event.created_at > latestEventCreatedAt)) {
-                        latestEventCreatedAt = event.created_at;
-                      }
-                    });
+                  if (ev.offline_events && ev.offline_events.length > 0) {
+                    const off = ev.offline_events[0];
+                    if (!off.end_date || off.end_date >= todayStr) {
+                      isEventActive = true;
+                    }
+                    eventCreatedAt = off.created_at || "";
+                  } else if (ev.online_events && ev.online_events.length > 0) {
+                    const on = ev.online_events[0];
+                    const endAtDate = on.end_at ? on.end_at.split("T")[0] : null;
+                    if (!endAtDate || endAtDate >= todayStr) {
+                      isEventActive = true;
+                    }
+                    eventCreatedAt = on.created_at || "";
                   }
 
-                  // Handle online variants
-                  if (baseEv.online_events) {
-                    baseEv.online_events.forEach((event: any) => {
-                      if (!event.end_at || event.end_at.split('T')[0] >= today) {
-                        activeCount++;
-                      }
-                      if (isMatchedBookmark) {
-                        hasBookmarkedEvent = true;
-                      }
-                      if (event.created_at && (!latestEventCreatedAt || event.created_at > latestEventCreatedAt)) {
-                        latestEventCreatedAt = event.created_at;
-                      }
-                    });
+                  if (isEventActive) {
+                    activeEventCount++;
+                    if (bookmarkedEventIds.has(ev.id)) {
+                      hasBookmarkedEvent = true;
+                    }
+                    if (eventCreatedAt && (!latestEventCreatedAt || eventCreatedAt > latestEventCreatedAt)) {
+                      latestEventCreatedAt = eventCreatedAt;
+                    }
                   }
                 });
               }
 
-              return {
-                id: channel.id,
-                name: channel.name,
-                type: channel.type,
-                image_url: channel.image_url,
-                activeEventCount: activeCount,
+              const formattedChannel: Channel = {
+                id: ch.id,
+                name: ch.name,
+                type: ch.type,
+                image_url: ch.image_url,
+                activeEventCount,
                 hasBookmarkedEvent,
                 latestEventCreatedAt,
-                favoriteCreatedAt: f.created_at,
-              } as Channel;
-            })
-            .filter(Boolean) as Channel[];
+                favoriteCreatedAt: fav.created_at
+              };
 
-          const zone1 = favoriteChannels.filter(c => (c.activeEventCount ?? 0) > 0);
-          const zone2 = favoriteChannels.filter(c => (c.activeEventCount ?? 0) === 0);
+              if (activeEventCount > 0) {
+                zone1.push(formattedChannel);
+              } else {
+                zone2.push(formattedChannel);
+              }
+            });
 
-          zone1.sort((a, b) => {
-            if (a.hasBookmarkedEvent && !b.hasBookmarkedEvent) return -1;
-            if (!a.hasBookmarkedEvent && b.hasBookmarkedEvent) return 1;
+            // Sort zone1: bookmarked events first, then latest created event first
+            zone1.sort((a, b) => {
+              if (a.hasBookmarkedEvent && !b.hasBookmarkedEvent) return -1;
+              if (!a.hasBookmarkedEvent && b.hasBookmarkedEvent) return 1;
+              if (a.latestEventCreatedAt && b.latestEventCreatedAt) {
+                return b.latestEventCreatedAt.localeCompare(a.latestEventCreatedAt);
+              }
+              return (b.favoriteCreatedAt || "").localeCompare(a.favoriteCreatedAt || "");
+            });
 
-            const timeA = a.latestEventCreatedAt ? new Date(a.latestEventCreatedAt).getTime() : 0;
-            const timeB = b.latestEventCreatedAt ? new Date(b.latestEventCreatedAt).getTime() : 0;
-            return timeB - timeA;
-          });
+            // Sort zone2: latest favorite first
+            zone2.sort((a, b) => {
+              return (b.favoriteCreatedAt || "").localeCompare(a.favoriteCreatedAt || "");
+            });
 
-          zone2.sort((a, b) => {
-            const timeA = a.favoriteCreatedAt ? new Date(a.favoriteCreatedAt).getTime() : 0;
-            const timeB = b.favoriteCreatedAt ? new Date(b.favoriteCreatedAt).getTime() : 0;
-            return timeB - timeA;
-          });
-
-          if (isMounted) {
             setChannels([...zone1, ...zone2]);
             setHasTimedOut(false);
           }
@@ -185,86 +181,13 @@ export function FavoriteChannels() {
       }
     };
 
-    console.log("FavoriteChannels: Calling supabase.auth.getSession()...");
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("FavoriteChannels: getSession resolved.", { hasSession: !!session });
-      const currentUser = session?.user ?? null;
-      
-      if (!currentUser) {
-        console.log("FavoriteChannels: No user session found.");
-        if (isMounted) {
-          setChannels([]);
-          setIsLoading(false);
-        }
-        clearTimeout(safetyTimeout);
-        return;
-      }
-
-      setUser((prev: any) => {
-        if (prev?.id === currentUser.id) {
-          console.log("FavoriteChannels: User session unchanged.");
-          clearTimeout(safetyTimeout);
-          return prev;
-        }
-        fetchFavoritesAndBookmarks(currentUser);
-        return currentUser;
-      });
-    }).catch(err => {
-      console.error("FavoriteChannels: getSession failed:", err);
-      if (isMounted) {
-        setIsLoading(false);
-      }
-      clearTimeout(safetyTimeout);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("FavoriteChannels: onAuthStateChange fired.", { event: _event, hasSession: !!session });
-      const currentUser = session?.user ?? null;
-      
-      if (!currentUser) {
-        console.log("FavoriteChannels: onAuthStateChange - No user session.");
-        if (isMounted) {
-          setChannels([]);
-          setIsLoading(false);
-        }
-        clearTimeout(safetyTimeout);
-        setUser(null);
-        return;
-      }
-
-      setUser((prev: any) => {
-        if (prev?.id === currentUser.id) {
-          console.log("FavoriteChannels: onAuthStateChange - User session unchanged.");
-          clearTimeout(safetyTimeout);
-          return prev;
-        }
-        
-        if (isMounted) {
-          setIsLoading(true);
-        }
-        
-        // Reset safety timeout for new fetch
-        clearTimeout(safetyTimeout);
-        safetyTimeout = setTimeout(() => {
-          if (isMounted) {
-            console.warn("FavoriteChannels: onAuthStateChange - Safety timeout reached (15s). Forcing isLoading to false.");
-            setHasTimedOut(true);
-            setIsLoading(false);
-          }
-        }, 15000);
-
-        fetchFavoritesAndBookmarks(currentUser);
-        return currentUser;
-      });
-    });
+    fetchFavoritesAndBookmarks(user);
 
     return () => {
-      console.log("FavoriteChannels: Cleaning up Auth useEffect.");
       isMounted = false;
       clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
     };
-  }, []);
+  }, [user, mounted]);
 
   if (!mounted || isLoading) {
     return (

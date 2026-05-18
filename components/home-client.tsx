@@ -177,7 +177,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
           <OrganizerSection user={user} />
 
           {/* Favorite Channels */}
-          <FavoriteChannels />
+          <FavoriteChannels user={user} />
 
           {/* Mini Calendar Section */}
           <MiniCalendar user={user} />

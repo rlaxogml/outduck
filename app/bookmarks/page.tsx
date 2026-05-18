@@ -213,7 +213,7 @@ export default function BookmarksPage() {
           {user && (
             <>
               {/* Favorite Channels section */}
-              <FavoriteChannels />
+              <FavoriteChannels user={user} />
 
               {/* Tabs */}
               <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />
