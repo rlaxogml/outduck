@@ -86,6 +86,34 @@ export function Header() {
   const hasTypedInput = searchText.trim().length > 0;
 
   useEffect(() => {
+    const syncSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const currentUser = session?.user ?? null;
+      setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+    };
+
+    syncSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setHasChannel(false);
+      return;
+    }
+
     const checkUserChannel = async (userId: string) => {
       try {
         const { data, error } = await supabase
@@ -104,39 +132,8 @@ export function Header() {
       }
     };
 
-    const syncSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const currentUser = session?.user ?? null;
-      setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
-      
-      if (currentUser) {
-        await checkUserChannel(currentUser.id);
-      } else {
-        setHasChannel(false);
-      }
-    };
-
-    syncSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
-      
-      if (currentUser) {
-        await checkUserChannel(currentUser.id);
-      } else {
-        setHasChannel(false);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+    checkUserChannel(user.id);
+  }, [user]);
 
 
 

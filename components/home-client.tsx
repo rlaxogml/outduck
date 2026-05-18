@@ -57,6 +57,40 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
     console.log("HomeClient: Component mounted and session check starting...");
     let isMounted = true;
 
+    const syncSession = async () => {
+      try {
+        console.log("HomeClient: Calling supabase.auth.getSession()...");
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log("HomeClient: getSession resolved.", { hasSession: !!session });
+        const currentUser = session?.user ?? null;
+        if (isMounted) {
+          setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+        }
+      } catch (err) {
+        console.error("HomeClient: syncSession failed:", err);
+      }
+    };
+    syncSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("HomeClient: onAuthStateChange fired.", { event: _event, hasSession: !!session });
+      const currentUser = session?.user ?? null;
+      if (isMounted) {
+        setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
+      }
+    });
+
+    return () => {
+      console.log("HomeClient: Cleaning up session synchronization useEffect.");
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let isMounted = true;
     const checkCompanyUser = async (userId: string) => {
       console.log("HomeClient: Checking if user is a company user:", userId);
       try {
@@ -76,43 +110,12 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
       }
     };
 
-    const syncSession = async () => {
-      try {
-        console.log("HomeClient: Calling supabase.auth.getSession()...");
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log("HomeClient: getSession resolved.", { hasSession: !!session });
-        const currentUser = session?.user ?? null;
-        if (isMounted) {
-          setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
-        }
-
-        if (currentUser) {
-          await checkCompanyUser(currentUser.id);
-        }
-      } catch (err) {
-        console.error("HomeClient: syncSession failed:", err);
-      }
-    };
-    syncSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("HomeClient: onAuthStateChange fired.", { event: _event, hasSession: !!session });
-      const currentUser = session?.user ?? null;
-      if (isMounted) {
-        setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
-      }
-      
-      if (currentUser) {
-        await checkCompanyUser(currentUser.id);
-      }
-    });
+    checkCompanyUser(user.id);
 
     return () => {
-      console.log("HomeClient: Cleaning up session synchronization useEffect.");
       isMounted = false;
-      subscription.unsubscribe();
     };
-  }, [router]);
+  }, [user, router]);
 
   const filteredEvents = (() => {
     let result = activeTab === "offline" ? offlineEvents : onlineEvents;
