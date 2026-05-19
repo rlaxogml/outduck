@@ -16,6 +16,26 @@ export default function SubscriptionsPage() {
   const [offlineEvents, setOfflineEvents] = useState<any[]>([]);
   const [onlineEvents, setOnlineEvents] = useState<any[]>([]);
 
+  const isPastEvent = (endDateStr: string | null, startDateStr: string | null) => {
+    if (!endDateStr && !startDateStr) return false;
+    const dateStr = endDateStr || startDateStr;
+    if (!dateStr) return false;
+
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const targetDate = new Date(date);
+    targetDate.setHours(23, 59, 59, 999);
+
+    return targetDate < today;
+  };
+
+  const activeOfflineEvents = offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
+  const activeOnlineEvents = onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
+
   const imageColors = [
     "bg-gradient-to-br from-indigo-400 to-indigo-600",
     "bg-gradient-to-br from-pink-400 to-pink-600",
@@ -193,6 +213,7 @@ export default function SubscriptionsPage() {
               isAlways: !event.start_date,
               createdAt: event.created_at,
               startDateValue: event.start_date,
+              endDateValue: event.end_date,
             };
           });
           setOfflineEvents(formatted);
@@ -233,6 +254,7 @@ export default function SubscriptionsPage() {
               isAlways: !event.start_at,
               createdAt: event.created_at,
               startDateValue: event.start_at,
+              endDateValue: event.end_at,
             };
           });
           setOnlineEvents(formatted);
@@ -299,13 +321,13 @@ export default function SubscriptionsPage() {
                   >
                     {activeTab === "offline" && (
                       <>
-                        {offlineEvents.length === 0 ? (
+                        {activeOfflineEvents.length === 0 ? (
                           <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
                             구독한 채널의 오프라인 행사가 없습니다.
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 gap-3 md:gap-4">
-                            {offlineEvents.map((event, index) => (
+                            {activeOfflineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}
@@ -329,13 +351,13 @@ export default function SubscriptionsPage() {
 
                     {activeTab === "online" && (
                       <>
-                        {onlineEvents.length === 0 ? (
+                        {activeOnlineEvents.length === 0 ? (
                           <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
                             구독한 채널의 온라인 행사가 없습니다.
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 gap-3 md:gap-4">
-                            {onlineEvents.map((event, index) => (
+                            {activeOnlineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}

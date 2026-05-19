@@ -32,17 +32,18 @@ const ReactQuill = dynamic(() => import("react-quill"), {
   loading: () => <div className="h-48 w-full bg-muted animate-pulse rounded-xl" />
 }) as any;
 
-// 8px ~ 120px 전체 정수 사이즈 whitelist 등록
+// Custom Style Attributor를 사용하여 모든 정수 크기(8px~120px)를 지원하도록 size 포맷 커스텀 등록
 if (typeof window !== "undefined") {
   import("react-quill").then((QuillModule) => {
-    const Quill = QuillModule.Quill;
-    const SizeStyle = Quill.import("attributors/style/size");
-    const sizes: string[] = [];
-    for (let i = 8; i <= 120; i++) {
-      sizes.push(`${i}px`);
-    }
-    SizeStyle.whitelist = sizes;
-    Quill.register(SizeStyle, true);
+    const Quill = (QuillModule.default as any).Quill || QuillModule.Quill;
+    const Parchment = Quill.import("parchment");
+    const StyleAttributor = Quill.import("attributors/style/size").constructor;
+    const CustomSizeAttributor = new StyleAttributor("size", "font-size", {
+      scope: Parchment.Scope.INLINE
+    });
+    Quill.register(CustomSizeAttributor, true);
+  }).catch(err => {
+    console.error("[Quill Init] Failed to load Quill CustomSizeAttributor registration:", err);
   });
 }
 
@@ -101,6 +102,26 @@ export default function EventDetailPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isScheduleExpanded, setIsScheduleExpanded] = useState(false);
 
+  const isPastEvent = useMemo(() => {
+    if (!event) return false;
+    const endDateStr = event.end_date;
+    const startDateStr = event.start_date;
+    if (!endDateStr && !startDateStr) return false;
+    const dateStr = endDateStr || startDateStr;
+    if (!dateStr) return false;
+
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const targetDate = new Date(date);
+    targetDate.setHours(23, 59, 59, 999);
+
+    return targetDate < today;
+  }, [event]);
+
   const [activeTab, setActiveTab] = useState<'main' | 'notices'>('main');
   const [notices, setNotices] = useState<any[]>([]);
   const [isNoticesLoaded, setIsNoticesLoaded] = useState(false);
@@ -147,7 +168,68 @@ export default function EventDetailPage() {
 
   const quillRef = useRef<any>(null);
   const [directFontSize, setDirectFontSize] = useState('16');
+  const directFontSizeRef = useRef(directFontSize);
+  useEffect(() => {
+    directFontSizeRef.current = directFontSize;
+  }, [directFontSize]);
   const lastSelectionRef = useRef<any>(null);
+
+  // 워드프로세서 스타일의 글꼴 크기 처리 함수들
+  const getCurrentFontSize = (): number => {
+    const q = quillRef.current?.getEditor();
+    if (!q) return 16;
+    const range = q.getSelection() || lastSelectionRef.current;
+    let sizeVal: any = undefined;
+    if (range) {
+      const formats = q.getFormat(range.index, Math.max(range.length, 1));
+      sizeVal = formats.size;
+    } else {
+      const formats = q.getFormat();
+      sizeVal = formats.size;
+    }
+    const raw = Array.isArray(sizeVal) ? sizeVal[0] : sizeVal;
+    if (raw) {
+      const parsed = parseInt(String(raw).replace(/[^0-9]/g, ''));
+      if (!isNaN(parsed)) return parsed;
+    }
+    const stateVal = parseInt(directFontSizeRef.current);
+    return isNaN(stateVal) ? 16 : stateVal;
+  };
+
+  const applySize = (sizeVal: number) => {
+    if (sizeVal < 8 || sizeVal > 120) return;
+    const q = quillRef.current?.getEditor();
+    if (!q) return;
+    const range = q.getSelection() || lastSelectionRef.current;
+    q.focus();
+    if (range) {
+      if (range.length > 0) {
+        q.formatText(range.index, range.length, 'size', `${sizeVal}px`);
+      } else {
+        q.format('size', `${sizeVal}px`);
+      }
+    } else {
+      q.format('size', `${sizeVal}px`);
+    }
+  };
+
+  const handleUp = () => {
+    const q = quillRef.current?.getEditor();
+    if (!q) return;
+    const current = getCurrentFontSize();
+    const next = Math.min(120, current + 1);
+    setDirectFontSize(String(next));
+    applySize(next);
+  };
+
+  const handleDown = () => {
+    const q = quillRef.current?.getEditor();
+    if (!q) return;
+    const current = getCurrentFontSize();
+    const next = Math.max(8, current - 1);
+    setDirectFontSize(String(next));
+    applySize(next);
+  };
 
   const quillModules = useMemo(() => ({
     toolbar: {
@@ -187,6 +269,7 @@ export default function EventDetailPage() {
 
   const quillFormats = [
     'size',
+    'align',
     'bold', 'italic', 'underline', 'strike', 'blockquote',
     'list', 'bullet', 'indent',
     'link', 'image'
@@ -308,7 +391,7 @@ export default function EventDetailPage() {
     return urls;
   };
 
-  // 폰트 크기 스피너 useEffect (custom HTML toolbar)
+  // 폰트 크기 스피너 및 워드프로세서 스타일 연동 useEffect
   useEffect(() => {
     if (!isWritingNotice) return;
 
@@ -316,90 +399,20 @@ export default function EventDetailPage() {
     let btnUp: HTMLElement | null = null;
     let btnDown: HTMLElement | null = null;
     let quill: any = null;
-    let pendingFontSize: string | null = null;
 
-    const applySize = (sizeVal: number) => {
-      const q = quillRef.current?.getEditor();
-      if (q) {
-        const range = q.getSelection() || lastSelectionRef.current;
-        if (range) {
-          setTimeout(() => {
-            const isInputFocused = document.activeElement === input;
-            if (range.length > 0) {
-              q.formatText(range.index, range.length, 'size', `${sizeVal}px`);
-            } else {
-              q.format('size', `${sizeVal}px`);
-            }
-            if (isInputFocused && input) {
-              input.focus();
-            }
-          }, 10);
-        }
-      }
-    };
-
-    const handleInput = (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      target.value = target.value.replace(/[^0-9]/g, '');
-      const val = target.value;
-      setDirectFontSize(val);
-      if (val) {
-        const num = Number(val);
-        if (num >= 8 && num <= 120) {
-          pendingFontSize = `${num}px`;
-          applySize(num);
-        }
-      }
-    };
-
-    const handleUp = () => {
+    const handleSelectionChange = () => {
       const q = quillRef.current?.getEditor();
       if (!q) return;
-      const range = q.getSelection() || lastSelectionRef.current;
-      let current = 16;
+      
+      const range = q.getSelection();
       if (range) {
-        const fmt = q.getFormat(range.index, Math.max(range.length, 1));
-        const raw = Array.isArray(fmt.size) ? fmt.size[0] : fmt.size;
-        const parsed = parseInt((raw || '16px').replace('px', ''));
-        if (!isNaN(parsed)) current = parsed;
+        lastSelectionRef.current = range;
       }
-      const next = Math.min(120, current + 1);
-      setDirectFontSize(String(next));
-      if (input) input.value = String(next);
-      applySize(next);
-    };
-
-    const handleDown = () => {
-      const q = quillRef.current?.getEditor();
-      if (!q) return;
-      const range = q.getSelection() || lastSelectionRef.current;
-      let current = 16;
-      if (range) {
-        const fmt = q.getFormat(range.index, Math.max(range.length, 1));
-        const raw = Array.isArray(fmt.size) ? fmt.size[0] : fmt.size;
-        const parsed = parseInt((raw || '16px').replace('px', ''));
-        if (!isNaN(parsed)) current = parsed;
-      }
-      const next = Math.max(8, current - 1);
-      setDirectFontSize(String(next));
-      if (input) input.value = String(next);
-      applySize(next);
-    };
-
-    const handleSelectionChange = (range: any) => {
-      if (!range) return;
-      lastSelectionRef.current = range;
-      const isInputFocused = document.activeElement === input;
-      if (isInputFocused) return;
-      const q = quillRef.current?.getEditor();
-      if (!q || !input) return;
-      const fmt = q.getFormat(range.index, Math.max(range.length, 1));
-      const raw = Array.isArray(fmt.size) ? fmt.size[0] : fmt.size;
-      const parsed = parseInt((raw || '16px').replace('px', ''));
-      if (!isNaN(parsed)) {
-        setDirectFontSize(String(parsed));
-        input.value = String(parsed);
-      }
+      
+      if (document.activeElement === input) return;
+      
+      const current = getCurrentFontSize();
+      setDirectFontSize(String(current));
     };
 
     const timer = setTimeout(() => {
@@ -408,7 +421,20 @@ export default function EventDetailPage() {
       btnDown = document.getElementById('toolbar-size-down-offline');
       quill = quillRef.current?.getEditor();
 
-      if (input) input.addEventListener('input', handleInput);
+      if (quill) {
+        try {
+          const QConstructor = quill.constructor;
+          const Parchment = QConstructor.import("parchment");
+          const StyleAttributor = QConstructor.import("attributors/style/size").constructor;
+          const CustomSizeAttributor = new StyleAttributor("size", "font-size", {
+            scope: Parchment.Scope.INLINE
+          });
+          QConstructor.register(CustomSizeAttributor, true);
+        } catch (e) {
+          console.error("[Spinner Setup] Error registering CustomSizeAttributor:", e);
+        }
+      }
+
       if (btnUp) btnUp.addEventListener('click', handleUp);
       if (btnDown) btnDown.addEventListener('click', handleDown);
       if (quill) quill.on('selection-change', handleSelectionChange);
@@ -416,7 +442,6 @@ export default function EventDetailPage() {
 
     return () => {
       clearTimeout(timer);
-      if (input) input.removeEventListener('input', handleInput);
       if (btnUp) btnUp.removeEventListener('click', handleUp);
       if (btnDown) btnDown.removeEventListener('click', handleDown);
       if (quill) quill.off('selection-change', handleSelectionChange);
@@ -891,7 +916,33 @@ export default function EventDetailPage() {
     return dateStr;
   };
 
+  const formatDateWithYear = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const year = parts[0];
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+      return `${year}년 ${month}월 ${day}일`;
+    }
+    const dotParts = dateStr.split(".");
+    if (dotParts.length === 3) {
+      const year = dotParts[0];
+      const month = parseInt(dotParts[1], 10);
+      const day = parseInt(dotParts[2], 10);
+      return `${year}년 ${month}월 ${day}일`;
+    }
+    return dateStr;
+  };
+
   const formatEventPeriod = (start: string, end: string | null) => {
+    if (isPastEvent) {
+      if (end) {
+        return `${formatDateWithYear(start)} ~ ${formatDateWithYear(end)}`;
+      }
+      return start ? formatDateWithYear(start) : "상시 진행";
+    }
+
     if (end) {
       return `${formatDateNoYear(start)} ~ ${formatDateNoYear(end)}`;
     }
@@ -1000,9 +1051,16 @@ export default function EventDetailPage() {
             <div className="flex items-start justify-between md:items-center gap-4">
               <div className="flex-1">
                 <div className="flex items-center md:items-start md:flex-col gap-2 mb-1.5 flex-wrap">
-                  <h1 className="text-xl md:text-2xl font-bold tracking-tight break-keep leading-tight text-foreground">
-                    {event.title}
-                  </h1>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-xl md:text-2xl font-bold tracking-tight break-keep leading-tight text-foreground">
+                      {event.title}
+                    </h1>
+                    {isPastEvent && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-slate-100 text-slate-500 dark:bg-slate-805 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 select-none">
+                        지나간 행사
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[13px] md:text-base text-muted-foreground font-medium shrink-0 whitespace-nowrap mt-0.5 md:mt-0">
                     {event.channels.length > 0 ? event.channels[0].name : "오프라인 행사"}
                   </span>
@@ -1058,15 +1116,17 @@ export default function EventDetailPage() {
                 <span className="text-[12px] md:text-sm font-medium md:font-semibold">{isBookmarked ? "관심저장" : "저장"}</span>
               </button>
 
-              <button 
-                onClick={() => router.push(`/map?eventId=${event.id}`)}
-                className="flex flex-col items-center gap-2 text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] transition-colors w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:bg-background md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10 md:text-[#3a5378] dark:md:text-[#a0b8d6] md:text-sm md:font-semibold shadow-sm"
-              >
-                <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
-                  <MapPin className="w-6 h-6 md:w-4 md:h-4" />
-                </div>
-                <span className="text-[12px] md:text-sm font-medium md:font-semibold">위치보기</span>
-              </button>
+              {!isPastEvent && (
+                <button 
+                  onClick={() => router.push(`/map?eventId=${event.id}`)}
+                  className="flex flex-col items-center gap-2 text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] transition-colors w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:bg-background md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10 md:text-[#3a5378] dark:md:text-[#a0b8d6] md:text-sm md:font-semibold shadow-sm"
+                >
+                  <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
+                    <MapPin className="w-6 h-6 md:w-4 md:h-4" />
+                  </div>
+                  <span className="text-[12px] md:text-sm font-medium md:font-semibold">위치보기</span>
+                </button>
+              )}
 
               <button className="flex flex-col items-center gap-2 text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] transition-colors cursor-default w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:bg-background md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10 md:text-[#3a5378] dark:md:text-[#a0b8d6] md:text-sm md:font-semibold shadow-sm">
                 <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
@@ -1116,24 +1176,37 @@ export default function EventDetailPage() {
               <div className="flex flex-col select-text divide-y divide-slate-100 dark:divide-slate-800/60 pb-4">
                 
                 {/* 1. 장소 (Location) */}
-                <div 
-                  onClick={() => router.push(`/map?eventId=${event.id}`)}
-                  className="flex items-start gap-4 py-4 sm:py-5 first:pt-0 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all rounded-xl -mx-4 px-4 group"
-                >
-                  <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
-                    <MapPin className="w-[22px] h-[22px] stroke-[2] group-hover:text-primary transition-colors" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="inline-flex items-center gap-1.5 flex-wrap">
-                      <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors break-keep leading-snug">
+                {isPastEvent ? (
+                  <div className="flex items-start gap-4 py-4 sm:py-5 first:pt-0 -mx-4 px-4">
+                    <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
+                      <MapPin className="w-[22px] h-[22px] stroke-[2]" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 break-keep leading-snug">
                         {event.location}
-                      </span>
-                      <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none ml-1 opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
-                        지도보기
                       </span>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div 
+                    onClick={() => router.push(`/map?eventId=${event.id}`)}
+                    className="flex items-start gap-4 py-4 sm:py-5 first:pt-0 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all rounded-xl -mx-4 px-4 group"
+                  >
+                    <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
+                      <MapPin className="w-[22px] h-[22px] stroke-[2] group-hover:text-primary transition-colors" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="inline-flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors break-keep leading-snug">
+                          {event.location}
+                        </span>
+                        <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none ml-1 opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
+                          지도보기
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* 2. 행사 기간 (Event Period) */}
                 <div 
@@ -1401,6 +1474,26 @@ export default function EventDetailPage() {
                   
                   {/* React Quill Editor Container */}
                   <div ref={editorContainerRef} className="relative mb-4 bg-background border border-border rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-primary/40 text-foreground">
+                    <style dangerouslySetInnerHTML={{ __html: `
+                      /* 툴바 활성화 버튼에 테두리 및 반투명 파란색 배경 부여 */
+                      .ql-toolbar button.ql-active {
+                        border: 1px solid #3b82f6 !important;
+                        border-radius: 4px;
+                        background-color: rgba(59, 130, 246, 0.08) !important;
+                      }
+                      /* 정렬 그룹에 활성화 버튼이 없는 초기 진입 상태일 때, 왼쪽 정렬 버튼(value="")을 활성화 상태로 강조 */
+                      .ql-toolbar .ql-formats:not(:has(button.ql-align.ql-active)) button.ql-align[value=""] {
+                        border: 1px solid #3b82f6 !important;
+                        border-radius: 4px;
+                        background-color: rgba(59, 130, 246, 0.08) !important;
+                      }
+                      .ql-toolbar .ql-formats:not(:has(button.ql-align.ql-active)) button.ql-align[value=""] .ql-stroke {
+                        stroke: #3b82f6 !important;
+                      }
+                      .ql-toolbar .ql-formats:not(:has(button.ql-align.ql-active)) button.ql-align[value=""] .ql-fill {
+                        fill: #3b82f6 !important;
+                      }
+                    `}} />
                     {/* Custom HTML Toolbar */}
                     <div id="quill-toolbar-offline" className="border-b border-border bg-slate-50 dark:bg-muted/10 px-3 py-2 flex flex-wrap items-center gap-1 select-none">
                       {/* 이미지 업로드 버튼 */}
@@ -1416,7 +1509,17 @@ export default function EventDetailPage() {
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          defaultValue={directFontSize}
+                          value={directFontSize}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setDirectFontSize(val);
+                            if (val) {
+                              const num = Number(val);
+                              if (num >= 8 && num <= 120) {
+                                applySize(num);
+                              }
+                            }
+                          }}
                           className="w-10 h-7 text-center text-xs font-bold border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/40 px-1"
                           style={{ MozAppearance: 'textfield' }}
                         />
@@ -1444,17 +1547,20 @@ export default function EventDetailPage() {
                       {/* 서식 버튼들 */}
                       <span className="ql-formats">
                         <button className="ql-bold" />
-                      <button className="ql-italic" />
+                        <button className="ql-italic" />
                         <button className="ql-underline" />
                         <button className="ql-strike" />
                         <button className="ql-blockquote" />
                       </span>
-                      <span className="ql-formats">
+                      <span className="ql-formats border-l border-border pl-2">
                         <button className="ql-list" value="ordered" />
                         <button className="ql-list" value="bullet" />
                       </span>
-                      <span className="ql-formats">
-                        <button className="ql-clean" />
+                      <span className="ql-formats border-l border-border pl-2">
+                        <button className="ql-align" value="" title="왼쪽 정렬" />
+                        <button className="ql-align" value="center" title="가운데 정렬" />
+                        <button className="ql-align" value="right" title="오른쪽 정렬" />
+                        <button className="ql-align" value="justify" title="양쪽 정렬" />
                       </span>
                     </div>
 

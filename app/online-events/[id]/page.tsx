@@ -32,16 +32,18 @@ const ReactQuill = dynamic(() => import("react-quill"), {
   loading: () => <div className="h-48 w-full bg-muted animate-pulse rounded-xl" />
 }) as any;
 
+// Custom Style Attributor를 사용하여 모든 정수 크기(8px~120px)를 지원하도록 size 포맷 커스텀 등록
 if (typeof window !== "undefined") {
   import("react-quill").then((QuillModule) => {
-    const Quill = QuillModule.Quill;
-    const SizeStyle = Quill.import("attributors/style/size");
-    const sizes = [];
-    for (let i = 8; i <= 120; i++) {
-      sizes.push(`${i}px`);
-    }
-    SizeStyle.whitelist = sizes;
-    Quill.register(SizeStyle, true);
+    const Quill = (QuillModule.default as any).Quill || QuillModule.Quill;
+    const Parchment = Quill.import("parchment");
+    const StyleAttributor = Quill.import("attributors/style/size").constructor;
+    const CustomSizeAttributor = new StyleAttributor("size", "font-size", {
+      scope: Parchment.Scope.INLINE
+    });
+    Quill.register(CustomSizeAttributor, true);
+  }).catch(err => {
+    console.error("[Quill Init] Failed to load Quill CustomSizeAttributor registration:", err);
   });
 }
 
@@ -67,6 +69,26 @@ export default function OnlineEventDetailPage() {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [heartAnim, setHeartAnim] = useState(false);
+
+  const isPastEvent = useMemo(() => {
+    if (!event) return false;
+    const endDateStr = event.end_at;
+    const startDateStr = event.start_at;
+    if (!endDateStr && !startDateStr) return false;
+    const dateStr = endDateStr || startDateStr;
+    if (!dateStr) return false;
+
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const targetDate = new Date(date);
+    targetDate.setHours(23, 59, 59, 999);
+
+    return targetDate < today;
+  }, [event]);
   
   const [activeTab, setActiveTab] = useState<'main' | 'notices'>('main');
   const [notices, setNotices] = useState<any[]>([]);
@@ -84,24 +106,66 @@ export default function OnlineEventDetailPage() {
 
   const quillRef = useRef<any>(null);
   const [directFontSize, setDirectFontSize] = useState('16');
+  const directFontSizeRef = useRef(directFontSize);
+  useEffect(() => {
+    directFontSizeRef.current = directFontSize;
+  }, [directFontSize]);
 
-  const applyCustomFontSize = (sizeVal: number) => {
-    if (!sizeVal || sizeVal < 8 || sizeVal > 120) return;
-    const quill = quillRef.current?.getEditor();
-    if (quill) {
-      const range = quill.getSelection() || lastSelectionRef.current;
-      if (range) {
-        if (range.length > 0) {
-          quill.formatText(range.index, range.length, 'size', `${sizeVal}px`);
-        } else {
-          quill.focus();
-          quill.setSelection(range.index, 0);
-          quill.format('size', `${sizeVal}px`);
-        }
-      } else {
-        toast.info('크기를 조절할 본문 텍스트를 드래그해 선택해주세요!');
-      }
+  // 워드프로세서 스타일의 글꼴 크기 처리 함수들
+  const getCurrentFontSize = (): number => {
+    const q = quillRef.current?.getEditor();
+    if (!q) return 16;
+    const range = q.getSelection() || lastSelectionRef.current;
+    let sizeVal: any = undefined;
+    if (range) {
+      const formats = q.getFormat(range.index, Math.max(range.length, 1));
+      sizeVal = formats.size;
+    } else {
+      const formats = q.getFormat();
+      sizeVal = formats.size;
     }
+    const raw = Array.isArray(sizeVal) ? sizeVal[0] : sizeVal;
+    if (raw) {
+      const parsed = parseInt(String(raw).replace(/[^0-9]/g, ''));
+      if (!isNaN(parsed)) return parsed;
+    }
+    const stateVal = parseInt(directFontSizeRef.current);
+    return isNaN(stateVal) ? 16 : stateVal;
+  };
+
+  const applySize = (sizeVal: number) => {
+    if (sizeVal < 8 || sizeVal > 120) return;
+    const q = quillRef.current?.getEditor();
+    if (!q) return;
+    const range = q.getSelection() || lastSelectionRef.current;
+    q.focus();
+    if (range) {
+      if (range.length > 0) {
+        q.formatText(range.index, range.length, 'size', `${sizeVal}px`);
+      } else {
+        q.format('size', `${sizeVal}px`);
+      }
+    } else {
+      q.format('size', `${sizeVal}px`);
+    }
+  };
+
+  const handleUp = () => {
+    const q = quillRef.current?.getEditor();
+    if (!q) return;
+    const current = getCurrentFontSize();
+    const next = Math.min(120, current + 1);
+    setDirectFontSize(String(next));
+    applySize(next);
+  };
+
+  const handleDown = () => {
+    const q = quillRef.current?.getEditor();
+    if (!q) return;
+    const current = getCurrentFontSize();
+    const next = Math.max(8, current - 1);
+    setDirectFontSize(String(next));
+    applySize(next);
   };
 
   useEffect(() => {
@@ -111,162 +175,55 @@ export default function OnlineEventDetailPage() {
     let btnUp: HTMLElement | null = null;
     let btnDown: HTMLElement | null = null;
     let quill: any = null;
-    let pendingFontSize: string | null = null;
-
-    const applySize = (sizeVal: number) => {
-      const q = quillRef.current?.getEditor();
-      if (q) {
-        const range = q.getSelection() || lastSelectionRef.current;
-        if (range) {
-          if (range.length === 0) {
-            pendingFontSize = `${sizeVal}px`;
-          } else {
-            pendingFontSize = null;
-          }
-
-          setTimeout(() => {
-            const isInputFocused = document.activeElement === input;
-            const selectionStart = input?.selectionStart;
-            const selectionEnd = input?.selectionEnd;
-
-            q.focus();
-            q.setSelection(range.index, range.length);
-
-            if (range.length > 0) {
-              q.formatText(range.index, range.length, 'size', `${sizeVal}px`);
-            } else {
-              q.format('size', `${sizeVal}px`);
-            }
-
-            if (isInputFocused && input) {
-              input.focus();
-              if (selectionStart !== null && selectionStart !== undefined && selectionEnd !== null && selectionEnd !== undefined) {
-                input.setSelectionRange(selectionStart, selectionEnd);
-              }
-            }
-          }, 50);
-        }
-      }
-    };
-
-    const handleInput = (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      target.value = target.value.replace(/[^0-9]/g, '');
-      const val = target.value;
-      if (val) {
-        const num = Number(val);
-        if (num >= 8 && num <= 120) {
-          const q = quillRef.current?.getEditor();
-          const range = q?.getSelection() || lastSelectionRef.current;
-          if (range && range.length > 0) {
-            applySize(num);
-          } else {
-            pendingFontSize = `${num}px`;
-          }
-        }
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const q = quillRef.current?.getEditor();
-        if (q) {
-          q.focus();
-          const range = lastSelectionRef.current;
-          if (range) {
-            q.setSelection(range.index, range.length);
-          }
-        }
-      }
-    };
-
-    const handleBlur = () => {
-      if (input) {
-        const val = input.value;
-        if (val) {
-          const num = Number(val);
-          if (num >= 8 && num <= 120) {
-            applySize(num);
-          }
-        }
-      }
-    };
-
-    const handleUpMousedown = (e: MouseEvent) => {
-      e.preventDefault();
-      if (input) {
-        const current = Number(input.value) || 16;
-        const next = Math.min(120, current + 1);
-        input.value = String(next);
-        applySize(next);
-      }
-    };
-
-    const handleDownMousedown = (e: MouseEvent) => {
-      e.preventDefault();
-      if (input) {
-        const current = Number(input.value) || 16;
-        const next = Math.max(8, current - 1);
-        input.value = String(next);
-        applySize(next);
-      }
-    };
 
     const handleSelectionChange = () => {
-      if (!quill || !input) return;
-      if (document.activeElement === input) return;
-
-      const range = quill.getSelection();
+      const q = quillRef.current?.getEditor();
+      if (!q) return;
+      
+      const range = q.getSelection();
       if (range) {
         lastSelectionRef.current = range;
-
-        if (pendingFontSize) {
-          const sizeVal = pendingFontSize;
-          pendingFontSize = null;
-          setTimeout(() => {
-            quill.format('size', sizeVal);
-            const num = sizeVal.replace(/[^0-9]/g, '');
-            if (input) {
-              input.value = num;
-            }
-          }, 20);
-          return;
-        }
-
-        const formats = quill.getFormat(range);
-        if (formats.size) {
-          const sizeVal = Array.isArray(formats.size) ? formats.size[0] : formats.size;
-          const num = String(sizeVal).replace(/[^0-9]/g, '');
-          input.value = num || '16';
-        } else {
-          input.value = '16';
-        }
       }
+      
+      if (document.activeElement === input) return;
+      
+      const current = getCurrentFontSize();
+      setDirectFontSize(String(current));
     };
 
     const timer = setTimeout(() => {
       input = document.getElementById('toolbar-font-size-input-online') as HTMLInputElement;
       btnUp = document.getElementById('toolbar-size-up-online');
       btnDown = document.getElementById('toolbar-size-down-online');
-
-      input?.addEventListener('input', handleInput);
-      input?.addEventListener('keydown', handleKeyDown);
-      input?.addEventListener('blur', handleBlur);
-      btnUp?.addEventListener('mousedown', handleUpMousedown);
-      btnDown?.addEventListener('mousedown', handleDownMousedown);
-
       quill = quillRef.current?.getEditor();
+
+      if (quill) {
+        try {
+          const QConstructor = quill.constructor;
+          const Parchment = QConstructor.import("parchment");
+          const StyleAttributor = QConstructor.import("attributors/style/size").constructor;
+          const CustomSizeAttributor = new StyleAttributor("size", "font-size", {
+            scope: Parchment.Scope.INLINE
+          });
+          QConstructor.register(CustomSizeAttributor, true);
+        } catch (e) {
+          console.error("[Spinner Setup] Error registering CustomSizeAttributor:", e);
+        }
+      }
+
+      btnUp?.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        handleUp();
+      });
+      btnDown?.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        handleDown();
+      });
       quill?.on('selection-change', handleSelectionChange);
     }, 100);
 
     return () => {
       clearTimeout(timer);
-      input?.removeEventListener('input', handleInput);
-      input?.removeEventListener('keydown', handleKeyDown);
-      input?.removeEventListener('blur', handleBlur);
-      btnUp?.removeEventListener('mousedown', handleUpMousedown);
-      btnDown?.removeEventListener('mousedown', handleDownMousedown);
       quill?.off('selection-change', handleSelectionChange);
     };
   }, [isWritingNotice]);
@@ -434,6 +391,7 @@ export default function OnlineEventDetailPage() {
 
   const quillFormats = [
     'header', 'size',
+    'align',
     'bold', 'italic', 'underline', 'strike', 'blockquote',
     'list', 'bullet', 'indent',
     'link', 'image'
@@ -862,9 +820,16 @@ export default function OnlineEventDetailPage() {
               <div className="flex items-start justify-between md:items-center gap-4">
                 <div className="flex-1">
                   <div className="flex items-center md:items-start md:flex-col gap-2 mb-1.5 flex-wrap">
-                    <h1 className="text-xl md:text-2xl font-bold tracking-tight break-keep leading-tight text-foreground animate-in fade-in duration-300">
-                      {event.title}
-                    </h1>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h1 className="text-xl md:text-2xl font-bold tracking-tight break-keep leading-tight text-foreground animate-in fade-in duration-300">
+                        {event.title}
+                      </h1>
+                      {isPastEvent && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-slate-100 text-slate-500 dark:bg-slate-805 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 select-none">
+                          지나간 행사
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[13px] md:text-base text-muted-foreground font-medium shrink-0 whitespace-nowrap mt-0.5 md:mt-0">
                       {event.channels.length > 0 ? event.channels[0].name : "온라인 행사"}
                     </span>
@@ -1087,6 +1052,26 @@ export default function OnlineEventDetailPage() {
                   
                   {/* React Quill Editor Container */}
                   <div ref={editorContainerRef} className="relative mb-4 bg-background border border-border rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-primary/40 text-foreground">
+                    <style dangerouslySetInnerHTML={{ __html: `
+                      /* 툴바 활성화 버튼에 테두리 및 반투명 파란색 배경 부여 */
+                      .ql-toolbar button.ql-active {
+                        border: 1px solid #3b82f6 !important;
+                        border-radius: 4px;
+                        background-color: rgba(59, 130, 246, 0.08) !important;
+                      }
+                      /* 정렬 그룹에 활성화 버튼이 없는 초기 진입 상태일 때, 왼쪽 정렬 버튼(value="")을 활성화 상태로 강조 */
+                      .ql-toolbar .ql-formats:not(:has(button.ql-align.ql-active)) button.ql-align[value=""] {
+                        border: 1px solid #3b82f6 !important;
+                        border-radius: 4px;
+                        background-color: rgba(59, 130, 246, 0.08) !important;
+                      }
+                      .ql-toolbar .ql-formats:not(:has(button.ql-align.ql-active)) button.ql-align[value=""] .ql-stroke {
+                        stroke: #3b82f6 !important;
+                      }
+                      .ql-toolbar .ql-formats:not(:has(button.ql-align.ql-active)) button.ql-align[value=""] .ql-fill {
+                        fill: #3b82f6 !important;
+                      }
+                    `}} />
                     
                     {/* Custom HTML Toolbar for Quill */}
                     <div id="quill-toolbar-online" className="border-b border-border bg-slate-50 dark:bg-muted/10 px-4 py-2 flex flex-wrap items-center gap-1 select-none">
@@ -1103,7 +1088,17 @@ export default function OnlineEventDetailPage() {
                           inputMode="numeric"
                           pattern="[0-9]*"
                           className="w-12 h-6 px-1 text-xs text-center font-bold bg-background text-foreground border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:m-0"
-                          defaultValue="16"
+                          value={directFontSize}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setDirectFontSize(val);
+                            if (val) {
+                              const num = Number(val);
+                              if (num >= 8 && num <= 120) {
+                                applySize(num);
+                              }
+                            }
+                          }}
                         />
                         <span className="text-[10px] text-muted-foreground font-semibold select-none">px</span>
                         
@@ -1128,6 +1123,7 @@ export default function OnlineEventDetailPage() {
                         </div>
                       </span>
 
+                      {/* 서식 버튼들 */}
                       <span className="ql-formats">
                         <button className="ql-bold" title="굵게" />
                         <button className="ql-italic" title="기울임" />
@@ -1135,12 +1131,15 @@ export default function OnlineEventDetailPage() {
                         <button className="ql-strike" title="취소선" />
                         <button className="ql-blockquote" title="인용구" />
                       </span>
-                      <span className="ql-formats">
+                      <span className="ql-formats border-l border-border pl-2">
                         <button className="ql-list" value="ordered" title="번호 리스트" />
                         <button className="ql-list" value="bullet" title="불릿 리스트" />
                       </span>
-                      <span className="ql-formats">
-                        <button className="ql-clean" title="서식 지우기" />
+                      <span className="ql-formats border-l border-border pl-2">
+                        <button className="ql-align" value="" title="왼쪽 정렬" />
+                        <button className="ql-align" value="center" title="가운데 정렬" />
+                        <button className="ql-align" value="right" title="오른쪽 정렬" />
+                        <button className="ql-align" value="justify" title="양쪽 정렬" />
                       </span>
                     </div>
 

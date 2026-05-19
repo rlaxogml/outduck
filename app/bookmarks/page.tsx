@@ -7,6 +7,7 @@ import { EventTabs } from "@/components/event-tabs";
 import { EventCard } from "@/components/event-card";
 import { supabase } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 export default function BookmarksPage() {
@@ -15,6 +16,29 @@ export default function BookmarksPage() {
   const [loading, setLoading] = useState(true);
   const [offlineEvents, setOfflineEvents] = useState<any[]>([]);
   const [onlineEvents, setOnlineEvents] = useState<any[]>([]);
+  const [showPastEvents, setShowPastEvents] = useState(false);
+
+  const isPastEvent = (endDateStr: string | null, startDateStr: string | null) => {
+    if (!endDateStr && !startDateStr) return false;
+    const dateStr = endDateStr || startDateStr;
+    if (!dateStr) return false;
+
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const targetDate = new Date(date);
+    targetDate.setHours(23, 59, 59, 999);
+
+    return targetDate < today;
+  };
+
+  const activeOfflineEvents = offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
+  const pastOfflineEvents = offlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue));
+  const activeOnlineEvents = onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
+  const pastOnlineEvents = onlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue));
 
   const imageColors = [
     "bg-gradient-to-br from-indigo-400 to-indigo-600",
@@ -160,6 +184,7 @@ export default function BookmarksPage() {
               isAlways: !event.start_date,
               createdAt: event.created_at,
               startDateValue: event.start_date,
+              endDateValue: event.end_date,
             }));
           });
           setOfflineEvents(formatted);
@@ -184,6 +209,7 @@ export default function BookmarksPage() {
               isAlways: !event.start_at,
               createdAt: event.created_at,
               startDateValue: event.start_at,
+              endDateValue: event.end_at,
             }));
           });
           setOnlineEvents(formatted);
@@ -250,13 +276,13 @@ export default function BookmarksPage() {
                   >
                     {activeTab === "offline" && (
                       <>
-                        {offlineEvents.length === 0 ? (
+                        {activeOfflineEvents.length === 0 ? (
                           <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
                             찜한 오프라인 행사가 없습니다.
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 gap-3 md:gap-4">
-                            {offlineEvents.map((event, index) => (
+                            {activeOfflineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}
@@ -275,18 +301,62 @@ export default function BookmarksPage() {
                             ))}
                           </div>
                         )}
+
+                        {pastOfflineEvents.length > 0 && (
+                          <div className="mt-8 border-t border-border pt-6">
+                            <button
+                              onClick={() => setShowPastEvents(!showPastEvents)}
+                              className="w-full py-3.5 px-5 bg-card hover:bg-slate-50 dark:hover:bg-muted/10 border border-border rounded-xl flex items-center justify-between transition-all group font-bold text-sm text-foreground shadow-sm"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span>지나간 찜한 행사</span>
+                                <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">
+                                  {pastOfflineEvents.length}
+                                </span>
+                              </span>
+                              {showPastEvents ? (
+                                <ChevronUp className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                              )}
+                            </button>
+
+                            {showPastEvents && (
+                              <div className="grid grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
+                                {pastOfflineEvents.map((event, index) => (
+                                  <div key={event.id} className="opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 transition-all duration-300">
+                                    <EventCard
+                                      id={event.id}
+                                      title={event.title}
+                                      date={event.date}
+                                      location={event.location}
+                                      category={event.category}
+                                      imageColor={event.imageColor}
+                                      imageUrl={event.imageUrl}
+                                      reservationType={event.reservationType}
+                                      channels={event.channels}
+                                      user={user}
+                                      eventType="offline"
+                                      isRightCard={index % 2 === 1}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </>
                     )}
 
                     {activeTab === "online" && (
                       <>
-                        {onlineEvents.length === 0 ? (
+                        {activeOnlineEvents.length === 0 ? (
                           <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
                             찜한 온라인 행사가 없습니다.
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 gap-3 md:gap-4">
-                            {onlineEvents.map((event, index) => (
+                            {activeOnlineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}
@@ -303,6 +373,50 @@ export default function BookmarksPage() {
                                 isRightCard={index % 2 === 1}
                               />
                             ))}
+                          </div>
+                        )}
+
+                        {pastOnlineEvents.length > 0 && (
+                          <div className="mt-8 border-t border-border pt-6">
+                            <button
+                              onClick={() => setShowPastEvents(!showPastEvents)}
+                              className="w-full py-3.5 px-5 bg-card hover:bg-slate-50 dark:hover:bg-muted/10 border border-border rounded-xl flex items-center justify-between transition-all group font-bold text-sm text-foreground shadow-sm"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span>지나간 찜한 행사</span>
+                                <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">
+                                  {pastOnlineEvents.length}
+                                </span>
+                              </span>
+                              {showPastEvents ? (
+                                <ChevronUp className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                              )}
+                            </button>
+
+                            {showPastEvents && (
+                              <div className="grid grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
+                                {pastOnlineEvents.map((event, index) => (
+                                  <div key={event.id} className="opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 transition-all duration-300">
+                                    <EventCard
+                                      id={event.id}
+                                      title={event.title}
+                                      date={event.date}
+                                      location={event.location}
+                                      category={event.category}
+                                      imageColor={event.imageColor}
+                                      imageUrl={event.imageUrl}
+                                      reservationType={event.reservationType}
+                                      channels={event.channels}
+                                      user={user}
+                                      eventType="online"
+                                      isRightCard={index % 2 === 1}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </>
