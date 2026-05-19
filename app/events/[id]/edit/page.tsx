@@ -1001,7 +1001,7 @@ export default function EditEventPage() {
       }
 
       toast.success("행사가 성공적으로 수정되었습니다!");
-      router.push(`/events/${eventId}`);
+      router.back();
     } catch (error: any) {
       console.error("Submission error:", error);
       toast.error("수정 중 오류가 발생했습니다: " + error.message);

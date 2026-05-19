@@ -665,10 +665,14 @@ export default function EventDetailPage() {
   };
 
   // Extract URL from description
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const urlRegex = /(https?:\/\/[^\s]+|(?:www\.)[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?|[a-zA-Z0-9.-]+\.(?:com|net|org|co\.kr|kr|io|tv|me|link|info|page|xyz|site|run|space|app|co|ee|so)(?:\/[^\s]*)?)/g;
   const descriptionWithLinks = event.description ? event.description.split(urlRegex).map((part, index) => {
     if (part.match(urlRegex)) {
-      return <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline break-all">{part}</a>;
+      let href = part;
+      if (!/^https?:\/\//i.test(part)) {
+        href = `https://${part}`;
+      }
+      return <a key={index} href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline break-all">{part}</a>;
     }
     return part;
   }) : null;
@@ -677,9 +681,20 @@ export default function EventDetailPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-background pb-12">
       <Header />
 
-      {/* 1. Hero Section Container */}
-      <div className="mx-auto max-w-2xl md:max-w-6xl bg-background border-x border-b border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:rounded-3xl md:border md:border-slate-200/80 overflow-hidden mt-2 md:mt-6 mb-4 md:mb-6">
-        {/* Top Section (Responsive Row-Reverse on Desktop) */}
+      {/* 1. Hero Section Container with floating back button */}
+      <div className="mx-auto max-w-2xl md:max-w-6xl relative mt-2 md:mt-6 mb-4 md:mb-6 px-4 md:px-0">
+        {/* Floating Back Button */}
+        <button
+          onClick={() => router.back()}
+          className="absolute left-4 md:-left-24 top-6 md:top-8 z-40 flex items-center justify-center w-16 h-16 rounded-full border border-border/60 bg-white/90 dark:bg-muted/90 text-foreground shadow-md backdrop-blur-sm hover:scale-105 active:scale-95 transition-all"
+          aria-label="뒤로가기"
+        >
+          <ChevronLeft className="w-8 h-8 stroke-[2.5]" />
+        </button>
+
+        {/* Hero Card content */}
+        <div className="bg-background border-x border-b border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:rounded-3xl md:border md:border-slate-200/80 overflow-hidden">
+          {/* Top Section (Responsive Row-Reverse on Desktop) */}
         <div className="flex flex-col md:flex-row-reverse md:gap-8 md:p-8 md:items-center">
           {/* Right (Image) on Desktop, Top on Mobile */}
           <div className="w-full md:w-[55%] shrink-0 relative">
@@ -803,6 +818,7 @@ export default function EventDetailPage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* 2. Main Content & Tabs Container */}

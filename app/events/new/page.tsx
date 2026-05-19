@@ -901,7 +901,7 @@ export default function NewEventPage() {
         }
 
         toast.success("오프라인 행사가 성공적으로 등록되었습니다!");
-        router.push(`/events/${eventData.id}`);
+        router.replace(`/events/${eventData.id}`);
 
       } else {
         // Online Event Submission
@@ -967,7 +967,7 @@ export default function NewEventPage() {
         if (relationError) throw relationError;
 
         toast.success("온라인 행사가 성공적으로 등록되었습니다!");
-        router.push(`/online-events/${eventData.id}`);
+        router.replace(`/online-events/${eventData.id}`);
       }
     } catch (error: any) {
       console.error("Submission error:", JSON.stringify(error, null, 2), error);
