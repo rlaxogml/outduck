@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, Fragment } from "react";
+import { useEffect, useState, useMemo, Fragment, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
@@ -30,7 +30,21 @@ import "react-quill/dist/quill.snow.css";
 const ReactQuill = dynamic(() => import("react-quill"), {
   ssr: false,
   loading: () => <div className="h-48 w-full bg-muted animate-pulse rounded-xl" />
-});
+}) as any;
+
+// 8px ~ 120px 전체 정수 사이즈 whitelist 등록
+if (typeof window !== "undefined") {
+  import("react-quill").then((QuillModule) => {
+    const Quill = QuillModule.Quill;
+    const SizeStyle = Quill.import("attributors/style/size");
+    const sizes: string[] = [];
+    for (let i = 8; i <= 120; i++) {
+      sizes.push(`${i}px`);
+    }
+    SizeStyle.whitelist = sizes;
+    Quill.register(SizeStyle, true);
+  });
+}
 
 type ScheduleItem = {
   id: number;
@@ -131,16 +145,13 @@ export default function EventDetailPage() {
     }
   };
 
+  const quillRef = useRef<any>(null);
+  const [directFontSize, setDirectFontSize] = useState('16');
+  const lastSelectionRef = useRef<any>(null);
+
   const quillModules = useMemo(() => ({
     toolbar: {
-      container: [
-        ['image'],
-        [{ 'size': ['small', false, 'large', 'huge'] }],
-        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-        [{ 'header': [1, 2, 3, false] }],
-        ['clean']
-      ],
+      container: '#quill-toolbar-offline',
       handlers: {
         image: function() {
           const input = document.createElement('input');
@@ -175,7 +186,7 @@ export default function EventDetailPage() {
   }), []);
 
   const quillFormats = [
-    'header', 'size',
+    'size',
     'bold', 'italic', 'underline', 'strike', 'blockquote',
     'list', 'bullet', 'indent',
     'link', 'image'
@@ -184,6 +195,233 @@ export default function EventDetailPage() {
   const [isWritingNotice, setIsWritingNotice] = useState(false);
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeContent, setNoticeContent] = useState('');
+
+  // --- Quill Editor Image Close Button Overlay Logic ---
+  interface FloatingButton {
+    src: string;
+    top: number;
+    left: number;
+  }
+  const [floatingButtons, setFloatingButtons] = useState<FloatingButton[]>([]);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  const extractNoticeImagePaths = (htmlContent: string): string[] => {
+    if (!htmlContent) return [];
+    const regex = /storage\/v1\/object\/public\/notices\/([^"'\s>]+)/g;
+    const paths: string[] = [];
+    let match;
+    while ((match = regex.exec(htmlContent)) !== null) {
+      if (match[1]) {
+        try {
+          paths.push(decodeURIComponent(match[1]));
+        } catch {
+          paths.push(match[1]);
+        }
+      }
+    }
+    return paths;
+  };
+
+  const updateFloatingButtons = () => {
+    if (!editorContainerRef.current) return;
+    const container = editorContainerRef.current;
+    const qlEditor = container.querySelector('.ql-editor');
+    if (!qlEditor) return;
+
+    const images = qlEditor.querySelectorAll('img');
+    const containerRect = container.getBoundingClientRect();
+
+    const buttons: FloatingButton[] = [];
+    images.forEach((img) => {
+      const imgRect = img.getBoundingClientRect();
+      const top = imgRect.top - containerRect.top + 16;
+      const left = imgRect.left - containerRect.left + 16;
+
+      buttons.push({
+        src: img.getAttribute('src') || img.src,
+        top,
+        left,
+      });
+    });
+
+    setFloatingButtons(buttons);
+  };
+
+  useEffect(() => {
+    if (!isWritingNotice) {
+      setFloatingButtons([]);
+      return;
+    }
+    const handle = requestAnimationFrame(updateFloatingButtons);
+    return () => cancelAnimationFrame(handle);
+  }, [noticeContent, isWritingNotice]);
+
+  useEffect(() => {
+    if (!isWritingNotice) return;
+    
+    const container = editorContainerRef.current;
+    if (!container) return;
+
+    const qlEditor = container.querySelector('.ql-editor');
+    const handleScroll = () => {
+      updateFloatingButtons();
+    };
+
+    qlEditor?.addEventListener('scroll', handleScroll);
+    window.addEventListener('resize', handleScroll);
+
+    const observer = new MutationObserver(() => {
+      updateFloatingButtons();
+    });
+    if (qlEditor) {
+      observer.observe(qlEditor, { childList: true, subtree: true, attributes: true });
+    }
+
+    const timer = setInterval(updateFloatingButtons, 500);
+
+    return () => {
+      qlEditor?.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+      observer.disconnect();
+      clearInterval(timer);
+    };
+  }, [isWritingNotice, noticeContent]);
+
+  const handleDeleteImageFromEditor = (src: string) => {
+    const escapedSrc = src.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regexImg = new RegExp(`<img[^>]+src=["']${escapedSrc}["'][^>]*>`, 'g');
+    setNoticeContent(prev => {
+      const next = prev.replace(regexImg, '');
+      return next;
+    });
+    toast.success('선택한 이미지가 공지 본문에서 제거되었습니다.');
+  };
+
+  // 스토리지 이미지 URL 목록 추출 헬퍼
+  const extractImageUrlsFromHtml = (html: string): string[] => {
+    const regex = /<img[^>]+src=["']([^"']+)["']/g;
+    const urls: string[] = [];
+    let match;
+    while ((match = regex.exec(html)) !== null) {
+      urls.push(match[1]);
+    }
+    return urls;
+  };
+
+  // 폰트 크기 스피너 useEffect (custom HTML toolbar)
+  useEffect(() => {
+    if (!isWritingNotice) return;
+
+    let input: HTMLInputElement | null = null;
+    let btnUp: HTMLElement | null = null;
+    let btnDown: HTMLElement | null = null;
+    let quill: any = null;
+    let pendingFontSize: string | null = null;
+
+    const applySize = (sizeVal: number) => {
+      const q = quillRef.current?.getEditor();
+      if (q) {
+        const range = q.getSelection() || lastSelectionRef.current;
+        if (range) {
+          setTimeout(() => {
+            const isInputFocused = document.activeElement === input;
+            if (range.length > 0) {
+              q.formatText(range.index, range.length, 'size', `${sizeVal}px`);
+            } else {
+              q.format('size', `${sizeVal}px`);
+            }
+            if (isInputFocused && input) {
+              input.focus();
+            }
+          }, 10);
+        }
+      }
+    };
+
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      target.value = target.value.replace(/[^0-9]/g, '');
+      const val = target.value;
+      setDirectFontSize(val);
+      if (val) {
+        const num = Number(val);
+        if (num >= 8 && num <= 120) {
+          pendingFontSize = `${num}px`;
+          applySize(num);
+        }
+      }
+    };
+
+    const handleUp = () => {
+      const q = quillRef.current?.getEditor();
+      if (!q) return;
+      const range = q.getSelection() || lastSelectionRef.current;
+      let current = 16;
+      if (range) {
+        const fmt = q.getFormat(range.index, Math.max(range.length, 1));
+        const raw = Array.isArray(fmt.size) ? fmt.size[0] : fmt.size;
+        const parsed = parseInt((raw || '16px').replace('px', ''));
+        if (!isNaN(parsed)) current = parsed;
+      }
+      const next = Math.min(120, current + 1);
+      setDirectFontSize(String(next));
+      if (input) input.value = String(next);
+      applySize(next);
+    };
+
+    const handleDown = () => {
+      const q = quillRef.current?.getEditor();
+      if (!q) return;
+      const range = q.getSelection() || lastSelectionRef.current;
+      let current = 16;
+      if (range) {
+        const fmt = q.getFormat(range.index, Math.max(range.length, 1));
+        const raw = Array.isArray(fmt.size) ? fmt.size[0] : fmt.size;
+        const parsed = parseInt((raw || '16px').replace('px', ''));
+        if (!isNaN(parsed)) current = parsed;
+      }
+      const next = Math.max(8, current - 1);
+      setDirectFontSize(String(next));
+      if (input) input.value = String(next);
+      applySize(next);
+    };
+
+    const handleSelectionChange = (range: any) => {
+      if (!range) return;
+      lastSelectionRef.current = range;
+      const isInputFocused = document.activeElement === input;
+      if (isInputFocused) return;
+      const q = quillRef.current?.getEditor();
+      if (!q || !input) return;
+      const fmt = q.getFormat(range.index, Math.max(range.length, 1));
+      const raw = Array.isArray(fmt.size) ? fmt.size[0] : fmt.size;
+      const parsed = parseInt((raw || '16px').replace('px', ''));
+      if (!isNaN(parsed)) {
+        setDirectFontSize(String(parsed));
+        input.value = String(parsed);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      input = document.getElementById('toolbar-font-size-input-offline') as HTMLInputElement;
+      btnUp = document.getElementById('toolbar-size-up-offline');
+      btnDown = document.getElementById('toolbar-size-down-offline');
+      quill = quillRef.current?.getEditor();
+
+      if (input) input.addEventListener('input', handleInput);
+      if (btnUp) btnUp.addEventListener('click', handleUp);
+      if (btnDown) btnDown.addEventListener('click', handleDown);
+      if (quill) quill.on('selection-change', handleSelectionChange);
+    }, 200);
+
+    return () => {
+      clearTimeout(timer);
+      if (input) input.removeEventListener('input', handleInput);
+      if (btnUp) btnUp.removeEventListener('click', handleUp);
+      if (btnDown) btnDown.removeEventListener('click', handleDown);
+      if (quill) quill.off('selection-change', handleSelectionChange);
+    };
+  }, [isWritingNotice]);
 
   const isOwner = useMemo(() => {
     if (!user || !event) return false;
@@ -218,6 +456,19 @@ export default function EventDetailPage() {
     
     if (editingNoticeId !== null) {
       // --- Update Mode ---
+      const oldNotice = notices.find(n => n.id === editingNoticeId);
+      if (oldNotice) {
+        const oldPaths = extractNoticeImagePaths(oldNotice.content);
+        const newPaths = extractNoticeImagePaths(noticeContent);
+        const deletedPaths = oldPaths.filter(path => !newPaths.includes(path));
+
+        if (deletedPaths.length > 0) {
+          await supabase.storage
+            .from('notices')
+            .remove(deletedPaths);
+        }
+      }
+
       const { data, error } = await supabase
         .from('channel_notices')
         .update({
@@ -271,6 +522,16 @@ export default function EventDetailPage() {
   const handleDeleteNotice = async (noticeId: number) => {
     if (!confirm('정말 이 공지사항을 삭제하시겠습니까?')) return;
     
+    const targetNotice = notices.find(n => n.id === noticeId);
+    if (targetNotice) {
+      const paths = extractNoticeImagePaths(targetNotice.content);
+      if (paths.length > 0) {
+        await supabase.storage
+          .from('notices')
+          .remove(paths);
+      }
+    }
+
     const { error } = await supabase
       .from('channel_notices')
       .delete()
@@ -1139,8 +1400,67 @@ export default function EventDetailPage() {
                   />
                   
                   {/* React Quill Editor Container */}
-                  <div className="mb-4 bg-background border border-border rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-primary/40 text-foreground">
+                  <div ref={editorContainerRef} className="relative mb-4 bg-background border border-border rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-primary/40 text-foreground">
+                    {/* Custom HTML Toolbar */}
+                    <div id="quill-toolbar-offline" className="border-b border-border bg-slate-50 dark:bg-muted/10 px-3 py-2 flex flex-wrap items-center gap-1 select-none">
+                      {/* 이미지 업로드 버튼 */}
+                      <span className="ql-formats">
+                        <button className="ql-image" title="이미지 삽입" />
+                      </span>
+
+                      {/* 글꼴 크기 스피너 */}
+                      <span className="ql-formats border-l border-r border-border px-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', float: 'none', verticalAlign: 'middle' }}>
+                        <span className="text-xs text-muted-foreground font-semibold shrink-0">크기</span>
+                        <input
+                          id="toolbar-font-size-input-offline"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          defaultValue={directFontSize}
+                          className="w-10 h-7 text-center text-xs font-bold border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/40 px-1"
+                          style={{ MozAppearance: 'textfield' }}
+                        />
+                        <span className="text-xs text-muted-foreground font-semibold shrink-0">px</span>
+                        <div className="flex flex-col" style={{ gap: '1px' }}>
+                          <button
+                            id="toolbar-size-up-offline"
+                            type="button"
+                            className="w-5 h-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                            title="크기 증가"
+                          >
+                            <svg width="8" height="5" viewBox="0 0 8 5" fill="none"><path d="M1 4L4 1L7 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </button>
+                          <button
+                            id="toolbar-size-down-offline"
+                            type="button"
+                            className="w-5 h-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                            title="크기 감소"
+                          >
+                            <svg width="8" height="5" viewBox="0 0 8 5" fill="none"><path d="M1 1L4 4L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </button>
+                        </div>
+                      </span>
+
+                      {/* 서식 버튼들 */}
+                      <span className="ql-formats">
+                        <button className="ql-bold" />
+                      <button className="ql-italic" />
+                        <button className="ql-underline" />
+                        <button className="ql-strike" />
+                        <button className="ql-blockquote" />
+                      </span>
+                      <span className="ql-formats">
+                        <button className="ql-list" value="ordered" />
+                        <button className="ql-list" value="bullet" />
+                      </span>
+                      <span className="ql-formats">
+                        <button className="ql-clean" />
+                      </span>
+                    </div>
+
+                    {/* 에디터 본문 */}
                     <ReactQuill
+                      ref={quillRef}
                       theme="snow"
                       value={noticeContent}
                       onChange={setNoticeContent}
@@ -1149,7 +1469,72 @@ export default function EventDetailPage() {
                       placeholder="공지 내용을 작성해보세요. 이미지 업로드 및 하이퍼링크가 지원됩니다."
                       className="min-h-[250px]"
                     />
+
+                    {/* 동그란 X 삭제 버튼 오버레이 */}
+                    {floatingButtons.map((btn, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleDeleteImageFromEditor(btn.src)}
+                        style={{
+                          position: 'absolute',
+                          top: `${btn.top}px`,
+                          left: `${btn.left}px`,
+                        }}
+                        className="w-12 h-12 rounded-full bg-white hover:bg-rose-600 text-black hover:text-white flex items-center justify-center transition-all hover:scale-110 shadow-xl z-30 cursor-pointer border-2 border-black select-none animate-in fade-in zoom-in-75 duration-200"
+                        title="이 이미지 삭제"
+                      >
+                        <span className="text-2xl font-bold leading-none">✕</span>
+                      </button>
+                    ))}
                   </div>
+
+                  {/* 업로드된 이미지 리스트 (X 버튼 클릭 시 삭제) */}
+                  {(() => {
+                    const regex = /<img[^>]+src=["']([^"']+)["']/g;
+                    const urls: string[] = [];
+                    let match;
+                    const htmlCopy = noticeContent;
+                    let m;
+                    const re = /<img[^>]+src=["']([^"']+)["']/g;
+                    while ((m = re.exec(htmlCopy)) !== null) {
+                      urls.push(m[1]);
+                    }
+                    if (urls.length === 0) return null;
+                    return (
+                      <div className="mb-4 p-3 bg-slate-50 dark:bg-muted/10 rounded-xl border border-border">
+                        <p className="text-xs font-bold text-muted-foreground mb-2">첨부 이미지 ({urls.length})</p>
+                        <div className="flex flex-wrap gap-3">
+                          {urls.map((url, idx) => (
+                            <div key={idx} className="relative group">
+                              <img src={url} alt="첨부이미지" className="w-20 h-20 object-cover rounded-lg border border-border shadow-sm" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // 에디터 본문에서 해당 이미지 src 태그 제거
+                                  const newContent = noticeContent.replace(
+                                    new RegExp(`<img[^>]+src=["']${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'g'),
+                                    ''
+                                  );
+                                  setNoticeContent(newContent);
+                                  // Storage에서도 삭제 시도
+                                  const storageBase = supabase.storage.from('notices').getPublicUrl('').data.publicUrl.replace(/\/$/, '');
+                                  if (url.startsWith(storageBase)) {
+                                    const path = url.replace(storageBase + '/', '');
+                                    supabase.storage.from('notices').remove([path]);
+                                  }
+                                }}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-white border-2 border-black text-black rounded-full flex items-center justify-center text-xs font-bold shadow hover:bg-red-500 hover:border-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                                title="이미지 삭제"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
 
                   <div className="flex justify-end gap-2">
                     <button

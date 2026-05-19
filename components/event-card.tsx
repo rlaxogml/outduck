@@ -27,6 +27,7 @@ interface EventCardProps {
   baseEventId?: number;
   isRightCard?: boolean;
   isPriority?: boolean;
+  showEventTypeBadge?: boolean;
 }
 
 const reservationBadgeColors: Record<string, string> = {
@@ -63,6 +64,7 @@ export function EventCard({
   baseEventId,
   isRightCard,
   isPriority,
+  showEventTypeBadge = false,
 }: EventCardProps) {
   const [showChannels, setShowChannels] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -214,11 +216,24 @@ export function EventCard({
             </button>
           )}
 
-          {/* 카테고리 뱃지 */}
-          <span className={`absolute top-2 left-2 px-1.5 md:px-2 py-0.5 md:py-1 rounded text-xs md:text-sm font-medium
-            ${categoryBadgeColors[category] ?? "bg-background/80 text-foreground"}`}>
-            {category}
-          </span>
+          {/* 온/오프라인 & 카테고리 뱃지 컨테이너 */}
+          <div className="absolute top-2 left-2 flex gap-1.5 z-10">
+            {/* 온/오프라인 뱃지 - 주최자 대시보드에서만 선택적으로 노출 */}
+            {showEventTypeBadge && (
+              <span className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded text-xs md:text-sm font-bold text-white shadow-sm transition-all
+                ${eventType === "online" 
+                  ? "bg-emerald-500/90 dark:bg-emerald-600/90" 
+                  : "bg-blue-600/90 dark:bg-blue-700/90"}`}>
+                {eventType === "online" ? "온라인" : "오프라인"}
+              </span>
+            )}
+
+            {/* 카테고리 뱃지 */}
+            <span className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded text-xs md:text-sm font-medium shadow-sm
+              ${categoryBadgeColors[category] ?? "bg-background/80 text-foreground"}`}>
+              {category}
+            </span>
+          </div>
         </div>
 
         {channels && channels.length > 0 && (

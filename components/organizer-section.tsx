@@ -59,61 +59,195 @@ export function OrganizerSection({ user }: { user: User | null }) {
 
         const eventIds = mappingData.map((m: any) => m.event_id);
 
-        const { data: eventsData, error: eventsError } = await supabase
-          .from("offline_events")
-          .select(`
-            id,
-            title,
-            start_date,
-            end_date,
-            image_url,
-            reservation_type,
-            created_at,
-            offline_event_locations(location),
-            events(event_channels(channels(id, name, type, image_url)))
-          `)
-          .in("event_id", eventIds)
-          .order("created_at", { ascending: false });
+        const [offlineRes, onlineRes] = await Promise.all([
+          supabase
+            .from("offline_events")
+            .select(`
+              id,
+              event_id,
+              title,
+              start_date,
+              end_date,
+              image_url,
+              reservation_type,
+              created_at,
+              offline_event_locations(location),
+              events(event_channels(channels(id, name, type, image_url)))
+            `)
+            .in("event_id", eventIds),
+          supabase
+            .from("online_events")
+            .select(`
+              id,
+              event_id,
+              title,
+              start_at,
+              end_at,
+              image_url,
+              created_at,
+              events(event_channels(channels(id, name, type, image_url)))
+            `)
+            .in("event_id", eventIds)
+        ]);
 
-        if (!eventsError && eventsData) {
-          const formatEventDate = (start: string | null, end: string | null) => {
-            return end
-              ? `${start?.replaceAll("-", ".") ?? ""} - ${end.replaceAll("-", ".")}`
-              : start?.replaceAll("-", ".") ?? "상시";
-          };
+        const formatEventDate = (start: string | null, end: string | null) => {
+          return end
+            ? `${start?.replaceAll("-", ".").split("T")[0] ?? ""} - ${end.replaceAll("-", ".").split("T")[0]}`
+            : start?.replaceAll("-", ".").split("T")[0] ?? "상시";
+        };
 
-          const getCategory = (type?: string) => {
-            if (!type) return "기타";
-            const t = type.trim().toLowerCase();
-            if (t === "game") return "게임";
-            if (t === "youtuber") return "유튜버";
-            if (t === "festival") return "동인 행사";
-            return "기타";
-          };
+        const getCategory = (type?: string) => {
+          if (!type) return "기타";
+          const t = type.trim().toLowerCase();
+          if (t === "game") return "게임";
+          if (t === "youtuber") return "유튜버";
+          if (t === "festival") return "동인 행사";
+          return "기타";
+        };
 
-          const formattedEvents = eventsData.map((e: any, index: number) => {
+        const formattedEvents: any[] = [];
+
+        if (offlineRes.data) {
+          offlineRes.data.forEach((e: any) => {
             const evChannels = e.events?.event_channels
               ?.map((c: any) => c.channels)
               .filter(Boolean) || [];
-            
-            return {
+
+            formattedEvents.push({
               id: e.id,
+              baseEventId: e.event_id,
+              eventType: "offline",
               title: e.title,
               date: formatEventDate(e.start_date, e.end_date),
               location: e.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
               category: getCategory(evChannels[0]?.type),
-              imageColor: imageColors[index % imageColors.length],
               imageUrl: e.image_url,
               reservationType: e.reservation_type,
+              created_at: e.created_at,
+              raw_start_date: e.start_date,
+              raw_end_date: e.end_date,
               channels: evChannels.map((c: any) => ({
                 id: c.id,
                 name: c.name,
                 image_url: c.image_url || "",
               })),
-            };
+            });
           });
-          setEvents(formattedEvents);
         }
+
+        if (onlineRes.data) {
+          onlineRes.data.forEach((e: any) => {
+            const evChannels = e.events?.event_channels
+              ?.map((c: any) => c.channels)
+              .filter(Boolean) || [];
+
+            formattedEvents.push({
+              id: e.id,
+              baseEventId: e.event_id,
+              eventType: "online",
+              title: e.title,
+              date: formatEventDate(e.start_at, e.end_at),
+              location: "온라인",
+              category: getCategory(evChannels[0]?.type),
+              imageUrl: e.image_url,
+              reservationType: undefined,
+              created_at: e.created_at,
+              raw_start_at: e.start_at,
+              raw_end_at: e.end_at,
+              channels: evChannels.map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                image_url: c.image_url || "",
+              })),
+            });
+          });
+        }
+
+        const sortedEvents = formattedEvents.sort((a, b) => {
+          const parseEventDates = (event: any) => {
+            let start: Date | null = null;
+            let end: Date | null = null;
+            let isAlwaysOn = false;
+
+            if (event.eventType === "offline") {
+              start = event.raw_start_date ? new Date(event.raw_start_date) : null;
+              end = event.raw_end_date ? new Date(event.raw_end_date) : null;
+            } else {
+              start = event.raw_start_at ? new Date(event.raw_start_at) : null;
+              end = event.raw_end_at ? new Date(event.raw_end_at) : null;
+            }
+
+            if (!start) {
+              isAlwaysOn = true;
+            }
+
+            const now = new Date();
+            let isOngoing = false;
+            if (!isAlwaysOn && start) {
+              if (start <= now) {
+                if (!end || end >= now) {
+                  isOngoing = true;
+                }
+              }
+            }
+
+            return { start, end, isAlwaysOn, isOngoing };
+          };
+
+          const infoA = parseEventDates(a);
+          const infoB = parseEventDates(b);
+
+          const getRank = (info: any) => {
+            if (info.isOngoing) return 1;
+            if (!info.isAlwaysOn && info.start && info.start > new Date()) return 2;
+            if (!info.isAlwaysOn && info.end && info.end < new Date()) return 3;
+            return 4; // Always-on
+          };
+
+          const rankA = getRank(infoA);
+          const rankB = getRank(infoB);
+
+          if (rankA !== rankB) {
+            return rankA - rankB;
+          }
+
+          // Same rank sorting
+          if (rankA === 1) {
+            // Ongoing: earlier ending first
+            if (infoA.end && infoB.end) {
+              return infoA.end.getTime() - infoB.end.getTime();
+            }
+            if (infoA.end) return -1;
+            if (infoB.end) return 1;
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          }
+
+          if (rankA === 2) {
+            // Upcoming: closer start time first (earlier start first)
+            if (infoA.start && infoB.start) {
+              return infoA.start.getTime() - infoB.start.getTime();
+            }
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          }
+
+          if (rankA === 3) {
+            // Past: most recently ended first
+            if (infoA.end && infoB.end) {
+              return infoB.end.getTime() - infoA.end.getTime();
+            }
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          }
+
+          // Always-on: descending created_at
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+
+        const finalEvents = sortedEvents.map((e, index) => ({
+          ...e,
+          imageColor: imageColors[index % imageColors.length]
+        }));
+
+        setEvents(finalEvents);
       } catch (err) {
         console.error("Failed to fetch organizer data:", err);
       } finally {
@@ -173,7 +307,9 @@ export function OrganizerSection({ user }: { user: User | null }) {
                   reservationType={event.reservationType}
                   channels={event.channels}
                   user={user}
-                  eventType="offline"
+                  eventType={event.eventType}
+                  baseEventId={event.baseEventId}
+                  showEventTypeBadge={true}
                 />
               </div>
             ))}
