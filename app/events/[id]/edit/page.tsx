@@ -13,217 +13,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Calendar, Clock, MapPin, Search, Upload, X, Plus, Check, Loader2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
+import { TimeInputPair } from "@/components/events/time-input-pair";
+import { DateInputTriple } from "@/components/events/date-input-triple";
+import { useKakaoAddress } from "@/hooks/use-kakao-address";
+import { useEventImageUpload } from "@/hooks/use-event-image-upload";
 
 type Channel = {
   id: number;
   name: string;
   image_url: string | null;
   type: string | null;
-};
-
-const TimeInputPair = ({ 
-  hour, 
-  minute, 
-  onHourChange, 
-  onMinuteChange,
-  size = "default",
-  disabled = false
-}: { 
-  hour: string, 
-  minute: string, 
-  onHourChange: (v: string) => void, 
-  onMinuteChange: (v: string) => void,
-  size?: "default" | "sm",
-  disabled?: boolean
-}) => {
-  const hourRef = useRef<HTMLInputElement>(null);
-  const minRef = useRef<HTMLInputElement>(null);
-
-  const handleHourChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, "");
-    
-    if (val.length === 2) {
-      const num = parseInt(val);
-      if (num > 23) {
-        const firstDigit = val.charAt(0);
-        const rest = val.slice(1);
-        onHourChange(firstDigit);
-        onMinuteChange(rest);
-        minRef.current?.focus();
-        return;
-      }
-    }
-    
-    val = val.slice(0, 2);
-    onHourChange(val);
-    if (val.length === 2) {
-      minRef.current?.focus();
-    }
-  };
-
-  const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, "").slice(0, 2);
-    const num = parseInt(val);
-    if (num > 59) val = "59";
-    onMinuteChange(val);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, isMin: boolean) => {
-    if (e.key === "Backspace" && isMin && minute === "") {
-      hourRef.current?.focus();
-    }
-  };
-
-  const isSm = size === "sm";
-
-  return (
-    <div className={`flex items-center justify-center border-2 transition-all rounded-xl shadow-sm select-none shrink-0
-      ${disabled 
-        ? "bg-slate-100/80 dark:bg-muted/10 border-border/40 opacity-40 cursor-not-allowed pointer-events-none" 
-        : "bg-white dark:bg-muted/20 border-2 border-border/80 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10"
-      }
-      ${isSm ? "h-9.5 w-[96px] px-2" : "h-11 w-[118px] px-3"}`}
-    >
-      <input
-        ref={hourRef}
-        placeholder="__"
-        disabled={disabled}
-        className={`bg-transparent border-0 p-0 text-center font-mono font-extrabold placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 shrink-0
-          ${disabled ? "text-muted-foreground/40 cursor-not-allowed" : "text-foreground"}
-          ${isSm ? "w-[20px] text-[13.5px]" : "w-[26px] text-[16px]"}`}
-        value={hour}
-        onChange={handleHourChange}
-        maxLength={2}
-      />
-      <span className={`font-black shrink-0 select-none mx-1 relative bottom-[0.5px]
-        ${disabled ? "text-muted-foreground/30" : "text-foreground/45"}
-        ${isSm ? "text-[14px]" : "text-[17px]"}`}
-      >:</span>
-      <input
-        ref={minRef}
-        placeholder="__"
-        disabled={disabled}
-        className={`bg-transparent border-0 p-0 text-center font-mono font-extrabold placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 shrink-0
-          ${disabled ? "text-muted-foreground/40 cursor-not-allowed" : "text-foreground"}
-          ${isSm ? "w-[20px] text-[13.5px]" : "w-[26px] text-[16px]"}`}
-        value={minute}
-        onChange={handleMinChange}
-        onKeyDown={(e) => handleKeyDown(e, true)}
-        maxLength={2}
-      />
-      <span className={`font-bold shrink-0 select-none ml-1
-        ${disabled ? "text-slate-400/50" : "text-muted-foreground"}
-        ${isSm ? "text-[11px]" : "text-[13px]"}`}
-      >분</span>
-    </div>
-  );
-};
-
-const DateInputTriple = ({ 
-  year, 
-  month, 
-  day, 
-  onYearChange, 
-  onMonthChange, 
-  onDayChange 
-}: { 
-  year: string, 
-  month: string, 
-  day: string, 
-  onYearChange: (v: string) => void, 
-  onMonthChange: (v: string) => void, 
-  onDayChange: (v: string) => void 
-}) => {
-  const yearRef = useRef<HTMLInputElement>(null);
-  const monthRef = useRef<HTMLInputElement>(null);
-  const dayRef = useRef<HTMLInputElement>(null);
-
-  const handleYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, "").slice(0, 4);
-    onYearChange(val);
-    if (val.length === 4) {
-      monthRef.current?.focus();
-    }
-  };
-
-  const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, "");
-    
-    if (val.length === 2) {
-      const num = parseInt(val);
-      if (num > 12) {
-        const firstDigit = val.charAt(0);
-        const rest = val.slice(1);
-        onMonthChange(firstDigit);
-        onDayChange(rest);
-        dayRef.current?.focus();
-        return;
-      }
-    }
-    
-    val = val.slice(0, 2);
-    onMonthChange(val);
-    if (val.length === 2) {
-      dayRef.current?.focus();
-    }
-  };
-
-  const handleDayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, "").slice(0, 2);
-    const num = parseInt(val);
-    if (num > 31) val = "31";
-    onDayChange(val);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: "month" | "day") => {
-    if (e.key === "Backspace") {
-      if (field === "month" && month === "") {
-        yearRef.current?.focus();
-      } else if (field === "day" && day === "") {
-        monthRef.current?.focus();
-      }
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap">
-      <div className="flex items-center gap-1 sm:gap-1.5">
-        <Input
-          ref={yearRef}
-          placeholder="----"
-          className="w-16 sm:w-20 h-10 sm:h-11 bg-white border-2 border-border/80 focus:border-primary rounded-xl text-center font-mono text-base sm:text-lg font-extrabold focus:ring-primary/10 p-0 shadow-sm"
-          value={year}
-          onChange={handleYearChange}
-          maxLength={4}
-        />
-        <span className="text-xs sm:text-sm font-extrabold text-foreground shrink-0">년</span>
-      </div>
-      <div className="flex items-center gap-1 sm:gap-1.5">
-        <Input
-          ref={monthRef}
-          placeholder="--"
-          className="w-11 sm:w-12 h-10 sm:h-11 bg-white border-2 border-border/80 focus:border-primary rounded-xl text-center font-mono text-base sm:text-lg font-extrabold focus:ring-primary/10 p-0 shadow-sm"
-          value={month}
-          onChange={handleMonthChange}
-          onKeyDown={(e) => handleKeyDown(e, "month")}
-          maxLength={2}
-        />
-        <span className="text-xs sm:text-sm font-extrabold text-foreground shrink-0">월</span>
-      </div>
-      <div className="flex items-center gap-1 sm:gap-1.5">
-        <Input
-          ref={dayRef}
-          placeholder="--"
-          className="w-11 sm:w-12 h-10 sm:h-11 bg-white border-2 border-border/80 focus:border-primary rounded-xl text-center font-mono text-base sm:text-lg font-extrabold focus:ring-primary/10 p-0 shadow-sm"
-          value={day}
-          onChange={handleDayChange}
-          onKeyDown={(e) => handleKeyDown(e, "day")}
-          maxLength={2}
-        />
-        <span className="text-xs sm:text-sm font-extrabold text-foreground shrink-0">일</span>
-      </div>
-    </div>
-  );
 };
 
 export default function EditEventPage() {
@@ -271,9 +70,14 @@ export default function EditEventPage() {
   const [resEndHour, setResEndHour] = useState("");
   const [resEndMin, setResEndMin] = useState("");
   const [isResAlways, setIsResAlways] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [imagePath, setImagePath] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const {
+    imageUrl,
+    setImageUrl,
+    imagePath,
+    setImagePath,
+    isUploading,
+    handleImageUpload,
+  } = useEventImageUpload();
   const [hostId, setHostId] = useState<string>("");
   const [coHosts, setCoHosts] = useState<Channel[]>([]);
   const [eventBaseId, setEventBaseId] = useState<number | null>(null);
@@ -496,9 +300,11 @@ export default function EditEventPage() {
   const [showCoHostSearch, setShowCoHostSearch] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Address search states
-  const [addrResults, setAddrResults] = useState<any[]>([]);
-  const [isSearchingAddr, setIsSearchingAddr] = useState(false);
+  const { addrResults, isSearchingAddr, setAddrResults } = useKakaoAddress(
+    locationInput,
+    isManualLocation,
+    isScriptLoaded
+  );
 
   // Wait for global Kakao Map Script to load
   useEffect(() => {
@@ -511,57 +317,6 @@ export default function EditEventPage() {
     }, 100);
     return () => clearInterval(interval);
   }, [isScriptLoaded]);
-
-  // Load address autocomplete search
-  useEffect(() => {
-    if (isManualLocation || !locationInput || locationInput.trim().length < 2) {
-      setAddrResults([]);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      if (typeof window === "undefined" || !window.kakao || !window.kakao.maps) return;
-
-      const performSearch = () => {
-        if (!window.kakao.maps.services) return;
-        const places = new window.kakao.maps.services.Places();
-        const geocoder = new window.kakao.maps.services.Geocoder();
-
-        setIsSearchingAddr(true);
-        places.keywordSearch(locationInput, (data: any, status: any) => {
-          if (status === window.kakao.maps.services.Status.OK && data && data.length > 0) {
-            const formatted = data.map((item: any) => ({
-              address: item.address_name,
-              placeName: item.place_name,
-            }));
-            setAddrResults(formatted);
-            setIsSearchingAddr(false);
-          } else {
-            geocoder.addressSearch(locationInput, (result: any, addrStatus: any) => {
-              if (addrStatus === window.kakao.maps.services.Status.OK && result && result.length > 0) {
-                const formatted = result.map((item: any) => ({
-                  address: item.address_name,
-                  placeName: item.address_name,
-                }));
-                setAddrResults(formatted);
-              } else {
-                setAddrResults([]);
-              }
-              setIsSearchingAddr(false);
-            });
-          }
-        });
-      };
-
-      if (window.kakao.maps.services) {
-        performSearch();
-      } else {
-        window.kakao.maps.load(performSearch);
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [locationInput, isManualLocation, isScriptLoaded]);
 
   const selectAddress = (addr: string) => {
     setLocations(prev => [...prev, addr]);
@@ -761,47 +516,6 @@ export default function EditEventPage() {
 
     initPage();
   }, [eventId, router]);
-
-  // Handle image upload
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("이미지 파일만 업로드 가능합니다.");
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      if (imagePath) {
-        await supabase.storage.from("event_images").remove([imagePath]);
-      }
-
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-      const filePath = `event-covers/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("event_images")
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("event_images")
-        .getPublicUrl(filePath);
-
-      setImageUrl(publicUrl);
-      setImagePath(filePath);
-      toast.success("이미지가 업로드되었습니다.");
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      toast.error("이미지 업로드에 실패했습니다: " + error.message);
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   // Search channels for co-hosts
   useEffect(() => {
