@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import type { User } from "@supabase/supabase-js";
-import { Calendar, Heart, MapPinned, Star, Search, X, House, PlusCircle } from "lucide-react";
+import { Calendar, Heart, MapPinned, Star, Search, X, House, PlusCircle, Bell, Megaphone, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 type ChannelType = "game" | "youtuber" | "festival";
 
@@ -33,7 +34,7 @@ const RECENT_CHANNELS_STORAGE_KEY = "recent-searched-channels";
 const channelTypeLabel: Record<ChannelType, string> = {
   game: "게임",
   youtuber: "유튜버",
-  festival: "동인 행사",
+  festival: "축제",
 };
 
 const sanitizeSearchText = (value: string) => {
@@ -71,6 +72,181 @@ export function Header() {
   };
 
   const [user, setUser] = useState<User | null>(null);
+
+  // Notification states & hooks
+  type Notification = {
+    id: string;
+    user_id: string;
+    type: string;
+    message: string;
+    is_read: boolean;
+    read_at: string | null;
+    event_id: number | null;
+    channel_id: number | null;
+    created_at: string;
+  };
+
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
+  const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+
+  const getRelativeTime = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "방금 전";
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) return `${diffInMinutes}분 전`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}시간 전`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays === 1) return "어제";
+    if (diffInDays < 7) return `${diffInDays}일 전`;
+    
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${month}/${day}`;
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case "new_event":
+        return <Calendar className="w-4 h-4" />;
+      case "new_notice":
+        return <Megaphone className="w-4 h-4" />;
+      case "request_status":
+        return <CheckCircle2 className="w-4 h-4" />;
+      case "new_company_request":
+        return <PlusCircle className="w-4 h-4" />;
+      default:
+        return <Bell className="w-4 h-4" />;
+    }
+  };
+
+  const getNotificationColorClass = (type: string) => {
+    switch (type) {
+      case "new_event":
+        return "bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400";
+      case "new_notice":
+        return "bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400";
+      case "request_status":
+        return "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400";
+      case "new_company_request":
+        return "bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400";
+      default:
+        return "bg-slate-500/10 text-slate-600 dark:bg-slate-500/20 dark:text-slate-400";
+    }
+  };
+
+  const fetchNotifications = async (userId: string) => {
+    setIsNotificationsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      const loaded = data || [];
+      setNotifications(loaded);
+      setUnreadCount(loaded.filter(n => !n.is_read).length);
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    } finally {
+      setIsNotificationsLoading(false);
+    }
+  };
+
+  const handleDropdownOpen = async (open: boolean) => {
+    setIsNotifDropdownOpen(open);
+    if (open && user && unreadCount > 0) {
+      // Optimistic UI update
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+
+      try {
+        const { error } = await supabase
+          .from("notifications")
+          .update({ is_read: true, read_at: new Date().toISOString() })
+          .eq("user_id", user.id)
+          .eq("is_read", false);
+
+        if (error) throw error;
+      } catch (err) {
+        console.error("Failed to mark notifications as read:", err);
+      }
+    }
+  };
+
+  const handleNotificationClick = async (notif: Notification) => {
+    if (!notif.is_read) {
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+      try {
+        await supabase
+          .from("notifications")
+          .update({ is_read: true, read_at: new Date().toISOString() })
+          .eq("id", notif.id);
+      } catch (err) {
+        console.error("Failed to mark notification as read:", err);
+      }
+    }
+
+    if (notif.event_id) {
+      router.push(`/events/${notif.event_id}`);
+    } else if (notif.channel_id) {
+      router.push(`/channels/${notif.channel_id}`);
+    } else if (notif.type === "new_company_request") {
+      router.push("/company");
+    } else if (notif.type === "request_status") {
+      router.push("/apply");
+    }
+  };
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    fetchNotifications(user.id);
+
+    const channel = supabase
+      .channel(`user-notifications-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newNotif = payload.new as Notification;
+          setNotifications(prev => [newNotif, ...prev]);
+          setUnreadCount(prev => prev + 1);
+
+          toast.info(newNotif.message || "새로운 알림이 도착했습니다.", {
+            action: newNotif.event_id ? {
+              label: "확인",
+              onClick: () => {
+                handleNotificationClick(newNotif);
+              }
+            } : undefined
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [user]);
+
   const [hasChannel, setHasChannel] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState<ChannelSearchItem[]>([]);
@@ -470,7 +646,80 @@ export function Header() {
             )}
           </div>
 
-          <div className="flex-shrink-0 justify-self-end">
+          <div className="flex-shrink-0 justify-self-end flex items-center gap-2.5 md:gap-3.5">
+            {user && (
+              <DropdownMenu modal={false} open={isNotifDropdownOpen} onOpenChange={handleDropdownOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200 focus:outline-none">
+                    <Bell className="h-[21px] w-[21px] md:h-6 md:w-6" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white ring-2 ring-background animate-in zoom-in duration-200">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[320px] sm:w-[380px] p-0 rounded-2xl shadow-xl mt-1.5 overflow-hidden border border-border bg-background">
+                  <div className="p-3.5 border-b border-border bg-muted/20 flex items-center justify-between">
+                    <span className="font-extrabold text-sm flex items-center gap-1.5">
+                      <Bell className="w-4 h-4 text-slate-500" /> 알림
+                    </span>
+                    {unreadCount > 0 && (
+                      <span className="text-[10px] font-bold text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-full">
+                        새 알림 {unreadCount}개
+                      </span>
+                    )}
+                  </div>
+                  <div className="max-h-[340px] overflow-y-auto no-scrollbar">
+                    {isNotificationsLoading && notifications.length === 0 ? (
+                      <div className="py-8 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground/60" />
+                        <span className="text-xs font-medium">알림을 불러오는 중...</span>
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="py-10 text-center text-muted-foreground select-none">
+                        <span className="text-xs font-semibold">새로운 알림이 없습니다.</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col">
+                        {notifications.map((notif) => (
+                          <button
+                            key={notif.id}
+                            onClick={() => handleNotificationClick(notif)}
+                            className={cn(
+                              "w-full text-left px-3.5 py-3 border-b border-border/40 hover:bg-muted/40 transition-colors flex gap-3 items-start",
+                              !notif.is_read && "bg-blue-500/5 dark:bg-blue-500/2"
+                            )}
+                          >
+                            <div className={cn(
+                              "p-2 rounded-xl shrink-0 flex items-center justify-center mt-0.5",
+                              getNotificationColorClass(notif.type)
+                            )}>
+                              {getNotificationIcon(notif.type)}
+                            </div>
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <p className={cn(
+                                "text-xs leading-relaxed font-medium break-words text-foreground/90",
+                                !notif.is_read && "font-bold text-foreground"
+                              )}>
+                                {notif.message}
+                              </p>
+                              <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
+                                <span>{getRelativeTime(notif.created_at)}</span>
+                                {!notif.is_read && (
+                                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             {user ? (
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>

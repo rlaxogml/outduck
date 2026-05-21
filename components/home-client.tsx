@@ -13,9 +13,8 @@ import { PosterSlider } from "@/components/poster-slider";
 import { OrganizerSection } from "@/components/organizer-section";
 import { FavoriteChannels } from "@/components/favorite-channels";
 import { MiniCalendar } from "@/components/mini-calendar";
-import dynamic from "next/dynamic";
-
-const GoogleAd = dynamic(() => import("@/components/google-ad").then(m => m.GoogleAd), { ssr: false });
+import { GoogleAd } from "@/components/google-ad";
+import { Building2, ArrowRight } from "lucide-react";
 
 type Event = {
   id: number;
@@ -46,6 +45,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
   const [offlineEvents, setOfflineEvents] = useState<Event[]>(initialOfflineEvents);
   const [onlineEvents, setOnlineEvents] = useState<Event[]>(initialOnlineEvents);
   const [user, setUser] = useState<User | null>(null);
+  const [isCompanyUser, setIsCompanyUser] = useState(false);
   const [visibleCount, setVisibleCount] = useState(10);
 
   // Reset visible count when filters change
@@ -88,7 +88,10 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setIsCompanyUser(false);
+      return;
+    }
 
     let isMounted = true;
     const checkCompanyUser = async (userId: string) => {
@@ -102,8 +105,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
 
         console.log("HomeClient: Company check complete. User has company account:", !!data);
         if (data && isMounted) {
-          console.log("HomeClient: Redirecting company user to /company dashboard.");
-          router.replace("/company");
+          setIsCompanyUser(true);
         }
       } catch (err) {
         console.error("HomeClient: Company user check failed:", err);
@@ -115,7 +117,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
     return () => {
       isMounted = false;
     };
-  }, [user, router]);
+  }, [user]);
 
   const filteredEvents = (() => {
     let result = activeTab === "offline" ? offlineEvents : onlineEvents;
@@ -129,7 +131,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
       } else {
         const catMap: Record<string, string> = {
           game: "게임",
-          festival: "동인 행사",
+          festival: "축제",
         };
         result = result.filter(e => e.category === catMap[activeCategory]);
       }
@@ -175,6 +177,27 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
           <section className="py-4">
             <PosterSlider />
           </section>
+
+          {/* Company Owner Banner */}
+          {isCompanyUser && (
+            <div className="mb-6 p-4 md:p-5 bg-gradient-to-r from-orange-500/10 to-amber-500/5 border border-orange-500/20 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-2 fade-in duration-300">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-orange-500 text-white rounded-2xl shrink-0">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div className="space-y-0.5">
+                  <h4 className="text-sm md:text-base font-extrabold text-foreground">회사 파트너십 관리 콘솔</h4>
+                  <p className="text-xs text-muted-foreground font-medium">회사 계정으로 로그인하셨습니다. 소속 크리에이터 채널과 가입 신청 목록을 제어하세요.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push("/company")}
+                className="h-11 px-6 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-md shrink-0 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              >
+                콘솔 바로가기 <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* Organizer Section */}
           <OrganizerSection user={user} />

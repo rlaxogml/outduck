@@ -140,3 +140,24 @@
 @utility ring-brand-gradient {
   background-image: linear-gradient(45deg, #2dd4bf 10%, #3b82f6 40%, #a855f7 70%, #ec4899 95%);
 }
+
+/* -------------------------------------------------------------
+   Radix UI Dialog/Dropdown Layout Shift Fix
+   모달/드롭다운 팝업 오픈 시 화면 밀림 및 우측 회색/흰색 여백 생김 방지
+------------------------------------------------------------- */
+html,
+body,
+html[data-scroll-locked],
+body[data-scroll-locked],
+[data-scroll-locked] {
+  padding-right: 0px !important;
+  margin-right: 0px !important;
+}
+
+/* fixed 요소들이나 포털로 렌더링된 요소들의 레이아웃 밀림 방지 */
+[style*="padding-right"] {
+  padding-right: 0px !important;
+}
+[style*="margin-right"] {
+  margin-right: 0px !important;
+}

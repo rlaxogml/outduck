@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import {
+  Camera,
+  Save,
   Building2,
   Plus,
   Users,
@@ -34,7 +36,16 @@ import {
   Globe,
   UserCircle,
   Link as LinkIcon,
-  Trash2
+  Trash2,
+  Copy,
+  RefreshCw,
+  Check,
+  CheckCircle2,
+  XCircle,
+  User,
+  Info,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { EventTabs } from "@/components/event-tabs";
@@ -50,6 +61,8 @@ type Company = {
   name: string;
   profile_image_url: string | null;
   user_id: string;
+  invite_code?: string | null;
+  is_auto_approved?: boolean | null;
 };
 
 type Channel = {
@@ -61,6 +74,7 @@ type Channel = {
   owner_id: string | null;
   company: string | null;
   links: ChannelLink[] | null;
+  team_id?: number | null;
 };
 
 type Event = {
@@ -126,7 +140,18 @@ export default function CompanyPage() {
   const [isLinksOpen, setIsLinksOpen] = useState(false);
   const [linksTargetChan, setLinksTargetChan] = useState<Channel | null>(null);
   const [linksForm, setLinksForm] = useState<(ChannelLink & { id: string })[]>([]);
+  const [linksTeamId, setLinksTeamId] = useState<string>("none");
+  const [linksImageUrl, setLinksImageUrl] = useState<string>("");
   const [isSavingLinks, setIsSavingLinks] = useState(false);
+  const [isUploadingLinkImg, setIsUploadingLinkImg] = useState(false);
+  const [showDeleteChanDialog, setShowDeleteChanDialog] = useState(false);
+  const [isDeletingChan, setIsDeletingChan] = useState(false);
+
+  // Pending Requests State
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [isProcessingRequest, setIsProcessingRequest] = useState<number | null>(null);
+  const [isPendingCollapsed, setIsPendingCollapsed] = useState(true);
+  const [hasInitializedPendingState, setHasInitializedPendingState] = useState(false);
 
   useEffect(() => {
     if (!transferCode || !codeExpiresAt) {
@@ -206,6 +231,9 @@ export default function CompanyPage() {
         // Fetch associated channels and subsequently events
         console.log("CompanyPage: Fetching channels and events...");
         await fetchChannelsAndEvents(compData.name);
+        
+        // Fetch pending requests for the company
+        await fetchPendingRequests(compData.id);
         
         // Fetch all available Teams for individual member affiliation
         console.log("CompanyPage: Fetching teams...");
@@ -295,7 +323,7 @@ export default function CompanyPage() {
     const t = type.trim().toLowerCase();
     if (t === "game") return "게임";
     if (t === "youtuber") return "유튜버";
-    if (t === "festival") return "동인 행사";
+    if (t === "festival") return "축제";
     return "기타";
   };
 
@@ -417,6 +445,100 @@ export default function CompanyPage() {
       console.error("Failed to fetch related events:", error);
     } finally {
       setIsLoadingEvents(false);
+    }
+  };
+
+  const fetchPendingRequests = async (companyId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from("channel_requests")
+        .select("*")
+        .eq("company_id", companyId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      const requests = data || [];
+      setPendingRequests(requests);
+      if (!hasInitializedPendingState) {
+        setIsPendingCollapsed(requests.length === 0);
+        setHasInitializedPendingState(true);
+      }
+    } catch (err) {
+      console.error("Failed to fetch pending requests:", err);
+    }
+  };
+
+  const handleUpdateInviteCode = async () => {
+    if (!company) return;
+    const newCode = generateRandomCode();
+    try {
+      const { error } = await supabase
+        .from("companies")
+        .update({ invite_code: newCode })
+        .eq("id", company.id);
+
+      if (error) throw error;
+
+      setCompany(prev => prev ? { ...prev, invite_code: newCode } : null);
+      toast.success("소속 코드가 성공적으로 업데이트되었습니다.");
+    } catch (err: any) {
+      console.error("Failed to update invite code:", err);
+      toast.error("소속 코드 업데이트 실패: " + err.message);
+    }
+  };
+
+  const handleToggleAutoApprove = async (checked: boolean) => {
+    if (!company) return;
+    try {
+      const { error } = await supabase
+        .from("companies")
+        .update({ is_auto_approved: checked })
+        .eq("id", company.id);
+
+      if (error) throw error;
+
+      setCompany(prev => prev ? { ...prev, is_auto_approved: checked } : null);
+      toast.success(checked ? "자동 가입 승인이 활성화되었습니다." : "자동 가입 승인이 비활성화되었습니다.");
+    } catch (err: any) {
+      console.error("Failed to update auto-approve setting:", err);
+      toast.error("설정 변경 실패: " + err.message);
+    }
+  };
+
+  const handleCopyInviteCode = () => {
+    if (!company?.invite_code) return;
+    navigator.clipboard.writeText(company.invite_code);
+    toast.success("소속 코드가 클립보드에 복사되었습니다.");
+  };
+
+  const handleRequestAction = async (request: any, action: "approve" | "reject") => {
+    if (!company) return;
+    setIsProcessingRequest(request.id);
+
+    try {
+      const newStatus = action === "approve" ? "approved" : "rejected";
+
+      const { error: updateError } = await supabase
+        .from("channel_requests")
+        .update({ status: newStatus })
+        .eq("id", request.id);
+
+      if (updateError) throw updateError;
+
+      if (action === "approve") {
+        toast.success("채널 승인 및 등록이 완료되었습니다!");
+      } else {
+        toast.success("신청을 거절 처리했습니다.");
+      }
+
+      await fetchPendingRequests(company.id);
+      await fetchChannelsAndEvents(company.name);
+    } catch (error: any) {
+      console.error("Failed to process request:", error);
+      toast.error("오류 발생: " + error.message);
+    } finally {
+      setIsProcessingRequest(null);
     }
   };
 
@@ -543,6 +665,99 @@ export default function CompanyPage() {
     }
   };
 
+  const handleLinkImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLinkImg(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `chan-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `channel-images/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("event_images")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("event_images")
+        .getPublicUrl(filePath);
+
+      setLinksImageUrl(publicUrl);
+      toast.success("이미지 업로드 완료");
+    } catch (err: any) {
+      toast.error("업로드 실패: " + err.message);
+    } finally {
+      setIsUploadingLinkImg(false);
+    }
+  };
+
+  const handleDeleteChannel = async () => {
+    if (!linksTargetChan) return;
+    setIsDeletingChan(true);
+    try {
+      // 1. event_channels에서 해당 channel_id와 연결된 모든 event_id 조회
+      const { data: eventChannels, error: fetchErr } = await supabase
+        .from("event_channels")
+        .select("event_id")
+        .eq("channel_id", linksTargetChan.id);
+      if (fetchErr) throw fetchErr;
+
+      const eventIds = (eventChannels || []).map(ec => ec.event_id).filter(Boolean) as number[];
+      let orphanEventIds: number[] = [];
+
+      if (eventIds.length > 0) {
+        // 2. 해당 행사들이 또 다른 채널과 연결되어 있는지 확인
+        const { data: allLinks, error: linksErr } = await supabase
+          .from("event_channels")
+          .select("event_id, channel_id")
+          .in("event_id", eventIds);
+        if (linksErr) throw linksErr;
+
+        const counts: Record<number, number> = {};
+        (allLinks || []).forEach(link => {
+          counts[link.event_id] = (counts[link.event_id] || 0) + 1;
+        });
+
+        orphanEventIds = eventIds.filter(id => counts[id] === 1);
+      }
+
+      // 3. event_channels 관계 삭제
+      const { error: delLinksErr } = await supabase
+        .from("event_channels")
+        .delete()
+        .eq("channel_id", linksTargetChan.id);
+      if (delLinksErr) throw delLinksErr;
+
+      // 4. 고아가 된 행사 데이터 삭제
+      if (orphanEventIds.length > 0) {
+        await supabase.from("offline_events").delete().in("event_id", orphanEventIds);
+        await supabase.from("online_events").delete().in("event_id", orphanEventIds);
+        await supabase.from("events").delete().in("id", orphanEventIds);
+      }
+
+      // 5. 채널 삭제
+      const { error: delChanErr } = await supabase
+        .from("channels")
+        .delete()
+        .eq("id", linksTargetChan.id);
+      if (delChanErr) throw delChanErr;
+
+      toast.success("채널과 관련 행사가 완전히 삭제되었습니다.");
+      setShowDeleteChanDialog(false);
+      setIsLinksOpen(false);
+      if (company) {
+        await fetchChannelsAndEvents(company.name);
+      }
+    } catch (e: any) {
+      toast.error("삭제 실패: " + e.message);
+    } finally {
+      setIsDeletingChan(false);
+    }
+  };
+
   const handleSaveLinks = async () => {
     if (!linksTargetChan) return;
     setIsSavingLinks(true);
@@ -550,18 +765,22 @@ export default function CompanyPage() {
       const finalLinks = linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url }));
       const { error } = await supabase
         .from("channels")
-        .update({ links: finalLinks.length > 0 ? finalLinks : null })
+        .update({ 
+          links: finalLinks.length > 0 ? finalLinks : null,
+          team_id: linksTeamId === "none" ? null : Number(linksTeamId),
+          image_url: linksImageUrl || null
+        })
         .eq("id", linksTargetChan.id);
 
       if (error) throw error;
 
-      toast.success("링크가 성공적으로 저장되었습니다.");
+      toast.success("채널 정보가 성공적으로 업데이트되었습니다.");
       setIsLinksOpen(false);
       if (company) {
         await fetchChannelsAndEvents(company.name);
       }
     } catch (err: any) {
-      toast.error("링크 저장 실패: " + err.message);
+      toast.error("정보 저장 실패: " + err.message);
     } finally {
       setIsSavingLinks(false);
     }
@@ -661,23 +880,107 @@ export default function CompanyPage() {
       <main className="w-full max-w-7xl mx-auto px-4 pt-6 md:pt-8 space-y-8">
         
         {/* Company Hero Info Block */}
-        <div className="relative bg-background border border-border/60 rounded-3xl shadow-sm overflow-hidden p-5 md:p-6 flex flex-col sm:flex-row items-center sm:items-start gap-5">
-          <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-orange-500/15 to-amber-500/5 opacity-40 pointer-events-none" />
+        <div className="relative bg-background border border-border/60 rounded-3xl shadow-sm overflow-hidden flex flex-col">
+          {/* Top Profile Section */}
+          <div className="relative p-5 md:p-6 flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-orange-500/15 to-amber-500/5 opacity-40 pointer-events-none" />
+            
+            <Avatar className="relative z-10 w-16 h-16 md:w-20 md:h-20 rounded-2xl border-2 border-background shadow-md overflow-hidden flex-shrink-0">
+              <AvatarImage src={company.profile_image_url || undefined} className="object-cover" />
+              <AvatarFallback className="rounded-2xl bg-orange-100 text-orange-600 font-extrabold text-2xl">
+                {company.name.slice(0, 1)}
+              </AvatarFallback>
+            </Avatar>
+            
+            <div className="relative z-10 flex-1 text-center sm:text-left space-y-1">
+              <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center justify-center sm:justify-start gap-2">
+                {company.name}
+              </h1>
+              <p className="text-muted-foreground text-xs md:text-sm font-medium">
+                통합 파트너 관리 콘솔 • 소속 채널 {channels.length}개
+              </p>
+            </div>
+          </div>
           
-          <Avatar className="relative z-10 w-16 h-16 md:w-20 md:h-20 rounded-2xl border-2 border-background shadow-md overflow-hidden flex-shrink-0">
-            <AvatarImage src={company.profile_image_url || undefined} className="object-cover" />
-            <AvatarFallback className="rounded-2xl bg-orange-100 text-orange-600 font-extrabold text-2xl">
-              {company.name.slice(0, 1)}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="relative z-10 flex-1 text-center sm:text-left space-y-1">
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center justify-center sm:justify-start gap-2">
-              {company.name}
-            </h1>
-            <p className="text-muted-foreground text-xs md:text-sm font-medium">
-              통합 파트너 관리 콘솔 • 소속 채널 {channels.length}개
-            </p>
+          {/* Bottom Invite Code Section */}
+          <div className="border-t border-border/60 bg-muted/10 p-4 md:px-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Left Column: Invite Code */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="p-2 bg-orange-500/10 text-orange-600 rounded-xl shrink-0">
+                <Key className="w-4 h-4" />
+              </div>
+              <div className="space-y-1 flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="text-xs md:text-sm font-bold text-foreground shrink-0">소속 가입 코드</span>
+                  {company.invite_code ? (
+                    <>
+                      <Badge variant="outline" className="text-[9px] font-extrabold h-4.5 border-orange-500/20 text-orange-600 bg-orange-500/5 shrink-0">
+                        활성 상태
+                      </Badge>
+                      <div className="flex items-center gap-1.5 bg-background border border-border/60 rounded-xl px-2.5 py-1 shadow-sm shrink-0">
+                        <span className="text-[9px] font-extrabold tracking-wider text-muted-foreground uppercase">Code</span>
+                        <span className="text-sm font-mono font-black tracking-wider text-orange-600 select-all">
+                          {company.invite_code}
+                        </span>
+                        <Button 
+                          onClick={handleCopyInviteCode}
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 rounded-lg hover:bg-orange-500/10 hover:text-orange-600 transition-all shadow-none border-none shrink-0"
+                          title="코드 복사"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground font-medium">코드가 발급되지 않았습니다.</span>
+                  )}
+                </div>
+                <p className="text-[10px] md:text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <Info className="w-3.5 h-3.5 text-muted-foreground/80 shrink-0" />
+                  개인이 주최자 계정 신청에서 입력하는 코드
+                </p>
+              </div>
+            </div>
+
+            {/* Middle Column: Auto Join Approval Switch */}
+            <div className="flex items-center justify-between md:justify-start gap-4 py-3 md:py-0 border-y md:border-y-0 md:border-x border-border/50 md:px-6 shrink-0 animate-in fade-in">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs md:text-sm font-bold text-foreground">자동 가입 승인</span>
+                  <Badge className={`text-[8px] md:text-[9px] font-extrabold h-4 md:h-4.5 px-1 md:px-1.5 rounded-full border-none shadow-none shrink-0 ${company.is_auto_approved ? "bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" : "bg-amber-500/15 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"}`}>
+                    {company.is_auto_approved ? "자동" : "수동 대기"}
+                  </Badge>
+                </div>
+                <p className="text-[10px] text-muted-foreground font-medium">소속 코드로 가입 신청 시 즉시 승인 및 채널 자동 생성</p>
+              </div>
+              <Switch
+                checked={!!company.is_auto_approved}
+                onCheckedChange={handleToggleAutoApprove}
+                className="data-[state=checked]:bg-orange-500"
+              />
+            </div>
+            
+            {/* Right Column: Code Action Button */}
+            <div className="flex items-center gap-3 self-end md:self-auto w-full md:w-auto justify-end shrink-0">
+              {company.invite_code ? (
+                <Button 
+                  onClick={handleUpdateInviteCode}
+                  variant="outline" 
+                  className="h-10 rounded-xl text-xs font-bold border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/30 flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <RefreshCw className="w-3 h-3" /> 코드 재발급
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleUpdateInviteCode}
+                  className="h-10 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md flex items-center gap-1.5 px-4"
+                >
+                  <Plus className="w-3.5 h-3.5" /> 소속 가입 코드 생성
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -727,58 +1030,91 @@ export default function CompanyPage() {
                 {channels.map((channel) => (
                   <div key={channel.id} className="flex flex-col items-center gap-2.5 min-w-[64px] md:min-w-[84px] group relative shrink-0 select-none">
                     
-                    <div className="relative w-14 h-14 md:w-16 md:h-16 bg-brand-gradient p-[2.5px] rounded-full shadow-md group-hover:scale-105 transition-all duration-300 ease-out">
-                      <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-muted flex items-center justify-center shrink-0">
-                        {channel.image_url ? (
-                          <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-base md:text-lg font-black text-muted-foreground/60">{channel.name.slice(0, 1).toUpperCase()}</span>
-                        )}
-                      </div>
-                      {/* Cog wheel badge inside image for Action */}
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTargetChan(channel);
-                          setTransferCode(null);
-                          setIsOwnerOpen(true);
-                        }}
-                        className="absolute -bottom-1 -right-1 bg-slate-900 hover:bg-orange-600 text-white p-1 rounded-full border-2 border-white transition-all duration-200 shadow-md cursor-pointer scale-95 group-hover:scale-105 active:scale-90 z-10"
-                        title="권한 관리"
-                      >
-                        <Settings className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setLinksTargetChan(channel);
-                          
-                          let initial: (ChannelLink & { id: string })[] = [];
-                          let parsedLinks: any = channel.links;
-                          if (typeof parsedLinks === 'string') {
-                            try {
-                              parsedLinks = JSON.parse(parsedLinks);
-                            } catch (e) {
-                              parsedLinks = null;
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <div className="relative w-14 h-14 md:w-16 md:h-16 bg-brand-gradient p-[2.5px] rounded-full shadow-md group-hover:scale-105 transition-all duration-300 ease-out cursor-pointer">
+                          <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-muted flex items-center justify-center shrink-0">
+                            {channel.image_url ? (
+                              <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-base md:text-lg font-black text-muted-foreground/60">{channel.name.slice(0, 1).toUpperCase()}</span>
+                            )}
+                          </div>
+                          {/* Cog wheel badge inside image for Action - 오너가 공석일 때만 위임 버튼 노출 */}
+                          {!channel.owner_id && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTargetChan(channel);
+                                setTransferCode(null);
+                                setIsOwnerOpen(true);
+                              }}
+                              className="absolute -bottom-1 -right-1 bg-slate-900 hover:bg-orange-600 text-white p-1 rounded-full border-2 border-white transition-all duration-200 shadow-md cursor-pointer scale-95 group-hover:scale-105 active:scale-90 z-10"
+                              title="권한 관리"
+                            >
+                              <Settings className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="center" className="w-40 rounded-2xl shadow-lg mt-1">
+                        <DropdownMenuLabel className="font-semibold text-xs text-muted-foreground">채널 메뉴</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setLinksTargetChan(channel);
+                            setLinksTeamId(channel.team_id ? String(channel.team_id) : "none");
+                            setLinksImageUrl(channel.image_url || "");
+                            
+                            let initial: (ChannelLink & { id: string })[] = [];
+                            let parsedLinks: any = channel.links;
+                            if (typeof parsedLinks === 'string') {
+                              try {
+                                parsedLinks = JSON.parse(parsedLinks);
+                              } catch (e) {
+                                parsedLinks = null;
+                              }
                             }
-                          }
-                          if (Array.isArray(parsedLinks) && parsedLinks.length > 0) {
-                            initial = parsedLinks.map((l: any) => ({ ...l, id: Math.random().toString() }));
-                          } else if (parsedLinks && typeof parsedLinks === 'object' && Object.keys(parsedLinks).length > 0) {
-                            initial = Object.entries(parsedLinks).map(([k, v]) => ({ id: Math.random().toString(), name: k, url: v as string }));
-                          }
-                          if (initial.length === 0) {
-                            initial = [{ id: Math.random().toString(), name: "", url: "" }];
-                          }
-                          setLinksForm(initial);
-                          setIsLinksOpen(true);
-                        }}
-                        className="absolute -bottom-1 -left-1 bg-slate-900 hover:bg-blue-600 text-white p-1 rounded-full border-2 border-white transition-all duration-200 shadow-md cursor-pointer scale-95 group-hover:scale-105 active:scale-90 z-10"
-                        title="링크 관리"
-                      >
-                        <LinkIcon className="w-3 h-3" />
-                      </button>
-                    </div>
+                            if (Array.isArray(parsedLinks) && parsedLinks.length > 0) {
+                              initial = parsedLinks.map((l: any) => ({ ...l, id: Math.random().toString() }));
+                            } else if (parsedLinks && typeof parsedLinks === 'object' && Object.keys(parsedLinks).length > 0) {
+                              initial = Object.entries(parsedLinks).map(([k, v]) => ({ id: Math.random().toString(), name: k, url: v as string }));
+                            }
+                            if (initial.length === 0) {
+                              initial = [{ id: Math.random().toString(), name: "", url: "" }];
+                            }
+                            setLinksForm(initial);
+                            setIsLinksOpen(true);
+                          }}
+                          className="cursor-pointer font-bold rounded-lg text-sm"
+                        >
+                          채널 정보 수정
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            router.push(`/channels/${channel.id}`);
+                          }}
+                          className="cursor-pointer font-bold rounded-lg text-sm text-blue-600 dark:text-blue-400 focus:text-blue-600"
+                        >
+                          채널 페이지
+                        </DropdownMenuItem>
+                        {!channel.owner_id && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setTargetChan(channel);
+                                setTransferCode(null);
+                                setIsOwnerOpen(true);
+                              }}
+                              className="cursor-pointer font-bold rounded-lg text-sm text-orange-600 dark:text-orange-400 focus:text-orange-600"
+                            >
+                              오너 권한 위임
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
 
                     <div className="flex flex-col items-center gap-0.5 min-w-0 w-full px-0.5">
                       <span className="text-[10px] md:text-xs font-bold text-center truncate w-full leading-tight group-hover:text-foreground transition-colors">{channel.name}</span>
@@ -795,6 +1131,115 @@ export default function CompanyPage() {
               </>
             )}
 
+          </div>
+        </section>
+
+        {/* 🔑 소속 신청 승인 관리 콘솔 */}
+        <section className={`bg-background border border-border rounded-3xl shadow-sm p-6 flex flex-col justify-between transition-all duration-300 ${isPendingCollapsed ? "min-h-0 py-4.5" : "min-h-[200px]"}`}>
+          <div className="flex-1 flex flex-col">
+            <div 
+              onClick={() => setIsPendingCollapsed(!isPendingCollapsed)}
+              className="flex items-center justify-between pb-1 cursor-pointer select-none group"
+            >
+              <h3 className="font-extrabold text-sm md:text-base flex items-center gap-2 text-foreground/90 group-hover:text-orange-600 transition-colors">
+                <UserCircle className="w-4.5 h-4.5 text-muted-foreground group-hover:text-orange-500 transition-colors" /> 소속 가입 신청 대기 목록
+                <Badge className="ml-1 bg-orange-500/10 text-orange-600 hover:bg-orange-500/10 border-none font-extrabold text-xs">
+                  {pendingRequests.length}
+                </Badge>
+              </h3>
+              <div className="p-1 hover:bg-muted/50 rounded-lg transition-colors text-muted-foreground group-hover:text-orange-600 shrink-0">
+                {isPendingCollapsed ? (
+                  <ChevronDown className="w-5 h-5 transition-transform" />
+                ) : (
+                  <ChevronUp className="w-5 h-5 transition-transform" />
+                )}
+              </div>
+            </div>
+
+            {!isPendingCollapsed && (
+              <div className="space-y-4 flex-1 flex flex-col mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                {pendingRequests.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center py-8 select-none border border-dashed border-border/60 rounded-2xl bg-muted/5 gap-2.5">
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center shadow-sm border border-border/30">
+                      <User className="w-5 h-5 text-muted-foreground/40" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-foreground/80">가입 신청 현황이 깨끗합니다!</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">대기 중인 신규 주최자 가입 신청이 없습니다.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 space-y-3 overflow-y-auto max-h-[300px] pr-1.5 no-scrollbar">
+                    {pendingRequests.map((request) => {
+                      const linksCount = request.links ? (Array.isArray(request.links) ? request.links.length : Object.keys(request.links).length) : 0;
+                      return (
+                        <div 
+                          key={request.id} 
+                          className="p-3.5 bg-muted/20 border border-border/50 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all duration-200 hover:bg-muted/30"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Avatar className="w-11 h-11 border border-border shadow-sm rounded-xl shrink-0">
+                              <AvatarImage src={request.image_url || undefined} className="object-cover" />
+                              <AvatarFallback className="rounded-xl bg-orange-100 text-orange-600 font-extrabold text-sm">
+                                {request.name.slice(0, 1).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-sm text-foreground truncate max-w-[150px]">{request.name}</span>
+                                <span className="text-[9px] text-muted-foreground font-semibold">
+                                  {new Date(request.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                <Badge className="text-[9px] font-bold h-4.5 px-1.5 bg-muted border-border/50 text-muted-foreground hover:bg-muted">
+                                  {request.type === "youtuber" ? "유튜버" : request.type === "festival" ? "축제" : "게임"}
+                                </Badge>
+                                {request.is_team && (
+                                  <Badge className="text-[9px] font-bold h-4.5 px-1.5 bg-orange-500/5 border-orange-500/10 text-orange-600 hover:bg-orange-500/5">
+                                    단체 / 팀
+                                  </Badge>
+                                )}
+                                {linksCount > 0 && (
+                                  <Badge variant="outline" className="text-[9px] font-bold h-4.5 px-1.5 text-blue-600 border-blue-500/10 bg-blue-500/5">
+                                    링크 {linksCount}개
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 self-end sm:self-center">
+                            <Button
+                              onClick={() => handleRequestAction(request, "reject")}
+                              disabled={isProcessingRequest !== null}
+                              className="flex-1 sm:flex-initial h-9 px-3 text-xs font-bold rounded-xl border-border bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors"
+                            >
+                              {isProcessingRequest === request.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <span className="flex items-center gap-1"><XCircle className="w-3.5 h-3.5" /> 거절</span>
+                              )}
+                            </Button>
+                            <Button
+                              onClick={() => handleRequestAction(request, "approve")}
+                              disabled={isProcessingRequest !== null}
+                              className="flex-1 sm:flex-initial h-9 px-3.5 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white transition-colors shadow-sm"
+                            >
+                              {isProcessingRequest === request.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> 승인</span>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
@@ -913,7 +1358,7 @@ export default function CompanyPage() {
                   <SelectContent className="rounded-xl">
                     <SelectItem value="youtuber">유튜버 / 버튜버</SelectItem>
                     <SelectItem value="game">게임</SelectItem>
-                    <SelectItem value="festival">축제 / 동인 행사</SelectItem>
+                    <SelectItem value="festival">축제</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1060,72 +1505,173 @@ export default function CompanyPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 3. Link Management Modal */}
+      {/* 3. Redesigned Channel Info Edit Modal (Agency-managed) */}
       <Dialog open={isLinksOpen} onOpenChange={setIsLinksOpen}>
-        <DialogContent className="sm:max-w-[460px] rounded-3xl shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl md:text-2xl font-extrabold flex items-center gap-2">
-              <LinkIcon className="w-5 h-5 text-blue-600" /> 링크 관리
-            </DialogTitle>
+        <DialogContent className="sm:max-w-[540px] rounded-3xl shadow-2xl p-6 bg-background border border-border">
+          {/* Accessibility Header */}
+          <DialogHeader className="sr-only">
+            <DialogTitle>채널 정보 수정</DialogTitle>
             <DialogDescription>
-              {linksTargetChan?.name} 채널의 SNS 링크를 관리합니다.
+              소속 채널의 정보를 수정합니다.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {linksForm.map((link, index) => (
-              <div key={link.id} className="flex items-start gap-2 animate-in fade-in duration-200">
-                <div className="flex-1 flex flex-col sm:flex-row gap-2">
-                  <Input
-                    placeholder="링크 이름 (예: 유튜브)"
-                    value={link.name}
-                    onChange={(e) => {
-                      const newForm = [...linksForm];
-                      newForm[index].name = e.target.value;
-                      setLinksForm(newForm);
-                    }}
-                    className="h-10 rounded-xl sm:flex-[1]"
-                  />
-                  <Input
-                    placeholder="https://"
-                    value={link.url}
-                    onChange={(e) => {
-                      const newForm = [...linksForm];
-                      newForm[index].url = e.target.value;
-                      setLinksForm(newForm);
-                    }}
-                    className="h-10 rounded-xl sm:flex-[2]"
-                  />
+
+          {/* Top Channel Identity Section */}
+          <div className="flex items-center gap-4 pb-4 border-b border-border/50">
+            <Avatar className="h-16 w-16 border border-slate-200 dark:border-slate-800 bg-background shadow-sm shrink-0">
+              <AvatarImage src={linksImageUrl || undefined} className="object-cover" />
+              <AvatarFallback className="text-xl font-bold bg-muted-foreground/10 text-muted-foreground flex items-center justify-center">
+                {linksTargetChan?.name.slice(0, 1).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h4 className="text-xl font-black text-foreground">{linksTargetChan?.name}</h4>
+              <p className="text-sm text-muted-foreground font-semibold">
+                {linksTargetChan?.type === "youtuber" ? "유튜버 채널" : linksTargetChan?.type === "festival" ? "행사 채널" : "게임 채널"}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-5 pt-3">
+            {/* 1. Profile Image Change */}
+            <div className="space-y-1.5">
+              <Label className="text-xs md:text-sm font-bold text-foreground">프로필 이미지 변경</Label>
+              <div className="flex items-center gap-3">
+                <Input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleLinkImageUpload} 
+                  disabled={isUploadingLinkImg} 
+                  className="max-w-xs h-10 border-neutral-300 dark:border-neutral-700 rounded-xl cursor-pointer bg-background" 
+                />
+                {isUploadingLinkImg && <Loader2 className="w-4 h-4 animate-spin text-orange-500" />}
+              </div>
+            </div>
+
+            {/* 2. Agency & Team Affiliation */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Agency (Read-only) */}
+              <div className="space-y-1.5">
+                <Label className="text-xs md:text-sm font-bold text-foreground flex items-center gap-1">
+                  <Building2 className="w-4 h-4 text-muted-foreground" /> 소속사
+                </Label>
+                <div className="flex items-center gap-2 bg-muted/20 px-3 py-1.5 rounded-xl border border-neutral-300 dark:border-neutral-800 h-10 select-none w-fit max-w-full">
+                  <Avatar className="h-6 w-6 border shadow-sm bg-background shrink-0">
+                    <AvatarImage src={company.profile_image_url || undefined} className="object-cover" />
+                    <AvatarFallback className="text-[10px] font-bold bg-muted-foreground/10 flex items-center justify-center">
+                      {company.name.slice(0, 1)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs md:text-sm font-bold text-foreground truncate">{company.name}</span>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setLinksForm(linksForm.filter(l => l.id !== link.id))}
-                  className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10"
+              </div>
+
+              {/* Team Selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs md:text-sm font-bold text-foreground flex items-center gap-1">
+                  <Users className="w-4 h-4 text-muted-foreground" /> 소속 팀
+                </Label>
+                <Select value={linksTeamId} onValueChange={setLinksTeamId}>
+                  <SelectTrigger className="h-10 border-neutral-300 dark:border-neutral-700 rounded-xl bg-background text-xs md:text-sm font-medium">
+                    <SelectValue placeholder="소속 팀 선택" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="none" className="text-xs md:text-sm font-medium">소속 없음</SelectItem>
+                    {allTeams.map(team => (
+                      <SelectItem key={team.id} value={String(team.id)} className="text-xs md:text-sm font-medium">
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* 3. SNS Links Management */}
+            <div className="space-y-2">
+              <Label className="text-xs md:text-sm font-bold text-foreground flex items-center gap-1">
+                <LinkIcon className="w-4 h-4 text-muted-foreground" /> SNS 링크
+              </Label>
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 no-scrollbar">
+                {linksForm.map((link, index) => (
+                  <div key={link.id} className="flex items-center gap-2 animate-in fade-in duration-200">
+                    <Input
+                      placeholder="링크 이름 (예: 유튜브)"
+                      value={link.name}
+                      onChange={(e) => {
+                        const newForm = [...linksForm];
+                        newForm[index].name = e.target.value;
+                        setLinksForm(newForm);
+                      }}
+                      className="h-10 sm:flex-[1] border-neutral-300 dark:border-neutral-700 rounded-xl bg-background text-xs md:text-sm"
+                    />
+                    <Input
+                      placeholder="https://"
+                      value={link.url}
+                      onChange={(e) => {
+                        const newForm = [...linksForm];
+                        newForm[index].url = e.target.value;
+                        setLinksForm(newForm);
+                      }}
+                      className="h-10 sm:flex-[2] border-neutral-300 dark:border-neutral-700 rounded-xl bg-background text-xs md:text-sm"
+                    />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setLinksForm(linksForm.filter(l => l.id !== link.id))}
+                      className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive rounded-xl"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLinksForm([...linksForm, { id: Math.random().toString(), name: "", url: "" }])}
+                  className="border-dashed border-neutral-300 dark:border-neutral-700 rounded-xl w-full h-10 flex items-center justify-center text-xs md:text-sm font-bold bg-background hover:bg-muted/30"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Plus className="h-4 w-4 mr-1" /> 링크 추가
                 </Button>
               </div>
-            ))}
-            
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setLinksForm([...linksForm, { id: Math.random().toString(), name: "", url: "" }])}
-              className="w-full h-10 border-dashed rounded-xl"
-            >
-              <Plus className="h-4 w-4 mr-2" /> 링크 추가
-            </Button>
+            </div>
           </div>
-          <DialogFooter className="mt-6 border-t border-border/50 pt-4">
+
+          {/* 4. Action Footer */}
+          <div className="flex justify-between items-center pt-4 mt-4 border-t border-border/50">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                if (window.confirm("정말로 이 채널과 관련된 모든 행사를 완전히 삭제하시겠습니까? 이 작업은 복구할 수 없습니다.")) {
+                  handleDeleteChannel();
+                }
+              }}
+              disabled={isDeletingChan}
+              className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-bold px-3 h-10 rounded-xl flex items-center gap-1.5"
+            >
+              {isDeletingChan ? (
+                <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+              채널 삭제
+            </Button>
+
             <Button
               onClick={handleSaveLinks}
-              disabled={isSavingLinks}
-              className="w-full h-12 rounded-xl text-base font-bold bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSavingLinks || isUploadingLinkImg}
+              className="h-10 rounded-xl text-xs md:text-sm font-bold bg-[#4F46E5] hover:bg-[#4338CA] text-white flex items-center gap-1.5 px-4 shadow-sm"
             >
-              {isSavingLinks ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-              저장하기
+              {isSavingLinks ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              저장
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

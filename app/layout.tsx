@@ -39,6 +39,18 @@ export default function RootLayout({
   return (
     <html lang="ko" className="bg-background">
       <body className="font-sans antialiased">
+        <style dangerouslySetInnerHTML={{ __html: `
+          html, body, [data-scroll-locked] {
+            padding-right: 0px !important;
+            margin-right: 0px !important;
+          }
+          [style*="padding-right"] {
+            padding-right: 0px !important;
+          }
+          [style*="margin-right"] {
+            margin-right: 0px !important;
+          }
+        `}} />
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
         <Toaster />

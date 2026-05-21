@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 const categoryLabelMap: Record<string, string> = {
   game: "게임",
   youtuber: "유튜버",
-  festival: "동인 행사",
+  festival: "축제",
 };
 
 const imageColors = [
@@ -182,7 +182,7 @@ function CalendarContent() {
           const t = type.trim().toLowerCase();
           if (t === "game") return "게임";
           if (t === "youtuber") return "유튜버";
-          if (t === "festival") return "동인 행사";
+          if (t === "festival") return "축제";
           return "기타";
         };
 
@@ -408,7 +408,7 @@ function CalendarContent() {
                 {[
                   { id: "game", label: "게임", activeClass: "bg-blue-100 text-blue-800 border-blue-500 shadow-sm" },
                   { id: "youtuber", label: "유튜버", activeClass: "bg-red-100 text-red-800 border-red-500 shadow-sm" },
-                  { id: "festival", label: "동인 행사", activeClass: "bg-amber-100 text-amber-800 border-amber-500 shadow-sm" },
+                  { id: "festival", label: "축제", activeClass: "bg-amber-100 text-amber-800 border-amber-500 shadow-sm" },
                 ].map((cat) => (
                   <button
                     key={cat.id}
@@ -509,9 +509,16 @@ function CalendarContent() {
                       return calDate >= start && calDate <= end;
                     });
 
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const tileDate = new Date(date);
+                    tileDate.setHours(0, 0, 0, 0);
+                    const isPast = tileDate < today;
+
                     const classes = [];
                     if (hasEvents) classes.push("react-calendar__tile--hasEvent");
                     if (isHighlightDate) classes.push("react-calendar__tile--highlightEvent");
+                    if (isPast) classes.push("react-calendar__tile--past");
                     return classes.join(" ");
                   }
                 }}
@@ -544,6 +551,12 @@ function CalendarContent() {
                       });
                     });
 
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const tileDate = new Date(date);
+                    tileDate.setHours(0, 0, 0, 0);
+                    const isPast = tileDate < today;
+
                     if (channelsWithProfile.length > 0) {
                       const maxVisible = 9;
                       const hasMore = channelsWithProfile.length > maxVisible;
@@ -551,7 +564,7 @@ function CalendarContent() {
                       const extraCount = channelsWithProfile.length - 8;
 
                       return (
-                        <div className="grid grid-cols-3 gap-0.5 mt-1 justify-items-center items-center w-full px-1">
+                        <div className={cn("grid grid-cols-3 gap-0.5 mt-1 justify-items-center items-center w-full px-1 transition-opacity duration-200", isPast && "opacity-40")}>
                           {displayList.map((ch, idx) => (
                             <div key={idx} className="w-7 h-7 rounded-full border border-background shadow-sm overflow-hidden flex-shrink-0 bg-muted">
                               {ch.image_url ? (
@@ -802,6 +815,9 @@ function CalendarContent() {
           background: var(--muted) !important;
           font-weight: 700;
           box-shadow: inset 0 0 0 2.5px var(--foreground) !important;
+        }
+        .react-calendar__tile--past:not(.react-calendar__tile--active):not(.react-calendar__tile--now) abbr {
+          opacity: 0.3;
         }
         .react-calendar [class*="neighboringMonth"],
         .react-calendar [class*="neighboringMonth"] * {

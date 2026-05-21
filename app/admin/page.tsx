@@ -93,6 +93,7 @@ export default function AdminPage() {
       const { data: reqData, error } = await supabase
         .from("channel_requests")
         .select("*")
+        .is("company_id", null)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -259,7 +260,7 @@ export default function AdminPage() {
                       {req.request_type === "company" ? (
                         <div className="flex items-center font-bold text-orange-500"><Building2 className="w-3 h-3 mr-1" /> 관리자(회사)</div>
                       ) : (
-                        <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "동인 행사" : "게임"}</div>
+                        <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "축제" : "게임"}</div>
                       )}
                       <div className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> {new Date(req.created_at).toLocaleDateString()}</div>
                     </div>

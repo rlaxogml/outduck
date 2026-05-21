@@ -36,6 +36,14 @@ interface Team {
   image_url: string | null;
 }
 
+interface Company {
+  id: number;
+  name: string;
+  profile_image_url: string | null;
+  invite_code: string | null;
+  is_auto_approved: boolean | null;
+}
+
 interface ChannelLink {
   id: string;
   name: string;
@@ -53,7 +61,14 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
   const [type, setType] = useState<string>("");
   const [teamId, setTeamId] = useState<string>("none");
   const [linksForm, setLinksForm] = useState<ChannelLink[]>([{ id: "default", name: "", url: "" }]);
-  const [company, setCompany] = useState("");
+  
+  // Company & Invite Code States
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [companySearch, setCompanySearch] = useState("");
+  const [openCompanyPopover, setOpenCompanyPopover] = useState(false);
+  const [inviteCodeInput, setInviteCodeInput] = useState("");
+
   const [openTeamPopover, setOpenTeamPopover] = useState(false);
   const [teamSearch, setTeamSearch] = useState("");
   
@@ -72,7 +87,7 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
     successMessage: "프로필 이미지가 업로드되었습니다.",
   });
 
-  // Fetch teams for auto-complete on mount
+  // Fetch teams & companies for auto-complete on mount
   useEffect(() => {
     const fetchTeams = async () => {
       const { data, error } = await supabase
@@ -88,7 +103,21 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
       }
     };
 
+    const fetchCompanies = async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id, name, profile_image_url, invite_code, is_auto_approved")
+        .order("name");
+      
+      if (error) {
+        console.error("Error fetching companies:", error);
+      } else if (data) {
+        setCompanies(data);
+      }
+    };
+
     fetchTeams();
+    fetchCompanies();
   }, []);
 
 
@@ -104,31 +133,53 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
       return;
     }
 
+    // Invite Code validation if company is selected
+    if (selectedCompany) {
+      if (!selectedCompany.invite_code) {
+        toast.error("선택한 소속사의 초대 코드가 설정되지 않았습니다. 관리자에게 문의하세요.");
+        return;
+      }
+      if (inviteCodeInput.trim().toUpperCase() !== selectedCompany.invite_code.toUpperCase()) {
+        toast.error("입력하신 소속 코드가 일치하지 않습니다. 다시 확인해주세요.");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const isYoutuberType = type === "youtuber" || type === "youtuber_team";
+      // Auto-approved only if company exists and has is_auto_approved turned on
+      const isAutoApproved = !!selectedCompany && selectedCompany.is_auto_approved === true;
+      const finalStatus = isAutoApproved ? "approved" : "pending";
+
       const insertData = {
         user_id: user.id,
         name: name.trim(),
         type: isYoutuberType ? "youtuber" : type,
         is_team: type === "youtuber_team",
         team_id: type === "youtuber" && teamId !== "none" ? parseInt(teamId) : null,
-        company: isYoutuberType ? company.trim() || null : null,
+        company: selectedCompany ? selectedCompany.name : null,
+        company_id: selectedCompany ? selectedCompany.id : null,
         links: linksForm.filter(l => l.name.trim() || l.url.trim()).length > 0 
           ? linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url })) 
           : null,
         image_url: imageUrl,
         request_type: "organizer",
-        status: "pending",
+        status: finalStatus,
       };
 
-      const { error } = await supabase
+      const { error: requestError } = await supabase
         .from("channel_requests")
         .insert([insertData]);
 
-      if (error) throw error;
+      if (requestError) throw requestError;
 
-      toast.success("신청이 성공적으로 접수되었습니다.");
+      if (isAutoApproved && selectedCompany) {
+        toast.success("소속 코드가 인증되어 주최자 권한이 즉시 부여되었습니다!");
+      } else {
+        toast.success("신청이 성공적으로 접수되었습니다. 관리자 승인 후 완료됩니다.");
+      }
+
       onSuccess();
     } catch (error: any) {
       console.error("Submission error:", error);
@@ -218,7 +269,7 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
                     <SelectItem value="game">게임</SelectItem>
                     <SelectItem value="youtuber">유튜버</SelectItem>
                     <SelectItem value="youtuber_team">유튜버 단체 팀</SelectItem>
-                    <SelectItem value="festival">동인 행사</SelectItem>
+                    <SelectItem value="festival">축제</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -296,15 +347,99 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
                   )}
 
                   <div className="space-y-2 animate-in fade-in duration-300">
-                    <Label htmlFor="company" className="text-base font-semibold">소속사</Label>
-                    <Input
-                      id="company"
-                      placeholder="소속 없음"
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                      className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20"
-                    />
+                    <Label className="text-base font-semibold">소속사</Label>
+                    <Popover open={openCompanyPopover} onOpenChange={setOpenCompanyPopover}>
+                      <PopoverTrigger asChild>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 shrink-0 opacity-50 pointer-events-none" />
+                          <Input
+                            placeholder="소속 없음"
+                            value={companySearch || (selectedCompany ? selectedCompany.name : "")}
+                            onFocus={() => {
+                              setOpenCompanyPopover(true);
+                              setCompanySearch("");
+                            }}
+                            onChange={(e) => {
+                              setCompanySearch(e.target.value);
+                              if (!openCompanyPopover) setOpenCompanyPopover(true);
+                            }}
+                            className="w-full h-12 text-base rounded-xl bg-muted/30 border-border/50 pl-10 pr-10 font-medium focus:ring-primary/20 transition-all animate-in fade-in"
+                          />
+                          <ChevronDown className={cn("absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 shrink-0 opacity-50 pointer-events-none transition-transform duration-200", openCompanyPopover && "rotate-180")} />
+                        </div>
+                      </PopoverTrigger>
+                      <PopoverContent 
+                        className="w-[--radix-popover-trigger-width] p-1 rounded-2xl shadow-2xl border-border/50 overflow-hidden" 
+                        align="start"
+                        onOpenAutoFocus={(e) => e.preventDefault()}
+                      >
+                        <div className="flex flex-col max-h-[280px] overflow-y-auto custom-scrollbar bg-card">
+                          {!companySearch.trim() && (
+                            <div className="py-8 flex flex-col items-center justify-center gap-2 text-muted-foreground/60 animate-in fade-in duration-200">
+                              <Search className="w-8 h-8 opacity-30" />
+                              <span className="text-sm font-medium">소속사 이름을 입력하여 검색하세요</span>
+                            </div>
+                          )}
+                          
+                          {selectedCompany && !companySearch.trim() && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCompany(null);
+                                setInviteCodeInput("");
+                                setOpenCompanyPopover(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-xl my-0.5 font-bold transition-colors"
+                            >
+                              선택 취소 (소속 없음으로 변경)
+                            </button>
+                          )}
+                          
+                          {companySearch.trim() !== "" && companies
+                            .filter(c => c.name.toLowerCase().includes(companySearch.toLowerCase()))
+                            .map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCompany(c);
+                                  setCompanySearch(c.name);
+                                  setOpenCompanyPopover(false);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted/60 active:bg-muted/80 rounded-xl my-0.5 text-left text-base font-medium transition-colors"
+                              >
+                                <Avatar className="w-6 h-6 flex-shrink-0">
+                                  <AvatarImage src={c.profile_image_url || undefined} />
+                                  <AvatarFallback className="text-[10px] bg-primary/10 text-primary font-bold">{c.name.slice(0,1)}</AvatarFallback>
+                                </Avatar>
+                                <span className="truncate text-foreground flex-1">{c.name}</span>
+                                {selectedCompany?.id === c.id && <Check className="ml-auto h-4 w-4 shrink-0 text-primary" />}
+                              </button>
+                            ))
+                          }
+                          {companySearch.trim() !== "" && companies.filter(c => c.name.toLowerCase().includes(companySearch.toLowerCase())).length === 0 && (
+                            <div className="py-6 text-center text-sm text-muted-foreground font-medium">검색 결과가 없습니다.</div>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
+
+                  {selectedCompany && (
+                    <div className="space-y-2 animate-in slide-in-from-top-2 fade-in duration-300">
+                      <Label htmlFor="inviteCode" className="text-base font-semibold">
+                        소속 코드 입력 <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="inviteCode"
+                        placeholder="소속사 관리자에게 받은 8자리 코드를 입력하세요"
+                        value={inviteCodeInput}
+                        onChange={(e) => setInviteCodeInput(e.target.value)}
+                        className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20 uppercase font-mono tracking-widest placeholder:normal-case placeholder:font-sans placeholder:tracking-normal"
+                        required
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </div>
