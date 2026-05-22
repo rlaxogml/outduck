@@ -13,7 +13,7 @@ export function useEventImageUpload({
 }: UseEventImageUploadParams = {}) {
   return useImageUpload({
     bucket: "event_images",
-    folderPath: "event-covers",
+    folderPath: "event-main-image",
     initialUrl,
     initialPath,
     successMessage: "이미지가 업로드되었습니다.",

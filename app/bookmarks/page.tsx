@@ -16,7 +16,7 @@ export default function BookmarksPage() {
   const [loading, setLoading] = useState(true);
   const [offlineEvents, setOfflineEvents] = useState<any[]>([]);
   const [onlineEvents, setOnlineEvents] = useState<any[]>([]);
-  const [showPastEvents, setShowPastEvents] = useState(false);
+  const [showPastEvents, setShowPastEvents] = useState(true);
 
   const isPastEvent = (endDateStr: string | null, startDateStr: string | null) => {
     if (!endDateStr && !startDateStr) return false;

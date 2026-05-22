@@ -697,6 +697,19 @@ export default function OnlineEventDetailPage() {
     try {
       if (!event?.event_id) throw new Error("이벤트 정보를 찾을 수 없습니다.");
 
+      // Delete main image from storage if it is a storage URL
+      if (event.image_url && event.image_url.includes("/storage/v1/object/public/event_images/event-main-image/")) {
+        const parts = event.image_url.split("event-main-image/");
+        const fileName = parts[parts.length - 1];
+        if (fileName) {
+          try {
+            await supabase.storage.from("event_images").remove([`event-main-image/${fileName}`]);
+          } catch (storageErr) {
+            console.error("Failed to delete event main image from storage:", storageErr);
+          }
+        }
+      }
+
       // 1. Manually delete specific child records
       await supabase.from("event_channels").delete().eq("event_id", event.event_id);
       await supabase.from("event_bookmarks").delete().eq("event_id", event.event_id);

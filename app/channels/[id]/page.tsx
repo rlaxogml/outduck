@@ -122,6 +122,19 @@ export default function ChannelProfilePage() {
   const pastOnlineEvents = onlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue));
 
   useEffect(() => {
+    if (isLoading) return;
+    
+    const activeOfflineCount = offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)).length;
+    const activeOnlineCount = onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)).length;
+
+    if (activeTab === "events") {
+      setShowPastEvents(activeOfflineCount === 0);
+    } else {
+      setShowPastEvents(activeOnlineCount === 0);
+    }
+  }, [activeTab, offlineEvents, onlineEvents, isLoading]);
+
+  useEffect(() => {
     const loadChannel = async () => {
       if (!Number.isFinite(channelId)) {
         setErrorText("유효하지 않은 채널 ID입니다.");
@@ -425,7 +438,7 @@ export default function ChannelProfilePage() {
                 <Star className={`h-5 w-5 transition-all duration-300 ${isSubscribed ? "fill-white text-white" : "text-muted-foreground"}`} />
                 <span className={`transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap ${isSubscribed ? "max-w-0 opacity-0 ml-0" : "max-w-[100px] opacity-100 ml-2"
                   }`}>
-                  찜하기
+                  팔로우
                 </span>
               </button>
             )}

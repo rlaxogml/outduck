@@ -101,59 +101,6 @@ const imageColors = [
   "bg-gradient-to-br from-red-400 to-red-600",
 ];
 
-const moveStorageImage = async (imageUrl: string): Promise<string> => {
-  try {
-    const bucketName = "channel-images";
-    const oldFolder = "channel-requests";
-    const newFolder = "channel-profile";
-    
-    if (!imageUrl || !imageUrl.includes(`/storage/v1/object/public/${bucketName}/${oldFolder}/`)) {
-      return imageUrl;
-    }
-    
-    const parts = imageUrl.split(`${oldFolder}/`);
-    const fileName = parts[parts.length - 1];
-    if (!fileName) return imageUrl;
-    
-    const oldPath = `${oldFolder}/${fileName}`;
-    const newPath = `${newFolder}/${fileName}`;
-    
-    // Copy the file
-    const { error: copyError } = await supabase.storage
-      .from(bucketName)
-      .copy(oldPath, newPath);
-      
-    if (copyError) {
-      console.error("Storage copy error, trying move fallback:", copyError);
-      const { error: moveError } = await supabase.storage
-        .from(bucketName)
-        .move(oldPath, newPath);
-        
-      if (moveError) {
-        throw new Error(`Failed to copy or move image: ${moveError.message}`);
-      }
-    } else {
-      // Delete old file
-      const { error: removeError } = await supabase.storage
-        .from(bucketName)
-        .remove([oldPath]);
-        
-      if (removeError) {
-        console.warn("Failed to remove old request image:", removeError);
-      }
-    }
-    
-    const { data: { publicUrl } } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(newPath);
-      
-    return publicUrl;
-  } catch (err) {
-    console.error("Error moving image in storage:", err);
-    return imageUrl;
-  }
-};
-
 export default function CompanyPage() {
   const router = useRouter();
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -170,8 +117,6 @@ export default function CompanyPage() {
 
   // Create Channel Form States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isChannelsExpanded, setIsChannelsExpanded] = useState(false);
-
   const [newChanName, setNewChanName] = useState("");
   const [newChanType, setNewChanType] = useState("youtuber");
   const [newChanIsTeam, setNewChanIsTeam] = useState(false);
@@ -207,110 +152,6 @@ export default function CompanyPage() {
   const [isProcessingRequest, setIsProcessingRequest] = useState<number | null>(null);
   const [isPendingCollapsed, setIsPendingCollapsed] = useState(true);
   const [hasInitializedPendingState, setHasInitializedPendingState] = useState(false);
-
-  const renderChannelItem = (channel: Channel) => {
-    return (
-      <div key={channel.id} className="flex flex-col items-center gap-2.5 min-w-[64px] md:min-w-[84px] group relative shrink-0 select-none">
-        
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <div className="relative w-14 h-14 md:w-16 md:h-16 bg-brand-gradient p-[2.5px] rounded-full shadow-md group-hover:scale-105 transition-all duration-300 ease-out cursor-pointer">
-              <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-muted flex items-center justify-center shrink-0">
-                {channel.image_url ? (
-                  <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover animate-in fade-in" />
-                ) : (
-                  <span className="text-base md:text-lg font-black text-muted-foreground/60">{channel.name.slice(0, 1).toUpperCase()}</span>
-                )}
-              </div>
-              {/* Cog wheel badge inside image for Action - 오너가 공석일 때만 위임 버튼 노출 */}
-              {!channel.owner_id && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTargetChan(channel);
-                    setTransferCode(null);
-                    setIsOwnerOpen(true);
-                  }}
-                  className="absolute -bottom-1 -right-1 bg-slate-900 hover:bg-orange-600 text-white p-1 rounded-full border-2 border-white transition-all duration-200 shadow-md cursor-pointer scale-95 group-hover:scale-105 active:scale-90 z-10"
-                  title="권한 관리"
-                >
-                  <Settings className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="center" className="w-40 rounded-2xl shadow-lg mt-1">
-            <DropdownMenuLabel className="font-semibold text-xs text-muted-foreground">채널 메뉴</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                setLinksTargetChan(channel);
-                setLinksTeamId(channel.team_id ? String(channel.team_id) : "none");
-                setLinksImageUrl(channel.image_url || "");
-                
-                let initial: (ChannelLink & { id: string })[] = [];
-                let parsedLinks: any = channel.links;
-                if (typeof parsedLinks === 'string') {
-                  try {
-                    parsedLinks = JSON.parse(parsedLinks);
-                  } catch (e) {
-                    parsedLinks = null;
-                  }
-                }
-                if (Array.isArray(parsedLinks) && parsedLinks.length > 0) {
-                  initial = parsedLinks.map((l: any) => ({ ...l, id: Math.random().toString() }));
-                } else if (parsedLinks && typeof parsedLinks === 'object' && Object.keys(parsedLinks).length > 0) {
-                  initial = Object.entries(parsedLinks).map(([k, v]) => ({ id: Math.random().toString(), name: k, url: v as string }));
-                }
-                if (initial.length === 0) {
-                  initial = [{ id: Math.random().toString(), name: "", url: "" }];
-                }
-                setLinksForm(initial);
-                setIsLinksOpen(true);
-              }}
-              className="cursor-pointer font-bold rounded-lg text-sm"
-            >
-              채널 정보 수정
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                router.push(`/channels/${channel.id}`);
-              }}
-              className="cursor-pointer font-bold rounded-lg text-sm text-blue-600 dark:text-blue-400 focus:text-blue-600"
-            >
-              채널 페이지
-            </DropdownMenuItem>
-            {!channel.owner_id && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    setTargetChan(channel);
-                    setTransferCode(null);
-                    setIsOwnerOpen(true);
-                  }}
-                  className="cursor-pointer font-bold rounded-lg text-sm text-orange-600 dark:text-orange-400 focus:text-orange-600"
-                >
-                  오너 권한 위임
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <div className="flex flex-col items-center gap-0.5 min-w-0 w-full px-0.5">
-          <span className="text-[10px] md:text-xs font-bold text-center truncate w-full leading-tight group-hover:text-foreground transition-colors">{channel.name}</span>
-          <span className="text-[8px] md:text-[9px] text-muted-foreground text-center truncate w-full font-medium leading-tight">
-            {channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "행사" : "게임"}
-          </span>
-          {/* Tiny Ownership status tag */}
-          <div className={`text-[7px] md:text-[8px] font-mono font-bold mt-0.5 px-1 py-0.5 rounded-full border ${channel.owner_id ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/50" : "text-rose-500 bg-rose-50 dark:bg-rose-950/20 border-rose-200/50"}`}>
-            {channel.owner_id ? "위임 완료" : "오너 공석"}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   useEffect(() => {
     if (!transferCode || !codeExpiresAt) {
@@ -677,48 +518,16 @@ export default function CompanyPage() {
 
     try {
       const newStatus = action === "approve" ? "approved" : "rejected";
-      let finalImageUrl = request.image_url;
-
-      if (action === "approve" && request.image_url) {
-        finalImageUrl = await moveStorageImage(request.image_url);
-      }
 
       const { error: updateError } = await supabase
         .from("channel_requests")
-        .update({ 
-          status: newStatus,
-          image_url: finalImageUrl
-        })
+        .update({ status: newStatus })
         .eq("id", request.id);
 
       if (updateError) throw updateError;
 
       if (action === "approve") {
-        const { error: insertError } = await supabase
-          .from("channels")
-          .insert([{
-            name: request.name,
-            type: request.type,
-            image_url: finalImageUrl,
-            is_team: request.is_team,
-            team_id: request.team_id,
-            owner_id: request.user_id,
-            links: request.links,
-            company: request.company
-          }]);
-
-        if (insertError) {
-          console.error("Channel insert error:", insertError);
-          toast.warning("상태는 변경되었으나 채널 생성 실패: " + insertError.message);
-        } else {
-          toast.success("채널이 승인되어 시스템에 즉시 등록되었습니다!");
-        }
-
-        // Force update the channel image_url in channels table in case it was auto-created or needs syncing
-        await supabase
-          .from("channels")
-          .update({ image_url: finalImageUrl })
-          .eq("name", request.name);
+        toast.success("채널 승인 및 등록이 완료되었습니다!");
       } else {
         toast.success("신청을 거절 처리했습니다.");
       }
@@ -741,16 +550,16 @@ export default function CompanyPage() {
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `chan-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-      const filePath = `channel-profile/${fileName}`;
+      const filePath = `channel-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("channel-images")
+        .from("event_images")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from("channel-images")
+        .from("event_images")
         .getPublicUrl(filePath);
 
       setNewChanImageUrl(publicUrl);
@@ -786,7 +595,7 @@ export default function CompanyPage() {
           team_id: finalTeamId,
           image_url: newChanImageUrl,
           company: company.name,
-          owner_id: null
+          owner_id: user?.id || null
         }]);
 
       if (error) throw error;
@@ -864,16 +673,16 @@ export default function CompanyPage() {
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `chan-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-      const filePath = `channel-profile/${fileName}`;
+      const filePath = `channel-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("channel-images")
+        .from("event_images")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from("channel-images")
+        .from("event_images")
         .getPublicUrl(filePath);
 
       setLinksImageUrl(publicUrl);
@@ -953,26 +762,6 @@ export default function CompanyPage() {
     if (!linksTargetChan) return;
     setIsSavingLinks(true);
     try {
-      // Delete old channel image from storage if the image is being replaced
-      if (linksTargetChan.image_url && linksImageUrl !== linksTargetChan.image_url) {
-        const bucketName = "channel-images";
-        const folder = "channel-profile";
-        if (linksTargetChan.image_url.includes(`/storage/v1/object/public/${bucketName}/${folder}/`)) {
-          const parts = linksTargetChan.image_url.split(`${folder}/`);
-          const fileName = parts[parts.length - 1];
-          if (fileName) {
-            const { error: removeError } = await supabase.storage
-              .from(bucketName)
-              .remove([`${folder}/${fileName}`]);
-            if (removeError) {
-              console.warn("Failed to delete old channel image from storage:", removeError);
-            } else {
-              console.log("Successfully deleted old channel image:", fileName);
-            }
-          }
-        }
-      }
-
       const finalLinks = linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url }));
       const { error } = await supabase
         .from("channels")
@@ -1203,87 +992,146 @@ export default function CompanyPage() {
             </h2>
           </div>
 
-          {!isChannelsExpanded ? (
-            /* COLLAPSED VIEW: Horizontal scroll list with absolute positioned '더보기' button */
-            <div className="relative w-full overflow-hidden">
-              <div className="p-4 md:p-6 flex gap-x-4 md:gap-x-6 items-start overflow-x-auto no-scrollbar pr-20 md:pr-24 w-full">
-                {/* Add New Channel Circle Action */}
-                <div 
-                  onClick={() => setIsCreateOpen(true)}
-                  className="flex flex-col items-center gap-2.5 min-w-[64px] md:min-w-[84px] cursor-pointer group shrink-0"
-                >
-                  <div className="relative w-14 h-14 md:w-16 md:h-16 border-2 border-dashed border-muted-foreground/30 hover:border-orange-500 hover:bg-orange-500/5 rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-105 active:scale-95 shadow-sm">
-                    <Plus className="w-6 h-6 text-muted-foreground group-hover:text-orange-600 transition-colors" />
+          <div className="p-4 md:p-6 flex gap-x-4 md:gap-x-6 items-start overflow-x-auto no-scrollbar relative">
+            
+            {/* Add New Channel Circle Action */}
+            <div 
+              onClick={() => setIsCreateOpen(true)}
+              className="flex flex-col items-center gap-2.5 min-w-[64px] md:min-w-[84px] cursor-pointer group shrink-0"
+            >
+              <div className="relative w-14 h-14 md:w-16 md:h-16 border-2 border-dashed border-muted-foreground/30 hover:border-orange-500 hover:bg-orange-500/5 rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-105 active:scale-95 shadow-sm">
+                <Plus className="w-6 h-6 text-muted-foreground group-hover:text-orange-600 transition-colors" />
+              </div>
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-[10px] md:text-xs font-bold text-muted-foreground group-hover:text-orange-600 leading-tight transition-colors">채널 생성</span>
+                <span className="text-[8px] opacity-0 md:text-[9px] md:opacity-60 text-muted-foreground italic leading-tight">New</span>
+              </div>
+            </div>
+
+            {/* Separator vertical line */}
+            <div className="w-px h-14 md:h-16 bg-border shrink-0 opacity-70 self-center" />
+
+            {channels.length === 0 ? (
+              <>
+                <div className="flex-1 flex flex-col items-center justify-center py-1.5 select-none animate-in fade-in duration-200 gap-2">
+                  <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-muted flex items-center justify-center border border-border/50 shadow-sm">
+                    <Plus className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground/50" />
                   </div>
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="text-[10px] md:text-xs font-bold text-muted-foreground group-hover:text-orange-600 leading-tight transition-colors">채널 생성</span>
-                    <span className="text-[8px] opacity-0 md:text-[9px] md:opacity-60 text-muted-foreground italic leading-tight">New</span>
-                  </div>
+                  <span className="text-xs md:text-sm font-medium text-muted-foreground">등록된 소속 채널이 없습니다.</span>
                 </div>
+                {/* RIGHT: Invisible offset spacer to achieve mathematically absolute center layout */}
+                <div className="invisible pointer-events-none select-none shrink-0 flex gap-x-4 md:gap-x-6 items-start">
+                  <div className="w-px h-14 md:h-16 bg-border opacity-0 self-center" />
+                  <div className="min-w-[64px] md:min-w-[84px]" />
+                </div>
+              </>
+            ) : (
+              <>
+                {channels.map((channel) => (
+                  <div key={channel.id} className="flex flex-col items-center gap-2.5 min-w-[64px] md:min-w-[84px] group relative shrink-0 select-none">
+                    
+                    <DropdownMenu modal={false}>
+                      <DropdownMenuTrigger asChild>
+                        <div className="relative w-14 h-14 md:w-16 md:h-16 bg-brand-gradient p-[2.5px] rounded-full shadow-md group-hover:scale-105 transition-all duration-300 ease-out cursor-pointer">
+                          <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-muted flex items-center justify-center shrink-0">
+                            {channel.image_url ? (
+                              <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-base md:text-lg font-black text-muted-foreground/60">{channel.name.slice(0, 1).toUpperCase()}</span>
+                            )}
+                          </div>
+                          {/* Cog wheel badge inside image for Action - 오너가 공석일 때만 위임 버튼 노출 */}
+                          {!channel.owner_id && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTargetChan(channel);
+                                setTransferCode(null);
+                                setIsOwnerOpen(true);
+                              }}
+                              className="absolute -bottom-1 -right-1 bg-slate-900 hover:bg-orange-600 text-white p-1 rounded-full border-2 border-white transition-all duration-200 shadow-md cursor-pointer scale-95 group-hover:scale-105 active:scale-90 z-10"
+                              title="권한 관리"
+                            >
+                              <Settings className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="center" className="w-40 rounded-2xl shadow-lg mt-1">
+                        <DropdownMenuLabel className="font-semibold text-xs text-muted-foreground">채널 메뉴</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setLinksTargetChan(channel);
+                            setLinksTeamId(channel.team_id ? String(channel.team_id) : "none");
+                            setLinksImageUrl(channel.image_url || "");
+                            
+                            let initial: (ChannelLink & { id: string })[] = [];
+                            let parsedLinks: any = channel.links;
+                            if (typeof parsedLinks === 'string') {
+                              try {
+                                parsedLinks = JSON.parse(parsedLinks);
+                              } catch (e) {
+                                parsedLinks = null;
+                              }
+                            }
+                            if (Array.isArray(parsedLinks) && parsedLinks.length > 0) {
+                              initial = parsedLinks.map((l: any) => ({ ...l, id: Math.random().toString() }));
+                            } else if (parsedLinks && typeof parsedLinks === 'object' && Object.keys(parsedLinks).length > 0) {
+                              initial = Object.entries(parsedLinks).map(([k, v]) => ({ id: Math.random().toString(), name: k, url: v as string }));
+                            }
+                            if (initial.length === 0) {
+                              initial = [{ id: Math.random().toString(), name: "", url: "" }];
+                            }
+                            setLinksForm(initial);
+                            setIsLinksOpen(true);
+                          }}
+                          className="cursor-pointer font-bold rounded-lg text-sm"
+                        >
+                          채널 정보 수정
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            router.push(`/channels/${channel.id}`);
+                          }}
+                          className="cursor-pointer font-bold rounded-lg text-sm text-blue-600 dark:text-blue-400 focus:text-blue-600"
+                        >
+                          채널 페이지
+                        </DropdownMenuItem>
+                        {!channel.owner_id && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setTargetChan(channel);
+                                setTransferCode(null);
+                                setIsOwnerOpen(true);
+                              }}
+                              className="cursor-pointer font-bold rounded-lg text-sm text-orange-600 dark:text-orange-400 focus:text-orange-600"
+                            >
+                              오너 권한 위임
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
 
-                {/* Separator vertical line */}
-                <div className="w-px h-14 md:h-16 bg-border shrink-0 opacity-70 self-center" />
-
-                {channels.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center py-1.5 select-none animate-in fade-in duration-200 gap-2">
-                    <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-muted flex items-center justify-center border border-border/50 shadow-sm">
-                      <Plus className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground/50" />
+                    <div className="flex flex-col items-center gap-0.5 min-w-0 w-full px-0.5">
+                      <span className="text-[10px] md:text-xs font-bold text-center truncate w-full leading-tight group-hover:text-foreground transition-colors">{channel.name}</span>
+                      <span className="text-[8px] md:text-[9px] text-muted-foreground text-center truncate w-full font-medium leading-tight">
+                        {channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "행사" : "게임"}
+                      </span>
+                      {/* Tiny Ownership status tag */}
+                      <div className={`text-[7px] md:text-[8px] font-mono font-bold mt-0.5 px-1 py-0.5 rounded-full border ${channel.owner_id ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/50" : "text-rose-500 bg-rose-50 dark:bg-rose-950/20 border-rose-200/50"}`}>
+                        {channel.owner_id ? "위임 완료" : "오너 공석"}
+                      </div>
                     </div>
-                    <span className="text-xs md:text-sm font-medium text-muted-foreground">등록된 소속 채널이 없습니다.</span>
                   </div>
-                ) : (
-                  channels.map((channel) => renderChannelItem(channel))
-                )}
-              </div>
+                ))}
+              </>
+            )}
 
-              {/* FLOATING "더보기" BUTTON: Pinned to the right edge with absolute position */}
-              {channels.length > 0 && (
-                <div className="absolute right-0 top-0 bottom-0 w-20 md:w-24 bg-gradient-to-l from-white via-white/80 to-transparent dark:from-zinc-950 dark:via-zinc-950/80 dark:to-transparent flex items-center justify-end pr-4 md:pr-6 pointer-events-none">
-                  <button
-                    onClick={() => setIsChannelsExpanded(true)}
-                    className="pointer-events-auto flex items-center justify-center w-10 h-10 rounded-full border border-orange-500/30 bg-background/90 dark:bg-zinc-900/90 text-orange-600 dark:text-orange-400 shadow-md hover:scale-110 active:scale-95 group transition-all duration-300"
-                    title="더보기"
-                  >
-                    <ChevronDown className="w-5 h-5 group-hover:animate-bounce" />
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* EXPANDED VIEW: CSS Grid with bottom full-width collapse panel */
-            <div className="flex flex-col w-full">
-              <div className="p-4 md:p-6 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-9 gap-x-4 gap-y-6 md:gap-x-6 md:gap-y-8 justify-items-center w-full">
-                {/* Add New Channel Circle Action */}
-                <div 
-                  onClick={() => setIsCreateOpen(true)}
-                  className="flex flex-col items-center gap-2.5 cursor-pointer group"
-                >
-                  <div className="relative w-14 h-14 md:w-16 md:h-16 border-2 border-dashed border-muted-foreground/30 hover:border-orange-500 hover:bg-orange-500/5 rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-105 active:scale-95 shadow-sm">
-                    <Plus className="w-6 h-6 text-muted-foreground group-hover:text-orange-600 transition-colors" />
-                  </div>
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="text-[10px] md:text-xs font-bold text-muted-foreground group-hover:text-orange-600 leading-tight transition-colors">채널 생성</span>
-                    <span className="text-[8px] opacity-0 md:text-[9px] md:opacity-60 text-muted-foreground italic leading-tight">New</span>
-                  </div>
-                </div>
-
-                {/* Separator vertical line is hidden in Expanded View */}
-
-                {channels.map((channel) => renderChannelItem(channel))}
-              </div>
-
-              {/* FULL-WIDTH CLICKABLE "닫기" BAR */}
-              <div 
-                onClick={() => setIsChannelsExpanded(false)}
-                className="w-full border-t border-border bg-gradient-to-r from-orange-500/5 via-amber-500/[0.02] to-orange-500/5 hover:from-orange-500/10 hover:via-amber-500/[0.05] hover:to-orange-500/10 py-3.5 flex items-center justify-center gap-2 cursor-pointer transition-all duration-300 group select-none"
-              >
-                <span className="text-xs md:text-sm font-bold text-orange-600 dark:text-orange-400 group-hover:scale-105 transition-transform duration-200">
-                  닫기
-                </span>
-                <ChevronUp className="w-4 h-4 md:w-5 md:h-5 text-orange-600 dark:text-orange-400 group-hover:animate-bounce" />
-              </div>
-            </div>
-          )}
+          </div>
         </section>
 
         {/* 🔑 소속 신청 승인 관리 콘솔 */}

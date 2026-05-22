@@ -141,6 +141,13 @@ export default function EditOnlineEventPage() {
             setTitle(event.title || "");
             setDescription(event.description || "");
             setImageUrl(event.image_url || null);
+            if (event.image_url && event.image_url.includes("/storage/v1/object/public/event_images/event-main-image/")) {
+              const parts = event.image_url.split("event-main-image/");
+              const fileName = parts[parts.length - 1];
+              if (fileName) {
+                setImagePath(`event-main-image/${fileName}`);
+              }
+            }
             
             if (event.start_at) {
               const dateObj = new Date(event.start_at);

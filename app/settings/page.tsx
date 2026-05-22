@@ -566,6 +566,26 @@ function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; team
   const handleUpdate = async () => {
     setIsUpdating(true);
     try {
+      // Delete old channel image from storage if the image is being replaced
+      if (channel.image_url && imageUrl !== channel.image_url) {
+        const bucketName = "channel-images";
+        const folder = "channel-profile";
+        if (channel.image_url.includes(`/storage/v1/object/public/${bucketName}/${folder}/`)) {
+          const parts = channel.image_url.split(`${folder}/`);
+          const fileName = parts[parts.length - 1];
+          if (fileName) {
+            const { error: removeError } = await supabase.storage
+              .from(bucketName)
+              .remove([`${folder}/${fileName}`]);
+            if (removeError) {
+              console.warn("Failed to delete old channel image from storage:", removeError);
+            } else {
+              console.log("Successfully deleted old channel image:", fileName);
+            }
+          }
+        }
+      }
+
       const finalLinks = linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url }));
       const { error } = await supabase
         .from("channels")
@@ -677,16 +697,16 @@ function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; team
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `chan-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-      const filePath = `channel-images/${fileName}`;
+      const filePath = `channel-profile/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from("event_images")
+        .from("channel-images")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from("event_images")
+        .from("channel-images")
         .getPublicUrl(filePath);
 
       setImageUrl(publicUrl);

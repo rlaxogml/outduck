@@ -1,0 +1,76 @@
+const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
+
+const envPath = path.join(__dirname, '../.env.local');
+const envContent = fs.readFileSync(envPath, 'utf8');
+const env = {};
+envContent.split('\n').forEach(line => {
+  const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+  if (match) {
+    let value = match[2] || '';
+    if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1);
+    } else if (value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1);
+    }
+    env[match[1]] = value.trim();
+  }
+});
+
+const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+async function test() {
+  console.log("1. Inserting pending request...");
+  const { data, error } = await supabase
+    .from('channel_requests')
+    .insert([{
+      user_id: '4080180c-0607-4273-b2b7-959f99b85e3a',
+      name: 'Approved Update Test',
+      type: 'youtuber',
+      company: '태스트',
+      company_id: 2,
+      status: 'pending',
+      request_type: 'organizer'
+    }])
+    .select();
+
+  if (error) {
+    console.error("Insert failed:", error);
+    return;
+  }
+  
+  const req = data[0];
+  console.log("Inserted pending request:", req);
+
+  console.log("2. Updating status to approved...");
+  const { data: updatedData, error: updateErr } = await supabase
+    .from('channel_requests')
+    .update({ status: 'approved' })
+    .eq('id', req.id)
+    .select();
+
+  console.log("Update result:", updatedData, updateErr);
+
+  console.log("3. Waiting 2 seconds for any DB trigger...");
+  await new Promise(r => setTimeout(r, 2000));
+
+  console.log("4. Querying channels with name 'Approved Update Test'...");
+  const { data: channels, error: chanErr } = await supabase
+    .from('channels')
+    .select('*')
+    .eq('name', 'Approved Update Test');
+
+  console.log("Channels found:", channels, chanErr);
+
+  console.log("5. Cleaning up...");
+  await supabase.from('channel_requests').delete().eq('id', req.id);
+  if (channels && channels.length > 0) {
+    await supabase.from('channels').delete().eq('id', channels[0].id);
+    console.log("Deleted created channel.");
+  }
+}
+
+test();

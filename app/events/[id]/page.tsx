@@ -320,6 +320,40 @@ export default function EventDetailPage() {
     try {
       if (!event?.event_id) throw new Error("이벤트 정보를 찾을 수 없습니다.");
 
+      // Delete main image from storage if it is a storage URL
+      if (event.image_url && event.image_url.includes("/storage/v1/object/public/event_images/event-main-image/")) {
+        const parts = event.image_url.split("event-main-image/");
+        const fileName = parts[parts.length - 1];
+        if (fileName) {
+          try {
+            await supabase.storage.from("event_images").remove([`event-main-image/${fileName}`]);
+          } catch (storageErr) {
+            console.error("Failed to delete event main image from storage:", storageErr);
+          }
+        }
+      }
+
+      // Delete support images from storage if they are storage URLs
+      if (event.images && event.images.length > 0) {
+        const supportPathsToDelete: string[] = [];
+        event.images.forEach(img => {
+          if (img.image_url && img.image_url.includes("/storage/v1/object/public/event_images/event-support/")) {
+            const parts = img.image_url.split("event-support/");
+            const fileName = parts[parts.length - 1];
+            if (fileName) {
+              supportPathsToDelete.push(`event-support/${fileName}`);
+            }
+          }
+        });
+        if (supportPathsToDelete.length > 0) {
+          try {
+            await supabase.storage.from("event_images").remove(supportPathsToDelete);
+          } catch (storageErr) {
+            console.error("Failed to delete support images from storage:", storageErr);
+          }
+        }
+      }
+
       // 1. Manually delete specific child records satisfying manual referential cleanup
       await supabase.from("offline_event_locations").delete().eq("offline_event_id", eventId);
       await supabase.from("event_channels").delete().eq("event_id", event.event_id);

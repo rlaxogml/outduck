@@ -248,6 +248,7 @@ export function Header() {
   }, [user]);
 
   const [hasChannel, setHasChannel] = useState(false);
+  const [isCompanyUser, setIsCompanyUser] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState<ChannelSearchItem[]>([]);
   const [lastValidResults, setLastValidResults] = useState<ChannelSearchItem[]>([]);
@@ -287,6 +288,7 @@ export function Header() {
   useEffect(() => {
     if (!user) {
       setHasChannel(false);
+      setIsCompanyUser(false);
       return;
     }
 
@@ -308,7 +310,26 @@ export function Header() {
       }
     };
 
+    const checkCompanyUser = async (userId: string) => {
+      try {
+        const { data } = await supabase
+          .from("companies")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (data) {
+          setIsCompanyUser(true);
+        } else {
+          setIsCompanyUser(false);
+        }
+      } catch {
+        setIsCompanyUser(false);
+      }
+    };
+
     checkUserChannel(user.id);
+    checkCompanyUser(user.id);
   }, [user]);
 
 
@@ -803,7 +824,7 @@ export function Header() {
           </nav>
 
           {/* Floating Action Button: Pushed visibly inward to fully detach from edge and made slightly lusher */}
-          {!hasChannel && (
+          {!hasChannel && !isCompanyUser && (
             <div className="absolute right-6 md:right-8 top-1/2 -translate-y-1/2 z-10 flex items-center">
               <button
                 onClick={() => router.push("/apply")}

@@ -288,7 +288,11 @@ export function EventCard({
                 </p>
                 <div className="flex flex-row gap-1.5 md:gap-3">
                   {channels.map((c, i) => (
-                    <div key={i} className="flex flex-col items-center gap-0.5 md:gap-1 cursor-pointer" onClick={() => router.push(`/channels/${c.id}`)}>
+                    <div key={i} className="flex flex-col items-center gap-0.5 md:gap-1 cursor-pointer" onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      router.push(`/channels/${c.id}`);
+                    }}>
                       <Avatar className="w-9 h-9 md:w-14 md:h-14 border border-border bg-muted flex-shrink-0">
                         <AvatarImage src={c.image_url || undefined} alt={c.name} className="object-cover" />
                         <AvatarFallback className="text-[10px] md:text-xs font-bold text-muted-foreground bg-muted">

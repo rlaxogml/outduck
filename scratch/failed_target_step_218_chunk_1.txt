@@ -1,0 +1,2 @@
+          <div className="relative w-full overflow-hidden">
+            <div className={`p-4 md:p-6 flex gap-x-4 md:gap-x-6 items-start ${isChannelsExpanded ? "flex-wrap pr-4" : "flex-nowrap overflow-x-auto no-scrollbar pr-16 md:pr-20"}`}>

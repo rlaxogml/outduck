@@ -1,0 +1,28 @@
+                {!isChannelsExpanded && channels.length > 10 && (
+                  <div
+                    onClick={() => setIsChannelsExpanded(true)}
+                    className="absolute right-0 top-0 bottom-0 flex flex-col items-center justify-center w-14 md:w-16 cursor-pointer select-none bg-gradient-to-b from-white/95 via-orange-50/95 to-white/95 dark:from-slate-900/95 dark:via-orange-950/20 dark:to-slate-900/95 backdrop-blur-sm z-20 border-l-2 border-orange-500/30 shadow-[-8px_0_20px_-6px_rgba(249,115,22,0.15)] hover:bg-orange-500/10 active:bg-orange-500/20 transition-all rounded-r-3xl group"
+                  >
+                    <div className="flex flex-col items-center gap-1 text-orange-600 dark:text-orange-400 group-hover:scale-110 transition-transform duration-200">
+                      <ChevronDown className="w-6 h-6 md:w-7 md:h-7 animate-bounce" />
+                      <span className="text-[10px] md:text-xs font-black tracking-widest whitespace-nowrap">
+                        더보기
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+          </div>
+          {isChannelsExpanded && channels.length > 10 && (
+            <div className="flex justify-center p-2.5 border-t border-border bg-muted/20">
+              <button
+                onClick={() => setIsChannelsExpanded(false)}
+                className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all py-1.5 px-4 rounded-xl hover:bg-muted/50 select-none border border-border/50 bg-white dark:bg-slate-900 shadow-sm cursor-pointer"
+              >
+                <span>접기</span>
+                <span className="text-sm select-none">▲</span>
+              </button>
+            </div>
+          )}

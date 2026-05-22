@@ -39,6 +39,59 @@ type ChannelRequest = {
   business_number?: string | null;
 };
 
+const moveStorageImage = async (imageUrl: string): Promise<string> => {
+  try {
+    const bucketName = "channel-images";
+    const oldFolder = "channel-requests";
+    const newFolder = "channel-profile";
+    
+    if (!imageUrl || !imageUrl.includes(`/storage/v1/object/public/${bucketName}/${oldFolder}/`)) {
+      return imageUrl;
+    }
+    
+    const parts = imageUrl.split(`${oldFolder}/`);
+    const fileName = parts[parts.length - 1];
+    if (!fileName) return imageUrl;
+    
+    const oldPath = `${oldFolder}/${fileName}`;
+    const newPath = `${newFolder}/${fileName}`;
+    
+    // Copy the file
+    const { error: copyError } = await supabase.storage
+      .from(bucketName)
+      .copy(oldPath, newPath);
+      
+    if (copyError) {
+      console.error("Storage copy error, trying move fallback:", copyError);
+      const { error: moveError } = await supabase.storage
+        .from(bucketName)
+        .move(oldPath, newPath);
+        
+      if (moveError) {
+        throw new Error(`Failed to copy or move image: ${moveError.message}`);
+      }
+    } else {
+      // Delete old file
+      const { error: removeError } = await supabase.storage
+        .from(bucketName)
+        .remove([oldPath]);
+        
+      if (removeError) {
+        console.warn("Failed to remove old request image:", removeError);
+      }
+    }
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(newPath);
+      
+    return publicUrl;
+  } catch (err) {
+    console.error("Error moving image in storage:", err);
+    return imageUrl;
+  }
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -111,10 +164,18 @@ export default function AdminPage() {
 
     try {
       const newStatus = action === "approve" ? "approved" : "rejected";
+      let finalImageUrl = request.image_url;
+
+      if (action === "approve" && request.image_url) {
+        finalImageUrl = await moveStorageImage(request.image_url);
+      }
 
       const { error: updateError } = await supabase
         .from("channel_requests")
-        .update({ status: newStatus })
+        .update({ 
+          status: newStatus,
+          image_url: finalImageUrl
+        })
         .eq("id", request.id);
 
       if (updateError) throw updateError;
@@ -126,7 +187,7 @@ export default function AdminPage() {
             .insert([{
               user_id: request.user_id,
               name: request.name,
-              profile_image_url: request.image_url
+              profile_image_url: finalImageUrl
             }]);
 
           if (insertError) {
@@ -141,7 +202,7 @@ export default function AdminPage() {
             .insert([{
               name: request.name,
               type: request.type,
-              image_url: request.image_url,
+              image_url: finalImageUrl,
               is_team: request.is_team,
               team_id: request.team_id,
               owner_id: request.user_id,
@@ -155,12 +216,18 @@ export default function AdminPage() {
           } else {
             toast.success("채널이 승인되어 시스템에 즉시 등록되었습니다!");
           }
+
+          // Force update the channel image_url in channels table in case it was auto-created or needs syncing
+          await supabase
+            .from("channels")
+            .update({ image_url: finalImageUrl })
+            .eq("name", request.name);
         }
       } else {
         toast.success("신청 건을 거절 처리했습니다.");
       }
 
-      setRequests(prev => prev.map(r => r.id === request.id ? { ...r, status: newStatus } : r));
+      setRequests(prev => prev.map(r => r.id === request.id ? { ...r, status: newStatus, image_url: finalImageUrl } : r));
 
     } catch (error: any) {
       console.error("Action error:", error);

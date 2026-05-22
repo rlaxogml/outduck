@@ -1,0 +1,11 @@
+          {isChannelsExpanded && channels.length > 10 && (
+            <div className="flex justify-center p-2.5 border-t border-border bg-muted/20">
+              <button
+                onClick={() => setIsChannelsExpanded(false)}
+                className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-all py-1.5 px-4 rounded-xl hover:bg-muted/50 select-none border border-border/50 bg-background shadow-sm"
+              >
+                <span>접기</span>
+                <span className="text-sm select-none">▲</span>
+              </button>
+            </div>
+          )}

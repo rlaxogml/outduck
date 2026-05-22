@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 interface UseImageUploadParams {
   bucket?: string;
-  folderPath?: string; // e.g. "event-covers" or "channel-requests"
+  folderPath?: string; // e.g. "event-main-image" or "channel-requests"
   initialUrl?: string | null;
   initialPath?: string | null;
   successMessage?: string;
@@ -15,7 +15,7 @@ interface UseImageUploadParams {
 
 export function useImageUpload({
   bucket = "event_images",
-  folderPath = "event-covers",
+  folderPath = "event-main-image",
   initialUrl = null,
   initialPath = null,
   successMessage = "이미지가 업로드되었습니다.",

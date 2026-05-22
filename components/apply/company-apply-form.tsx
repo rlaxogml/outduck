@@ -35,7 +35,7 @@ export function CompanyApplyForm({ user, onBack, onSuccess }: CompanyApplyFormPr
     isUploading,
     handleImageUpload,
   } = useImageUpload({
-    bucket: "event_images",
+    bucket: "channel-images",
     folderPath: "channel-requests",
     prefix: "request-",
     successMessage: "프로필 이미지가 업로드되었습니다.",

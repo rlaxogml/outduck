@@ -56,6 +56,59 @@ interface OrganizerApplyFormProps {
   onSuccess: () => void;
 }
 
+const moveStorageImage = async (imageUrl: string): Promise<string> => {
+  try {
+    const bucketName = "channel-images";
+    const oldFolder = "channel-requests";
+    const newFolder = "channel-profile";
+    
+    if (!imageUrl || !imageUrl.includes(`/storage/v1/object/public/${bucketName}/${oldFolder}/`)) {
+      return imageUrl;
+    }
+    
+    const parts = imageUrl.split(`${oldFolder}/`);
+    const fileName = parts[parts.length - 1];
+    if (!fileName) return imageUrl;
+    
+    const oldPath = `${oldFolder}/${fileName}`;
+    const newPath = `${newFolder}/${fileName}`;
+    
+    // Copy the file
+    const { error: copyError } = await supabase.storage
+      .from(bucketName)
+      .copy(oldPath, newPath);
+      
+    if (copyError) {
+      console.error("Storage copy error, trying move fallback:", copyError);
+      const { error: moveError } = await supabase.storage
+        .from(bucketName)
+        .move(oldPath, newPath);
+        
+      if (moveError) {
+        throw new Error(`Failed to copy or move image: ${moveError.message}`);
+      }
+    } else {
+      // Delete old file
+      const { error: removeError } = await supabase.storage
+        .from(bucketName)
+        .remove([oldPath]);
+        
+      if (removeError) {
+        console.warn("Failed to remove old request image:", removeError);
+      }
+    }
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(newPath);
+      
+    return publicUrl;
+  } catch (err) {
+    console.error("Error moving image in storage:", err);
+    return imageUrl;
+  }
+};
+
 export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFormProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState<string>("");
@@ -81,7 +134,7 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
     isUploading,
     handleImageUpload,
   } = useImageUpload({
-    bucket: "event_images",
+    bucket: "channel-images",
     folderPath: "channel-requests",
     prefix: "request-",
     successMessage: "프로필 이미지가 업로드되었습니다.",
@@ -152,6 +205,11 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
       const isAutoApproved = !!selectedCompany && selectedCompany.is_auto_approved === true;
       const finalStatus = isAutoApproved ? "approved" : "pending";
 
+      let finalImageUrl = imageUrl;
+      if (isAutoApproved && imageUrl) {
+        finalImageUrl = await moveStorageImage(imageUrl);
+      }
+
       const insertData = {
         user_id: user.id,
         name: name.trim(),
@@ -163,7 +221,7 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
         links: linksForm.filter(l => l.name.trim() || l.url.trim()).length > 0 
           ? linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url })) 
           : null,
-        image_url: imageUrl,
+        image_url: finalImageUrl,
         request_type: "organizer",
         status: finalStatus,
       };
