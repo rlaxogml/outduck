@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useId } from "react";
 import ReactDOM from "react-dom";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -84,6 +84,12 @@ export default function RichTextEditor({
   onChange,
   placeholder = "공지 내용을 작성해보세요. 이미지 업로드 및 하이퍼링크가 지원됩니다."
 }: RichTextEditorProps) {
+  const uniqueId = useId().replace(/:/g, "-");
+  const toolbarId = `quill-toolbar-${uniqueId}`;
+  const inputId = `toolbar-font-size-input-${uniqueId}`;
+  const btnUpId = `toolbar-size-up-${uniqueId}`;
+  const btnDownId = `toolbar-size-down-${uniqueId}`;
+
   const quillRef = useRef<any>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const [directFontSize, setDirectFontSize] = useState('16');
@@ -154,7 +160,7 @@ export default function RichTextEditor({
 
   const quillModules = useMemo(() => ({
     toolbar: {
-      container: '#quill-toolbar-offline',
+      container: '#' + toolbarId,
       handlers: {
         image: function() {
           const input = document.createElement('input');
@@ -186,7 +192,7 @@ export default function RichTextEditor({
         }
       }
     }
-  }), []);
+  }), [toolbarId]);
 
   const quillFormats = [
     'size',
@@ -286,9 +292,9 @@ export default function RichTextEditor({
     };
 
     const timer = setTimeout(() => {
-      input = document.getElementById('toolbar-font-size-input-offline') as HTMLInputElement;
-      btnUp = document.getElementById('toolbar-size-up-offline');
-      btnDown = document.getElementById('toolbar-size-down-offline');
+      input = document.getElementById(inputId) as HTMLInputElement;
+      btnUp = document.getElementById(btnUpId);
+      btnDown = document.getElementById(btnDownId);
       quill = quillRef.current?.getEditor();
 
       if (quill) {
@@ -316,7 +322,7 @@ export default function RichTextEditor({
       if (btnDown) btnDown.removeEventListener('click', handleDown);
       if (quill) quill.off('selection-change', handleSelectionChange);
     };
-  }, []);
+  }, [inputId, btnUpId, btnDownId]);
 
   // 에디터 내 이미지 URL 목록 추출 헬퍼
   const getEmbeddedImages = (): string[] => {
@@ -337,6 +343,12 @@ export default function RichTextEditor({
       {/* React Quill Editor Container */}
       <div ref={editorContainerRef} className="relative bg-background border border-border rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-primary/40 text-foreground">
         <style dangerouslySetInnerHTML={{ __html: `
+          /* 툴바 기본 버튼들에 투명 테두리를 부여하여 레이아웃 시프트 방지 */
+          .ql-toolbar button {
+            border: 1px solid transparent !important;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+          }
           /* 툴바 활성화 버튼에 테두리 및 반투명 파란색 배경 부여 */
           .ql-toolbar button.ql-active {
             border: 1px solid #3b82f6 !important;
@@ -355,20 +367,40 @@ export default function RichTextEditor({
           .ql-toolbar .ql-formats:not(:has(button.ql-align.ql-active)) button.ql-align[value=""] .ql-fill {
             fill: #3b82f6 !important;
           }
+          /* Quill 기본 테두리 제거 및 커스텀 스타일링 */
+          .ql-toolbar.ql-snow {
+            border: none !important;
+          }
+          .ql-container.ql-snow {
+            border: none !important;
+            font-size: 14px;
+            font-family: inherit;
+          }
+          .ql-editor {
+            min-height: 250px;
+            font-family: inherit;
+          }
+          .ql-editor.ql-blank::before {
+            color: var(--muted-foreground) !important;
+            font-style: normal !important;
+            opacity: 0.7;
+            left: 16px !important;
+            right: 16px !important;
+          }
         `}} />
         
         {/* Custom HTML Toolbar */}
-        <div id="quill-toolbar-offline" className="border-b border-border bg-slate-50 dark:bg-muted/10 px-3 py-2 flex flex-wrap items-center gap-1 select-none">
+        <div id={toolbarId} className="border-b border-border bg-slate-50 dark:bg-muted/10 px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-2 select-none">
           {/* 이미지 업로드 버튼 */}
           <span className="ql-formats">
             <button className="ql-image" title="이미지 삽입" />
           </span>
 
           {/* 글꼴 크기 스피너 */}
-          <span className="ql-formats border-l border-r border-border px-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', float: 'none', verticalAlign: 'middle' }}>
+          <span className="ql-formats" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', float: 'none', verticalAlign: 'middle' }}>
             <span className="text-xs text-muted-foreground font-semibold shrink-0">크기</span>
             <input
-              id="toolbar-font-size-input-offline"
+              id={inputId}
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -389,7 +421,7 @@ export default function RichTextEditor({
             <span className="text-xs text-muted-foreground font-semibold shrink-0">px</span>
             <div className="flex flex-col" style={{ gap: '1px' }}>
               <button
-                id="toolbar-size-up-offline"
+                id={btnUpId}
                 type="button"
                 className="w-5 h-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                 title="크기 증가"
@@ -397,7 +429,7 @@ export default function RichTextEditor({
                 <svg width="8" height="5" viewBox="0 0 8 5" fill="none"><path d="M1 4L4 1L7 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
               <button
-                id="toolbar-size-down-offline"
+                id={btnDownId}
                 type="button"
                 className="w-5 h-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                 title="크기 감소"
@@ -415,11 +447,11 @@ export default function RichTextEditor({
             <button className="ql-strike" />
             <button className="ql-blockquote" />
           </span>
-          <span className="ql-formats border-l border-border pl-2">
+          <span className="ql-formats">
             <button className="ql-list" value="ordered" />
             <button className="ql-list" value="bullet" />
           </span>
-          <span className="ql-formats border-l border-border pl-2">
+          <span className="ql-formats">
             <button className="ql-align" value="" title="왼쪽 정렬" />
             <button className="ql-align" value="center" title="가운데 정렬" />
             <button className="ql-align" value="right" title="오른쪽 정렬" />

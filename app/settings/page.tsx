@@ -518,6 +518,13 @@ function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; team
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  useEffect(() => {
+    if (!showDeleteDialog) {
+      setDeleteConfirmText("");
+    }
+  }, [showDeleteDialog]);
 
   useEffect(() => {
     if (channel.company) {
@@ -582,6 +589,13 @@ function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; team
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
+      // 0. notifications에서 해당 channel_id와 연관된 알림 먼저 삭제 (외래키 제약조건 방지)
+      const { error: delNotifErr } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("channel_id", channel.id);
+      if (delNotifErr) throw delNotifErr;
+
       // 1. event_channels에서 해당 channel_id와 연결된 모든 event_id 조회
       const { data: eventChannels, error: fetchErr } = await supabase
         .from("event_channels")
@@ -816,9 +830,25 @@ function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; team
               한 번 삭제하면 <strong>되돌릴 수 없으며</strong>, 채널과 연관된 데이터가 영구적으로 삭제됩니다.
             </DialogDescription>
           </DialogHeader>
+          <div className="mt-4 space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground block">
+              확인을 위해 아래에 <span className="text-rose-600 font-bold">{channel.name}/삭제한다</span>를 입력해주세요.
+            </Label>
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={`${channel.name}/삭제한다`}
+              className="h-10 border-neutral-300 dark:border-neutral-600 rounded-xl"
+            />
+          </div>
           <DialogFooter className="mt-4 gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting} className="rounded-xl font-semibold">취소</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting} className="rounded-xl font-semibold">
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting || deleteConfirmText !== `${channel.name}/삭제한다`}
+              className="rounded-xl font-semibold"
+            >
               {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               삭제하기
             </Button>

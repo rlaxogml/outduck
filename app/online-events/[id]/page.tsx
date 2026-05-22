@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, Fragment, useRef } from "react";
+import { useEffect, useState, useMemo, Fragment, useRef, useId } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
@@ -60,6 +60,12 @@ type OnlineEventDetail = {
 };
 
 export default function OnlineEventDetailPage() {
+  const uniqueId = useId().replace(/:/g, "-");
+  const toolbarId = `quill-toolbar-${uniqueId}`;
+  const inputId = `toolbar-font-size-input-${uniqueId}`;
+  const btnUpId = `toolbar-size-up-${uniqueId}`;
+  const btnDownId = `toolbar-size-down-${uniqueId}`;
+
   const params = useParams<{ id: string }>();
   const eventId = useMemo(() => Number(params.id), [params.id]);
   const router = useRouter();
@@ -192,9 +198,9 @@ export default function OnlineEventDetailPage() {
     };
 
     const timer = setTimeout(() => {
-      input = document.getElementById('toolbar-font-size-input-online') as HTMLInputElement;
-      btnUp = document.getElementById('toolbar-size-up-online');
-      btnDown = document.getElementById('toolbar-size-down-online');
+      input = document.getElementById(inputId) as HTMLInputElement;
+      btnUp = document.getElementById(btnUpId);
+      btnDown = document.getElementById(btnDownId);
       quill = quillRef.current?.getEditor();
 
       if (quill) {
@@ -226,7 +232,7 @@ export default function OnlineEventDetailPage() {
       clearTimeout(timer);
       quill?.off('selection-change', handleSelectionChange);
     };
-  }, [isWritingNotice]);
+  }, [isWritingNotice, inputId, btnUpId, btnDownId]);
 
   // --- Quill Editor Image Close Button Overlay Logic ---
   interface FloatingButton {
@@ -355,7 +361,7 @@ export default function OnlineEventDetailPage() {
 
   const quillModules = useMemo(() => ({
     toolbar: {
-      container: '#quill-toolbar-online',
+      container: '#' + toolbarId,
       handlers: {
         image: function() {
           const input = document.createElement('input');
@@ -387,7 +393,7 @@ export default function OnlineEventDetailPage() {
         }
       }
     }
-  }), []);
+  }), [toolbarId]);
 
   const quillFormats = [
     'header', 'size',
@@ -588,6 +594,14 @@ export default function OnlineEventDetailPage() {
       setUser(session?.user ?? null);
     };
     syncSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -677,6 +691,33 @@ export default function OnlineEventDetailPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("정말 이 행사를 삭제하시겠습니까? (공동 주최 정보도 함께 삭제됩니다)")) return;
+
+    try {
+      if (!event?.event_id) throw new Error("이벤트 정보를 찾을 수 없습니다.");
+
+      // 1. Manually delete specific child records
+      await supabase.from("event_channels").delete().eq("event_id", event.event_id);
+      await supabase.from("event_bookmarks").delete().eq("event_id", event.event_id);
+      await supabase.from("channel_notices").delete().eq("event_id", event.event_id);
+      
+      // 2. Delete online specific row
+      const { error: delOnErr } = await supabase.from("online_events").delete().eq("id", eventId);
+      if (delOnErr) throw delOnErr;
+
+      // 3. Finally delete underlying universal event record
+      const { error: delBaseErr } = await supabase.from("events").delete().eq("id", event.event_id);
+      if (delBaseErr) throw delBaseErr;
+      
+      toast.success("행사가 삭제되었습니다.");
+      router.push("/");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("행사 삭제 중 오류가 발생했습니다.");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -757,7 +798,7 @@ export default function OnlineEventDetailPage() {
   const handleShare = () => {
     if (typeof window !== "undefined") {
       navigator.clipboard.writeText(window.location.href);
-      toast.success("행사 링크가 복사되었습니다!");
+      toast.success("클립보드에 저장됐습니다");
     }
   };
 
@@ -848,6 +889,24 @@ export default function OnlineEventDetailPage() {
                   <span>{isBookmarked ? "관심저장" : "알림받기"}</span>
                 </button>
               </div>
+
+              {/* Owner Action Row */}
+              {isOwner && (
+                <div className="flex gap-2 mt-4 md:mt-6">
+                  <button 
+                    onClick={() => router.push(`/online-events/${event.id}/edit`)}
+                    className="flex-1 py-2 bg-secondary text-secondary-foreground text-sm font-semibold rounded-xl hover:bg-secondary/80 transition-colors"
+                  >
+                    행사 수정
+                  </button>
+                  <button 
+                    onClick={handleDelete}
+                    className="flex-1 py-2 bg-destructive/10 text-destructive text-sm font-semibold rounded-xl hover:bg-destructive/20 transition-colors"
+                  >
+                    행사 삭제
+                  </button>
+                </div>
+              )}
 
               {/* Action Buttons Row (Save, Link, Share) */}
               <div className="flex justify-around md:justify-start md:gap-3 items-center mt-6 md:mt-8 pt-5 md:pt-0 border-t md:border-t-0 border-border/40">
@@ -1053,6 +1112,12 @@ export default function OnlineEventDetailPage() {
                   {/* React Quill Editor Container */}
                   <div ref={editorContainerRef} className="relative mb-4 bg-background border border-border rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-primary/40 text-foreground">
                     <style dangerouslySetInnerHTML={{ __html: `
+                      /* 툴바 기본 버튼들에 투명 테두리를 부여하여 레이아웃 시프트 방지 */
+                      .ql-toolbar button {
+                        border: 1px solid transparent !important;
+                        border-radius: 4px;
+                        transition: all 0.15s ease;
+                      }
                       /* 툴바 활성화 버튼에 테두리 및 반투명 파란색 배경 부여 */
                       .ql-toolbar button.ql-active {
                         border: 1px solid #3b82f6 !important;
@@ -1071,19 +1136,39 @@ export default function OnlineEventDetailPage() {
                       .ql-toolbar .ql-formats:not(:has(button.ql-align.ql-active)) button.ql-align[value=""] .ql-fill {
                         fill: #3b82f6 !important;
                       }
+                      /* Quill 기본 테두리 제거 및 커스텀 스타일링 */
+                      .ql-toolbar.ql-snow {
+                        border: none !important;
+                      }
+                      .ql-container.ql-snow {
+                        border: none !important;
+                        font-size: 14px;
+                        font-family: inherit;
+                      }
+                      .ql-editor {
+                        min-height: 250px;
+                        font-family: inherit;
+                      }
+                      .ql-editor.ql-blank::before {
+                        color: var(--muted-foreground) !important;
+                        font-style: normal !important;
+                        opacity: 0.7;
+                        left: 16px !important;
+                        right: 16px !important;
+                      }
                     `}} />
                     
                     {/* Custom HTML Toolbar for Quill */}
-                    <div id="quill-toolbar-online" className="border-b border-border bg-slate-50 dark:bg-muted/10 px-4 py-2 flex flex-wrap items-center gap-1 select-none">
+                    <div id={toolbarId} className="border-b border-border bg-slate-50 dark:bg-muted/10 px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-2 select-none">
                       <span className="ql-formats">
                         <button className="ql-image" title="이미지 업로드" />
                       </span>
                       
                       {/* Custom font size spinner inside the toolbar! */}
-                      <span className="ql-formats border-l border-r border-border px-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', float: 'none', verticalAlign: 'middle' }}>
+                      <span className="ql-formats" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', float: 'none', verticalAlign: 'middle' }}>
                         <span className="text-xs font-bold text-muted-foreground mr-1 select-none">크기:</span>
                         <input
-                          id="toolbar-font-size-input-online"
+                          id={inputId}
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
@@ -1105,7 +1190,7 @@ export default function OnlineEventDetailPage() {
                         {/* Up/down small buttons for spinner */}
                         <div className="flex flex-col gap-0.5 ml-1 select-none">
                           <button
-                            id="toolbar-size-up-online"
+                            id={btnUpId}
                             type="button"
                             className="w-3.5 h-3 flex items-center justify-center text-[8px] bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-sm font-bold active:scale-95"
                             title="크기 키우기"
@@ -1113,7 +1198,7 @@ export default function OnlineEventDetailPage() {
                             ▲
                           </button>
                           <button
-                            id="toolbar-size-down-online"
+                            id={btnDownId}
                             type="button"
                             className="w-3.5 h-3 flex items-center justify-center text-[8px] bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-sm font-bold active:scale-95"
                             title="크기 줄이기"
@@ -1131,11 +1216,11 @@ export default function OnlineEventDetailPage() {
                         <button className="ql-strike" title="취소선" />
                         <button className="ql-blockquote" title="인용구" />
                       </span>
-                      <span className="ql-formats border-l border-border pl-2">
+                      <span className="ql-formats">
                         <button className="ql-list" value="ordered" title="번호 리스트" />
                         <button className="ql-list" value="bullet" title="불릿 리스트" />
                       </span>
-                      <span className="ql-formats border-l border-border pl-2">
+                      <span className="ql-formats">
                         <button className="ql-align" value="" title="왼쪽 정렬" />
                         <button className="ql-align" value="center" title="가운데 정렬" />
                         <button className="ql-align" value="right" title="오른쪽 정렬" />
@@ -1234,151 +1319,153 @@ export default function OnlineEventDetailPage() {
                 </div>
               )}
 
-              {isNoticesLoading ? (
-                <div className="py-10 text-center text-muted-foreground text-sm font-bold animate-pulse">
-                  불러오는 중...
-                </div>
-              ) : selectedNoticeId !== null ? (
-                (() => {
-                  const notice = notices.find(n => n.id === selectedNoticeId);
-                  if (!notice) return null;
-
-                  const views = getNoticeViews(notice.id);
-                  const fullDateStr = new Date(notice.created_at).toLocaleString('ko-KR', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  });
-
-                  return (
-                    <div className="border border-border/60 rounded-2xl bg-background shadow-sm min-h-[500px] flex flex-col p-5 md:p-8 animate-in fade-in duration-300">
-                      <div className="flex items-center pb-3">
-                        <button
-                          onClick={() => setSelectedNoticeId(null)}
-                          className="inline-flex items-center justify-center p-1.5 rounded-lg bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground transition-all hover:scale-105"
-                          aria-label="목록으로 가기"
-                        >
-                          <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
-                        </button>
-                      </div>
-
-                      <div className="border-b border-border/60 mb-6" />
-
-                      <div className="flex-1 flex flex-col">
-                        <h1 className="text-xl md:text-2xl font-bold text-foreground leading-snug tracking-tight mb-4 select-text">
-                          {notice.title}
-                        </h1>
-
-                        <div className="flex items-center gap-3 mb-6 select-text">
-                          <Avatar className="w-10 h-10 border border-border shadow-sm shrink-0">
-                            <AvatarImage src={notice.channels?.image_url || undefined} className="object-cover bg-muted" />
-                            <AvatarFallback className="bg-muted text-xs font-bold">{notice.channels?.name?.charAt(0) || "운"}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-sm font-bold text-foreground">{notice.channels?.name || "공식 채널"}</span>
-                                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-extrabold select-none">작성자</span>
-                              </div>
-                              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground font-semibold">
-                                <span>{fullDateStr}</span>
-                                <span className="text-muted-foreground/30">•</span>
-                                <span>조회 {views}</span>
-                              </div>
-                            </div>
-
-                            {isOwner && (
-                              <div className="flex items-center gap-2.5 text-xs md:text-sm font-bold select-none shrink-0 self-end sm:self-center">
-                                <button
-                                  onClick={() => {
-                                    setNoticeTitle(notice.title);
-                                    setNoticeContent(notice.content);
-                                    setEditingNoticeId(notice.id);
-                                    setIsWritingNotice(true);
-                                    setSelectedNoticeId(null);
-                                  }}
-                                  className="text-muted-foreground hover:text-primary transition-all hover:scale-105"
-                                >
-                                  수정
-                                </button>
-                                <span className="text-muted-foreground/20 font-normal">|</span>
-                                <button
-                                  onClick={() => handleDeleteNotice(notice.id)}
-                                  className="text-rose-500 hover:text-rose-600 transition-all hover:scale-105"
-                                >
-                                  삭제
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex-1 select-text">
-                          <div 
-                            className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor-display"
-                            dangerouslySetInnerHTML={{ __html: notice.content }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="border-t border-border/60 mt-8 pt-6 flex justify-center">
-                        <button
-                          onClick={() => setSelectedNoticeId(null)}
-                          className="px-6 py-2.5 border border-border bg-background hover:bg-muted text-foreground font-bold text-sm rounded-xl transition-all shadow-sm flex items-center gap-2"
-                        >
-                          목록으로 돌아가기
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="border border-border/60 rounded-2xl overflow-hidden bg-background shadow-sm min-h-[500px] flex flex-col animate-in fade-in duration-300">
-                  <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3.5 border-b border-border bg-muted/30 text-sm font-extrabold text-muted-foreground select-none">
-                    <div className="col-span-9">제목</div>
-                    <div className="col-span-2 text-center">작성일</div>
-                    <div className="col-span-1 text-center">조회수</div>
+              {!isWritingNotice && (
+                isNoticesLoading ? (
+                  <div className="py-10 text-center text-muted-foreground text-sm font-bold animate-pulse">
+                    불러오는 중...
                   </div>
+                ) : selectedNoticeId !== null ? (
+                  (() => {
+                    const notice = notices.find(n => n.id === selectedNoticeId);
+                    if (!notice) return null;
 
-                  {pinnedNotices.length === 0 && regularNotices.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm font-semibold bg-muted/5">
-                      등록된 공지·안내가 없습니다.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-border/60 flex-1">
-                      {pinnedNotices.map(notice => {
-                        const views = getNoticeViews(notice.id);
-                        const dateStr = new Date(notice.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replaceAll(" ", "");
+                    const views = getNoticeViews(notice.id);
+                    const fullDateStr = new Date(notice.created_at).toLocaleString('ko-KR', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
 
-                        return (
-                          <div key={`pinned-${notice.id}`} className="bg-rose-50/15 dark:bg-rose-950/5">
-                            <button
-                              onClick={() => handleViewNotice(notice.id)}
-                              className="w-full px-4 md:px-6 py-3.5 flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 items-stretch md:items-center hover:bg-muted/15 transition-colors text-left font-bold text-[14px]"
-                            >
-                              <div className="col-span-9 flex items-center gap-2">
-                                <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold select-none">
-                                  📌 공지
-                                </span>
-                                <span className="text-foreground hover:underline line-clamp-1 flex-1 font-bold text-[14px]">{notice.title}</span>
-                              </div>
-                              
-                              <div className="col-span-2 text-left md:text-center text-sm text-muted-foreground font-semibold flex items-center gap-1.5 md:block">
-                                <span className="md:hidden text-muted-foreground font-bold">작성일:</span>{dateStr}
+                    return (
+                      <div className="border border-border/60 rounded-2xl bg-background shadow-sm min-h-[500px] flex flex-col p-5 md:p-8 animate-in fade-in duration-300">
+                        <div className="flex items-center pb-3">
+                          <button
+                            onClick={() => setSelectedNoticeId(null)}
+                            className="inline-flex items-center justify-center p-1.5 rounded-lg bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground transition-all hover:scale-105"
+                            aria-label="목록으로 가기"
+                          >
+                            <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
+                          </button>
+                        </div>
+
+                        <div className="border-b border-border/60 mb-6" />
+
+                        <div className="flex-1 flex flex-col">
+                          <h1 className="text-xl md:text-2xl font-bold text-foreground leading-snug tracking-tight mb-4 select-text">
+                            {notice.title}
+                          </h1>
+
+                          <div className="flex items-center gap-3 mb-6 select-text">
+                            <Avatar className="w-10 h-10 border border-border shadow-sm shrink-0">
+                              <AvatarImage src={notice.channels?.image_url || undefined} className="object-cover bg-muted" />
+                              <AvatarFallback className="bg-muted text-xs font-bold">{notice.channels?.name?.charAt(0) || "운"}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-sm font-bold text-foreground">{notice.channels?.name || "공식 채널"}</span>
+                                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-extrabold select-none">작성자</span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground font-semibold">
+                                  <span>{fullDateStr}</span>
+                                  <span className="text-muted-foreground/30">•</span>
+                                  <span>조회 {views}</span>
+                                </div>
                               </div>
 
-                              <div className="col-span-1 text-left md:text-center text-sm text-muted-foreground font-semibold flex items-center gap-1.5 md:block">
-                                <span className="md:hidden font-bold">조회수:</span>{views}
-                              </div>
-                            </button>
+                              {isOwner && (
+                                <div className="flex items-center gap-2.5 text-xs md:text-sm font-bold select-none shrink-0 self-end sm:self-center">
+                                  <button
+                                    onClick={() => {
+                                      setNoticeTitle(notice.title);
+                                      setNoticeContent(notice.content);
+                                      setEditingNoticeId(notice.id);
+                                      setIsWritingNotice(true);
+                                      setSelectedNoticeId(null);
+                                    }}
+                                    className="text-muted-foreground hover:text-primary transition-all hover:scale-105"
+                                  >
+                                    수정
+                                  </button>
+                                  <span className="text-muted-foreground/20 font-normal">|</span>
+                                  <button
+                                    onClick={() => handleDeleteNotice(notice.id)}
+                                    className="text-rose-500 hover:text-rose-600 transition-all hover:scale-105"
+                                  >
+                                    삭제
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        );
-                      })}
+
+                          <div className="flex-1 select-text">
+                            <div 
+                              className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor-display"
+                              dangerouslySetInnerHTML={{ __html: notice.content }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="border-t border-border/60 mt-8 pt-6 flex justify-center">
+                          <button
+                            onClick={() => setSelectedNoticeId(null)}
+                            className="px-6 py-2.5 border border-border bg-background hover:bg-muted text-foreground font-bold text-sm rounded-xl transition-all shadow-sm flex items-center gap-2"
+                          >
+                            목록으로 돌아가기
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="border border-border/60 rounded-2xl overflow-hidden bg-background shadow-sm min-h-[500px] flex flex-col animate-in fade-in duration-300">
+                    <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3.5 border-b border-border bg-muted/30 text-sm font-extrabold text-muted-foreground select-none">
+                      <div className="col-span-9">제목</div>
+                      <div className="col-span-2 text-center">작성일</div>
+                      <div className="col-span-1 text-center">조회수</div>
                     </div>
-                  )}
-                </div>
+
+                    {pinnedNotices.length === 0 && regularNotices.length === 0 ? (
+                      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm font-semibold bg-muted/5">
+                        등록된 공지·안내가 없습니다.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border/60 flex-1">
+                        {pinnedNotices.map(notice => {
+                          const views = getNoticeViews(notice.id);
+                          const dateStr = new Date(notice.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replaceAll(" ", "");
+
+                          return (
+                            <div key={`pinned-${notice.id}`} className="bg-rose-50/15 dark:bg-rose-950/5">
+                              <button
+                                onClick={() => handleViewNotice(notice.id)}
+                                className="w-full px-4 md:px-6 py-3.5 flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 items-stretch md:items-center hover:bg-muted/15 transition-colors text-left font-bold text-[14px]"
+                              >
+                                <div className="col-span-9 flex items-center gap-2">
+                                  <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold select-none">
+                                    📌 공지
+                                  </span>
+                                  <span className="text-foreground hover:underline line-clamp-1 flex-1 font-bold text-[14px]">{notice.title}</span>
+                                </div>
+                                
+                                <div className="col-span-2 text-left md:text-center text-sm text-muted-foreground font-semibold flex items-center gap-1.5 md:block">
+                                  <span className="md:hidden text-muted-foreground font-bold">작성일:</span>{dateStr}
+                                </div>
+
+                                <div className="col-span-1 text-left md:text-center text-sm text-muted-foreground font-semibold flex items-center gap-1.5 md:block">
+                                  <span className="md:hidden font-bold">조회수:</span>{views}
+                                </div>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
               )}
             </div>
           )}
@@ -1392,9 +1479,22 @@ export default function OnlineEventDetailPage() {
             <span className="w-1.5 h-5 bg-primary rounded-full inline-block"></span>
             행사 정보
           </h2>
-          <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-slate-700 dark:text-slate-300 font-medium select-text">
-            {descriptionWithLinks}
-          </div>
+          {(() => {
+            const isHtml = /<[a-z][\s\S]*>/i.test(event.description);
+            if (isHtml) {
+              return (
+                <div 
+                  className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed break-words ql-editor-display"
+                  dangerouslySetInnerHTML={{ __html: event.description }}
+                />
+              );
+            }
+            return (
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-slate-700 dark:text-slate-300 font-medium select-text">
+                {descriptionWithLinks}
+              </div>
+            );
+          })()}
         </div>
       )}
 

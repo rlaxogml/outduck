@@ -17,6 +17,7 @@ import { TimeInputPair } from "@/components/events/time-input-pair";
 import { DateInputTriple } from "@/components/events/date-input-triple";
 import { useKakaoAddress } from "@/hooks/use-kakao-address";
 import { useEventImageUpload } from "@/hooks/use-event-image-upload";
+import RichTextEditor from "@/components/events/rich-text-editor";
 
 type Channel = {
   id: number;
@@ -708,7 +709,7 @@ export default function NewEventPage() {
     <div className="min-h-screen bg-gray-50/50 dark:bg-background pb-20">
       <Header />
 
-      <main className="mx-auto max-w-2xl px-4 mt-8">
+      <main className="mx-auto max-w-3xl px-4 mt-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">행사 등록</h1>
         </div>
@@ -891,12 +892,10 @@ export default function NewEventPage() {
 
             <div className="space-y-3">
               <Label htmlFor="description" className="text-sm font-semibold">설명</Label>
-              <Textarea
-                id="description"
-                placeholder="행사에 대한 상세 정보를 입력해주세요"
-                className="min-h-[150px] bg-muted/30 border-border/50 rounded-xl resize-none py-4 focus:ring-primary/20"
+              <RichTextEditor
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={setDescription}
+                placeholder="행사에 대한 상세 정보를 입력해주세요"
               />
             </div>
 

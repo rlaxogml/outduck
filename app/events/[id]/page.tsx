@@ -92,6 +92,13 @@ export default function EventDetailPage() {
     return event.channels.some(ch => ch.owner_id === user.id);
   }, [user, event]);
 
+  const handleShare = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success("클립보드에 저장됐습니다");
+    }
+  };
+
   // Sort and process schedules
   const processedSchedules = useMemo(() => {
     if (!event?.schedules || event.schedules.length === 0) return [];
@@ -593,7 +600,10 @@ export default function EventDetailPage() {
                 </button>
               )}
 
-              <button className="flex flex-col items-center gap-2 text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] transition-colors cursor-default w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:bg-background md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10 md:text-[#3a5378] dark:md:text-[#a0b8d6] md:text-sm md:font-semibold shadow-sm">
+              <button 
+                onClick={handleShare}
+                className="flex flex-col items-center gap-2 text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] transition-colors cursor-pointer w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:bg-background md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10 md:text-[#3a5378] dark:md:text-[#a0b8d6] md:text-sm md:font-semibold shadow-sm"
+              >
                 <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 md:w-4 md:h-4">
                     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
@@ -915,9 +925,22 @@ export default function EventDetailPage() {
             <span className="w-1.5 h-5 bg-primary rounded-full inline-block"></span>
             행사 정보
           </h2>
-          <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-foreground/90 font-medium">
-            {descriptionWithLinks}
-          </div>
+          {(() => {
+            const isHtml = /<[a-z][\s\S]*>/i.test(event.description);
+            if (isHtml) {
+              return (
+                <div 
+                  className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor-display"
+                  dangerouslySetInnerHTML={{ __html: event.description }}
+                />
+              );
+            }
+            return (
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-foreground/90 font-medium">
+                {descriptionWithLinks}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -970,6 +993,28 @@ export default function EventDetailPage() {
           </div>
         </div>
       )}
+      {/* React Quill Styling overrides */}
+      <style jsx global>{`
+        .ql-editor-display img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 0.75rem;
+          margin-top: 1rem;
+          margin-bottom: 1rem;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        .ql-editor-display a {
+          color: #3b82f6 !important;
+          text-decoration: underline !important;
+          font-weight: bold;
+        }
+        .ql-editor-display a:hover {
+          color: #2563eb !important;
+        }
+        .ql-editor-display p {
+          margin-bottom: 0.5rem;
+        }
+      `}</style>
     </div>
   );
 }
