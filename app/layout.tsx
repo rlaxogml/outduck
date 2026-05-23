@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from "@/components/ui/sonner"
 import Script from "next/script"
 import './globals.css'
+import { BottomNav } from "@/components/ui/bottom-nav"
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -38,7 +39,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className="bg-background">
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased pb-[calc(env(safe-area-inset-bottom,0px)+64px)] md:pb-0">
         <style dangerouslySetInnerHTML={{ __html: `
           html, body, [data-scroll-locked] {
             padding-right: 0px !important;
@@ -52,6 +53,7 @@ export default function RootLayout({
           }
         `}} />
         {children}
+        <BottomNav />
         {process.env.NODE_ENV === 'production' && <Analytics />}
         <Toaster />
         {process.env.NEXT_PUBLIC_KAKAO_MAP_KEY && (

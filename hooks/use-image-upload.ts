@@ -11,6 +11,7 @@ interface UseImageUploadParams {
   initialPath?: string | null;
   successMessage?: string;
   prefix?: string; // e.g. "request-" or ""
+  delayDelete?: boolean;
 }
 
 export function useImageUpload({
@@ -20,10 +21,12 @@ export function useImageUpload({
   initialPath = null,
   successMessage = "이미지가 업로드되었습니다.",
   prefix = "",
+  delayDelete = false,
 }: UseImageUploadParams = {}) {
   const [imageUrl, setImageUrl] = useState<string | null>(initialUrl);
   const [imagePath, setImagePath] = useState<string | null>(initialPath);
   const [isUploading, setIsUploading] = useState(false);
+  const [deletedPaths, setDeletedPaths] = useState<string[]>([]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -38,7 +41,14 @@ export function useImageUpload({
     try {
       // Clean up previous image if exists
       if (imagePath) {
-        await supabase.storage.from(bucket).remove([imagePath]);
+        if (delayDelete) {
+          setDeletedPaths(prev => [...prev, imagePath]);
+        } else {
+          const { error: delErr } = await supabase.storage.from(bucket).remove([imagePath]);
+          if (delErr) {
+            console.error("Failed to delete previous image from storage:", delErr);
+          }
+        }
       }
 
       const fileExt = file.name.split(".").pop();
@@ -69,10 +79,18 @@ export function useImageUpload({
 
   const clearImage = async () => {
     if (imagePath) {
-      try {
-        await supabase.storage.from(bucket).remove([imagePath]);
-      } catch (err) {
-        console.error("Error removing file:", err);
+      if (delayDelete) {
+        setDeletedPaths(prev => [...prev, imagePath]);
+      } else {
+        try {
+          const { error: delErr } = await supabase.storage.from(bucket).remove([imagePath]);
+          if (delErr) {
+            console.error("Error removing file:", delErr);
+            toast.error("이미지 삭제 실패: " + delErr.message);
+          }
+        } catch (err) {
+          console.error("Error removing file:", err);
+        }
       }
     }
     setImageUrl(null);
@@ -87,5 +105,7 @@ export function useImageUpload({
     isUploading,
     handleImageUpload,
     clearImage,
+    deletedPaths,
+    setDeletedPaths,
   };
 }

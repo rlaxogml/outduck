@@ -651,20 +651,8 @@ function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; team
         .eq("channel_id", channel.id);
       if (delLinksErr) throw delLinksErr;
 
-      // 4. 연결된 채널이 0개가 된 행사들은 offline_events, online_events, events에서 삭제
+      // 4. 연결된 채널이 0개가 된 행사들 삭제 - DB-level ON DELETE CASCADE로 부모 테이블만 삭제하면 하위 데이터도 자동 삭제됩니다.
       if (orphanEventIds.length > 0) {
-        const { error: delOffErr } = await supabase
-          .from("offline_events")
-          .delete()
-          .in("event_id", orphanEventIds);
-        if (delOffErr) throw delOffErr;
-
-        const { error: delOnErr } = await supabase
-          .from("online_events")
-          .delete()
-          .in("event_id", orphanEventIds);
-        if (delOnErr) throw delOnErr;
-
         const { error: delEvErr } = await supabase
           .from("events")
           .delete()

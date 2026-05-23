@@ -201,6 +201,8 @@ export default function CompanyPage() {
   const [isUploadingLinkImg, setIsUploadingLinkImg] = useState(false);
   const [showDeleteChanDialog, setShowDeleteChanDialog] = useState(false);
   const [isDeletingChan, setIsDeletingChan] = useState(false);
+  const [linksChanName, setLinksChanName] = useState<string>("");
+  const [isTransferringChan, setIsTransferringChan] = useState(false);
 
   // Pending Requests State
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
@@ -222,29 +224,29 @@ export default function CompanyPage() {
                   <span className="text-base md:text-lg font-black text-muted-foreground/60">{channel.name.slice(0, 1).toUpperCase()}</span>
                 )}
               </div>
-              {/* Cog wheel badge inside image for Action - 오너가 공석일 때만 위임 버튼 노출 */}
+              {/* Green checkbadge inside image for Action - 오너가 공석(위임 안됨)일 때만 노출 */}
               {!channel.owner_id && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTargetChan(channel);
-                    setTransferCode(null);
-                    setIsOwnerOpen(true);
-                  }}
-                  className="absolute -bottom-1 -right-1 bg-slate-900 hover:bg-orange-600 text-white p-1 rounded-full border-2 border-white transition-all duration-200 shadow-md cursor-pointer scale-95 group-hover:scale-105 active:scale-90 z-10"
-                  title="권한 관리"
-                >
-                  <Settings className="w-3 h-3" />
-                </button>
+                <div className="absolute -top-1 -left-1 bg-emerald-500 text-white p-0.5 rounded-full border-2 border-white shadow-md z-10 flex items-center justify-center w-5 h-5">
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </div>
               )}
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="w-40 rounded-2xl shadow-lg mt-1">
+            {!channel.owner_id && (
+              <>
+                <DropdownMenuLabel className="font-extrabold text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/5 px-2 py-1 rounded-md mb-1.5 text-center select-none">
+                  회사 소유 채널입니다
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuLabel className="font-semibold text-xs text-muted-foreground">채널 메뉴</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
                 setLinksTargetChan(channel);
+                setLinksChanName(channel.name);
                 setLinksTeamId(channel.team_id ? String(channel.team_id) : "none");
                 setLinksImageUrl(channel.image_url || "");
                 
@@ -297,16 +299,11 @@ export default function CompanyPage() {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-
         <div className="flex flex-col items-center gap-0.5 min-w-0 w-full px-0.5">
           <span className="text-[10px] md:text-xs font-bold text-center truncate w-full leading-tight group-hover:text-foreground transition-colors">{channel.name}</span>
           <span className="text-[8px] md:text-[9px] text-muted-foreground text-center truncate w-full font-medium leading-tight">
             {channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "행사" : "게임"}
           </span>
-          {/* Tiny Ownership status tag */}
-          <div className={`text-[7px] md:text-[8px] font-mono font-bold mt-0.5 px-1 py-0.5 rounded-full border ${channel.owner_id ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/50" : "text-rose-500 bg-rose-50 dark:bg-rose-950/20 border-rose-200/50"}`}>
-            {channel.owner_id ? "위임 완료" : "오너 공석"}
-          </div>
         </div>
       </div>
     );
@@ -885,6 +882,29 @@ export default function CompanyPage() {
     }
   };
 
+  const handleTransferChannel = async () => {
+    if (!linksTargetChan) return;
+    setIsTransferringChan(true);
+    try {
+      const { error } = await supabase
+        .from("channels")
+        .update({ company: null })
+        .eq("id", linksTargetChan.id);
+
+      if (error) throw error;
+
+      toast.success("소속사 이적 처리가 완료되었습니다.");
+      setIsLinksOpen(false);
+      if (company) {
+        await fetchChannelsAndEvents(company.name);
+      }
+    } catch (e: any) {
+      toast.error("이적 처리 실패: " + e.message);
+    } finally {
+      setIsTransferringChan(false);
+    }
+  };
+
   const handleDeleteChannel = async () => {
     if (!linksTargetChan) return;
     setIsDeletingChan(true);
@@ -922,11 +942,13 @@ export default function CompanyPage() {
         .eq("channel_id", linksTargetChan.id);
       if (delLinksErr) throw delLinksErr;
 
-      // 4. 고아가 된 행사 데이터 삭제
+      // 4. 고아가 된 행사 데이터 삭제 - DB-level ON DELETE CASCADE로 부모 테이블만 삭제하면 하위 데이터도 자동 삭제됩니다.
       if (orphanEventIds.length > 0) {
-        await supabase.from("offline_events").delete().in("event_id", orphanEventIds);
-        await supabase.from("online_events").delete().in("event_id", orphanEventIds);
-        await supabase.from("events").delete().in("id", orphanEventIds);
+        const { error: delEvErr } = await supabase
+          .from("events")
+          .delete()
+          .in("id", orphanEventIds);
+        if (delEvErr) throw delEvErr;
       }
 
       // 5. 채널 삭제
@@ -973,10 +995,17 @@ export default function CompanyPage() {
         }
       }
 
+      if (!linksChanName.trim()) {
+        toast.error("채널 이름을 입력해주세요.");
+        setIsSavingLinks(false);
+        return;
+      }
+
       const finalLinks = linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url }));
       const { error } = await supabase
         .from("channels")
         .update({ 
+          name: linksChanName.trim(),
           links: finalLinks.length > 0 ? finalLinks : null,
           team_id: linksTeamId === "none" ? null : Number(linksTeamId),
           image_url: linksImageUrl || null
@@ -1059,7 +1088,7 @@ export default function CompanyPage() {
 
           {/* RIGHT: Account Dropdown */}
           <div className="flex items-center z-10">
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <div className="flex items-center gap-2 group cursor-pointer select-none hover:opacity-85 transition-opacity">
                   <span className="hidden sm:inline-block text-xs md:text-sm font-bold tracking-tight group-hover:text-foreground/80 transition-colors max-w-[100px] truncate">
@@ -1421,7 +1450,7 @@ export default function CompanyPage() {
               <h3 className="text-base font-bold text-foreground">등록된 진행중인 행사가 없습니다.</h3>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 animate-in fade-in duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 animate-in fade-in duration-300">
               {activeEvents.map((event, index) => (
                 <EventCard
                   key={event.id}
@@ -1685,6 +1714,18 @@ export default function CompanyPage() {
           </div>
 
           <div className="space-y-5 pt-3">
+            {/* 0. Channel Name Edit */}
+            <div className="space-y-1.5">
+              <Label htmlFor="editChanName" className="text-xs md:text-sm font-bold text-foreground">채널 이름</Label>
+              <Input
+                id="editChanName"
+                value={linksChanName}
+                onChange={e => setLinksChanName(e.target.value)}
+                placeholder="채널 이름을 입력하세요"
+                className="h-10 border-neutral-300 dark:border-neutral-700 rounded-xl bg-background"
+                required
+              />
+            </div>
             {/* 1. Profile Image Change */}
             <div className="space-y-1.5">
               <Label className="text-xs md:text-sm font-bold text-foreground">프로필 이미지 변경</Label>
@@ -1792,24 +1833,57 @@ export default function CompanyPage() {
 
           {/* 4. Action Footer */}
           <div className="flex justify-between items-center pt-4 mt-4 border-t border-border/50">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => {
-                if (window.confirm("정말로 이 채널과 관련된 모든 행사를 완전히 삭제하시겠습니까? 이 작업은 복구할 수 없습니다.")) {
-                  handleDeleteChannel();
-                }
-              }}
-              disabled={isDeletingChan}
-              className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-bold px-3 h-10 rounded-xl flex items-center gap-1.5"
-            >
-              {isDeletingChan ? (
-                <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
-              ) : (
-                <Trash2 className="w-4 h-4" />
-              )}
-              채널 삭제
-            </Button>
+            {linksTargetChan?.owner_id ? (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  const expectedConfirm = `${linksTargetChan?.name}/소속사 이적`;
+                  const userInput = window.prompt(
+                    `이적시 이 채널은 무소속으로 설정되고 해당 채널에 대한 소속사의 권한도 사라집니다.\n\n이적을 진행하려면 아래에 "${expectedConfirm}"을(를) 정확히 입력해주세요.`
+                  );
+                  if (userInput === expectedConfirm) {
+                    handleTransferChannel();
+                  } else if (userInput !== null) {
+                    toast.error("입력한 텍스트가 일치하지 않습니다.");
+                  }
+                }}
+                disabled={isTransferringChan}
+                className="text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 font-bold px-3 h-10 rounded-xl flex items-center gap-1.5"
+              >
+                {isTransferringChan ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                ) : (
+                  <Building2 className="w-4 h-4" />
+                )}
+                소속사 이적
+              </Button>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  const expectedConfirm = `${linksTargetChan?.name}/채널 삭제`;
+                  const userInput = window.prompt(
+                    `정말로 이 채널과 관련된 모든 행사를 완전히 삭제하시겠습니까? 이 작업은 복구할 수 없습니다.\n\n삭제를 진행하려면 아래에 "${expectedConfirm}"을(를) 정확히 입력해주세요.`
+                  );
+                  if (userInput === expectedConfirm) {
+                    handleDeleteChannel();
+                  } else if (userInput !== null) {
+                    toast.error("입력한 텍스트가 일치하지 않습니다.");
+                  }
+                }}
+                disabled={isDeletingChan}
+                className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-bold px-3 h-10 rounded-xl flex items-center gap-1.5"
+              >
+                {isDeletingChan ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                채널 삭제
+              </Button>
+            )}
 
             <Button
               onClick={handleSaveLinks}

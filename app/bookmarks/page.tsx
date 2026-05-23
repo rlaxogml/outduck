@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
+import { cn } from "@/lib/utils";
 
 export default function BookmarksPage() {
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
@@ -17,6 +18,7 @@ export default function BookmarksPage() {
   const [offlineEvents, setOfflineEvents] = useState<any[]>([]);
   const [onlineEvents, setOnlineEvents] = useState<any[]>([]);
   const [showPastEvents, setShowPastEvents] = useState(true);
+  const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
 
   const isPastEvent = (endDateStr: string | null, startDateStr: string | null) => {
     if (!endDateStr && !startDateStr) return false;
@@ -39,6 +41,24 @@ export default function BookmarksPage() {
   const pastOfflineEvents = offlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue));
   const activeOnlineEvents = onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
   const pastOnlineEvents = onlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue));
+
+  const sortEvents = (list: any[]) => {
+    let result = [...list];
+    if (sortType === "upcoming") {
+      result = result.filter(e => !e.isAlways);
+      return result.sort((a, b) => {
+        if (!a.startDateValue || !b.startDateValue) return 0;
+        return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
+      });
+    } else {
+      return result.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+  };
+
+  const displayedOfflineEvents = sortEvents(activeOfflineEvents);
+  const displayedOnlineEvents = sortEvents(activeOnlineEvents);
 
   const imageColors = [
     "bg-gradient-to-br from-indigo-400 to-indigo-600",
@@ -244,9 +264,44 @@ export default function BookmarksPage() {
               {/* Tabs */}
               <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
+              {/* Sorting Filter */}
+              <div className="flex justify-end px-4 py-2 bg-background/50 backdrop-blur-sm sticky top-0 z-30 border-b border-border/40">
+                <div className="relative flex items-center bg-muted/50 p-1 rounded-xl w-[180px] h-9 border border-border/30 select-none">
+                  {/* Sliding pill background */}
+                  <div
+                    className={cn(
+                      "absolute top-[4px] bottom-[4px] left-[4px] w-[calc(50%-4px)] bg-background rounded-lg shadow-sm border border-border/10 transition-transform duration-300 ease-out z-0",
+                      sortType === "recent" ? "translate-x-0" : "translate-x-full"
+                    )}
+                  />
+                  <button
+                    className={cn(
+                      "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
+                      sortType === "recent"
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setSortType("recent")}
+                  >
+                    최근 등록
+                  </button>
+                  <button
+                    className={cn(
+                      "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
+                      sortType === "upcoming"
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setSortType("upcoming")}
+                  >
+                    가까운 일정
+                  </button>
+                </div>
+              </div>
+
               <div className="p-4 min-h-[600px]">
                 {loading ? (
-                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                     {Array.from({ length: 4 }).map((_, i) => (
                       <Card key={i} className="relative overflow-hidden animate-pulse pt-0">
                         <div className="aspect-[5/3] bg-muted-foreground/30 relative">
@@ -271,18 +326,18 @@ export default function BookmarksPage() {
                   </div>
                 ) : (
                   <div
-                    key={activeTab}
+                    key={`${activeTab}-${sortType}`}
                     className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out"
                   >
                     {activeTab === "offline" && (
                       <>
-                        {activeOfflineEvents.length === 0 ? (
+                        {displayedOfflineEvents.length === 0 ? (
                           <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
                             찜한 오프라인 행사가 없습니다.
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-3 md:gap-4">
-                            {activeOfflineEvents.map((event, index) => (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                            {displayedOfflineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}
@@ -322,7 +377,7 @@ export default function BookmarksPage() {
                             </button>
 
                             {showPastEvents && (
-                              <div className="grid grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
                                 {pastOfflineEvents.map((event, index) => (
                                   <div key={event.id} className="opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 transition-all duration-300">
                                     <EventCard
@@ -350,13 +405,13 @@ export default function BookmarksPage() {
 
                     {activeTab === "online" && (
                       <>
-                        {activeOnlineEvents.length === 0 ? (
+                        {displayedOnlineEvents.length === 0 ? (
                           <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
                             찜한 온라인 행사가 없습니다.
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-3 md:gap-4">
-                            {activeOnlineEvents.map((event, index) => (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                            {displayedOnlineEvents.map((event, index) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}
@@ -396,7 +451,7 @@ export default function BookmarksPage() {
                             </button>
 
                             {showPastEvents && (
-                              <div className="grid grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
                                 {pastOnlineEvents.map((event, index) => (
                                   <div key={event.id} className="opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 transition-all duration-300">
                                     <EventCard

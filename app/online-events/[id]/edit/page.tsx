@@ -57,7 +57,9 @@ export default function EditOnlineEventPage() {
     setImagePath,
     isUploading,
     handleImageUpload,
-  } = useEventImageUpload();
+    clearImage,
+    deletedPaths: mainDeletedPaths,
+  } = useEventImageUpload({ delayDelete: true });
   
   const [hostId, setHostId] = useState<string>("");
   const [coHosts, setCoHosts] = useState<Channel[]>([]);
@@ -83,14 +85,41 @@ export default function EditOnlineEventPage() {
         }
         setUser(session.user);
 
-        // Fetch owned channels
-        const { data: channels, error: channelsError } = await supabase
+        // Fetch owned channels (owned directly by the user)
+        const { data: ownedChans, error: channelsError } = await supabase
           .from("channels")
-          .select("id, name, image_url, type")
+          .select("id, name, image_url, type, company, owner_id")
           .eq("owner_id", session.user.id);
 
+        // Fetch channels that belong to user's company and are NOT delegated yet
+        const { data: compData } = await supabase
+          .from("companies")
+          .select("name")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+
+        let companyChans: any[] = [];
+        if (compData?.name) {
+          const { data: compChans } = await supabase
+            .from("channels")
+            .select("id, name, image_url, type, company, owner_id")
+            .eq("company", compData.name)
+            .is("owner_id", null);
+          if (compChans) {
+            companyChans = compChans;
+          }
+        }
+
+        // Combine channels
+        const combined = [...(ownedChans || [])];
+        companyChans.forEach(cc => {
+          if (!combined.some(c => c.id === cc.id)) {
+            combined.push(cc);
+          }
+        });
+
         if (channelsError) throw channelsError;
-        setOwnedChannels(channels || []);
+        setOwnedChannels(combined);
 
         // Fetch Online Event Data
         if (eventId) {
@@ -99,7 +128,7 @@ export default function EditOnlineEventPage() {
             .select(`
               id, event_id, title, description, start_at, end_at, image_url, links,
               events (
-                event_channels ( channels ( id, name, type, image_url, owner_id ) )
+                event_channels ( channels ( id, name, type, image_url, owner_id, company ) )
               )
             `)
             .eq("id", eventId)
@@ -130,7 +159,13 @@ export default function EditOnlineEventPage() {
               setCoHosts(mappedChannels.slice(1));
               
               // Verify ownership against the current user's session
-              const isEventOwner = mappedChannels.some((ch: any) => ch.owner_id === session.user.id);
+              let isEventOwner = mappedChannels.some((ch: any) => ch.owner_id === session.user.id);
+              if (!isEventOwner && compData?.name) {
+                isEventOwner = mappedChannels.some((ch: any) => 
+                  ch.company === compData.name && !ch.owner_id
+                );
+              }
+
               if (!isEventOwner) {
                 toast.error("수정 권한이 없습니다.");
                 router.push(`/online-events/${eventId}`);
@@ -141,9 +176,9 @@ export default function EditOnlineEventPage() {
             setTitle(event.title || "");
             setDescription(event.description || "");
             setImageUrl(event.image_url || null);
-            if (event.image_url && event.image_url.includes("/storage/v1/object/public/event_images/event-main-image/")) {
+            if (event.image_url && event.image_url.includes("event_images/event-main-image/")) {
               const parts = event.image_url.split("event-main-image/");
-              const fileName = parts[parts.length - 1];
+              const fileName = parts[parts.length - 1].split("?")[0].split("#")[0];
               if (fileName) {
                 setImagePath(`event-main-image/${fileName}`);
               }
@@ -303,6 +338,18 @@ export default function EditOnlineEventPage() {
         .insert(channelRelations);
 
       if (relationError) throw relationError;
+
+      // Delete delayed images from storage since the event was updated successfully!
+      if (mainDeletedPaths.length > 0) {
+        try {
+          const { error: storageErr } = await supabase.storage.from("event_images").remove(mainDeletedPaths);
+          if (storageErr) {
+            console.error("Failed to delete old main image from storage error:", storageErr);
+          }
+        } catch (err) {
+          console.error("Failed to delete old main image from storage:", err);
+        }
+      }
 
       toast.success("온라인 행사가 성공적으로 수정되었습니다!");
       router.push(`/online-events/${eventId}`);
@@ -500,13 +547,7 @@ export default function EditOnlineEventPage() {
                     <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
-                      onClick={async () => {
-                        setImageUrl(null);
-                        if (imagePath) {
-                          await supabase.storage.from("event_images").remove([imagePath]);
-                          setImagePath(null);
-                        }
-                      }}
+                      onClick={clearImage}
                       className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
                     >
                       <X className="w-4 h-4" />

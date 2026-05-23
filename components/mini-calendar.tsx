@@ -262,9 +262,9 @@ export function MiniCalendar({ user }: { user: User | null }) {
 
   return (
 
-    <div className="mt-4 mb-10 px-2 sm:px-4 mx-auto max-w-6xl">
+    <div className="mt-4 mb-10 px-4 sm:px-4 mx-auto max-w-6xl">
 
-        <div className="flex flex-row items-center justify-between gap-2 mb-3.5 ml-1">
+        <div className="flex flex-row items-center justify-between gap-2 mb-3.5">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-5 bg-primary rounded-full" />
             <h2 className="text-base md:text-lg font-bold text-foreground">
@@ -322,8 +322,8 @@ export function MiniCalendar({ user }: { user: User | null }) {
         </div>
 
         {/* Calendar Grid (Matching Full Calendar Style) */}
-        <div className="w-full border-t border-l border-slate-300 dark:border-slate-700 overflow-hidden rounded-lg bg-gradient-to-br from-[#dbeafe]/50 to-[#f6e4ff]/50 dark:from-primary/10 dark:to-primary/10">
-              <div className="grid grid-cols-7 text-center bg-white/20 dark:bg-slate-900/20">
+        <div className="w-[calc(100%+32px)] sm:w-full mx-[-16px] sm:mx-0 rounded-none sm:rounded-lg border border-slate-300 dark:border-slate-700 overflow-hidden bg-gradient-to-br from-[#dbeafe]/50 to-[#f6e4ff]/50 dark:from-primary/10 dark:to-primary/10">
+          <div className="grid grid-cols-7 text-center bg-white/20 dark:bg-slate-900/20">
             {dayNames.map((name, idx) => (
               <div 
                 key={idx} 
@@ -367,7 +367,7 @@ export function MiniCalendar({ user }: { user: User | null }) {
                     }
                   }}
                   className={cn(
-                    "flex flex-col items-center justify-start min-h-[110px] sm:min-h-[140px] md:min-h-[150px] border-r border-b border-slate-300 dark:border-slate-700 cursor-pointer transition-all relative p-1",
+                    "flex flex-col items-center justify-start min-h-[60px] sm:min-h-[110px] md:min-h-[150px] border-r border-b border-slate-300 dark:border-slate-700 cursor-pointer transition-all relative p-1",
                     isToday ? "bg-primary/10 z-10" : "bg-white/20 dark:bg-slate-900/20 backdrop-blur-[1px] hover:bg-white/40 dark:hover:bg-black/40",
                     isSelected && "ring-inset ring-2 ring-primary shadow-md z-20 bg-white dark:bg-slate-900",
                     isToday && !isSelected && "ring-inset ring-1 ring-primary/40"

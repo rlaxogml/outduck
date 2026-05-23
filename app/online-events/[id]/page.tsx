@@ -889,18 +889,6 @@ export default function OnlineEventDetailPage() {
                     </span>
                   </div>
                 </div>
-                
-                {/* Mobile Bookmark Button */}
-                <button
-                  onClick={handleBookmark}
-                  className={`shrink-0 md:hidden flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-all duration-300
-                    ${isBookmarked ? "border-pink-500 text-pink-500 bg-pink-50/50 dark:bg-pink-950/30" : "border-border text-foreground hover:bg-muted"}
-                    ${heartAnim ? "scale-105" : "scale-100"}
-                  `}
-                >
-                  <Heart className={`w-3.5 h-3.5 ${isBookmarked ? "fill-pink-500 text-pink-500" : "text-muted-foreground"}`} />
-                  <span>{isBookmarked ? "관심저장" : "알림받기"}</span>
-                </button>
               </div>
 
               {/* Owner Action Row */}

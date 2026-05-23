@@ -40,6 +40,7 @@ function MapContent() {
   const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing" | "within_weeks">("all");
   const [weeksThreshold, setWeeksThreshold] = useState<number>(2);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [drawnMarkersCount, setDrawnMarkersCount] = useState(0);
   const [isMapReady, setIsMapReady] = useState(false);
 
@@ -724,29 +725,220 @@ function MapContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="map-outer-container h-[calc(100vh-64px)] md:h-auto md:min-h-screen bg-background">
       <Header />
-      <div className="mx-auto max-w-6xl px-4 py-3">
-        <main className="py-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+      <div className="map-inner-container w-full h-[calc(100vh-120px)] md:h-auto md:mx-auto md:max-w-6xl md:px-4 md:py-3 relative">
+        <main className="w-full h-full md:h-auto flex flex-col md:block py-0 md:py-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 py-2 md:px-0 md:py-0 mb-1 md:mb-2 shrink-0">
             <div className="space-y-1">
-              <h1 className="text-3xl font-extrabold tracking-tight">🗺️ 오프라인 행사 지도</h1>
-              <p className="text-sm text-muted-foreground">현재 등록된 오프라인 행사의 진행 위치를 한눈에 확인해보세요.</p>
+              <h1 className="text-sm md:text-3xl font-extrabold tracking-tight">🗺️ 오프라인 행사 지도</h1>
             </div>
-
           </div>
 
-          <div className="relative border border-border rounded-2xl bg-muted overflow-hidden shadow-md h-[650px]">
-            {/* New Floating Panel */}
-            <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-gradient-to-br from-[#dbeafe] to-[#f6e4ff] dark:from-primary/20 dark:to-primary/20 border border-primary/30 rounded-2xl sm:rounded-[1.75rem] shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden backdrop-blur-md">
-              {/* Master Header Toggle */}
-              <div
-                className={cn(
-                  "p-2.5 sm:p-3.5 flex items-center justify-between cursor-pointer select-none hover:bg-primary/10 transition-all bg-white/20 dark:bg-black/10",
-                  isSidebarExpanded && "border-b border-primary/10"
-                )}
-                onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-              >
+          {/* Mobile Flat Collapsible Premium Filter Widget */}
+          <div className="block md:hidden shrink-0 px-4 pb-3">
+            {isFilterOpen ? (
+              /* EXPANDED FILTER PANEL */
+              <div className="bg-gradient-to-br from-[#dbeafe] to-[#f6e4ff] dark:from-slate-900/95 dark:to-slate-800/95 border border-primary/30 rounded-2xl shadow-xl p-3.5 flex flex-col gap-3.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+                  {/* Header Row */}
+                  <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setIsFilterOpen(false)}>
+                    <div className="flex items-center gap-1.5">
+                      <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <h3 className="text-[13px] font-extrabold text-foreground tracking-tight">필터 설정</h3>
+                    </div>
+                    <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+                  </div>
+
+                  {/* Horizontal Sections */}
+                  <div className="space-y-3.5 pt-1.5 border-t border-primary/10">
+                    {/* Section 1: 빠른 필터 */}
+                    <div className="flex flex-col gap-1.5">
+                      <h4 className="text-[10px] font-bold text-slate-500 tracking-tight">빠른 필터</h4>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          onClick={() => setInteractionFilter("all")}
+                          className={cn(
+                            "flex items-center justify-center px-3.5 py-1.5 text-[10px] font-bold rounded-full border transition-all shadow-sm select-none",
+                            interactionFilter === "all"
+                              ? "border-slate-700 bg-slate-300 text-slate-950 font-extrabold"
+                              : "border-slate-300/80 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
+                          )}
+                        >
+                          전체
+                        </button>
+                        {[
+                          { id: "subscribed", label: "구독 행사" },
+                          { id: "bookmarks", label: "찜한 행사" },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => toggleInteractionFilter(item.id as any)}
+                            className={cn(
+                              "flex items-center justify-center px-3.5 py-1.5 text-[10px] font-bold rounded-full border transition-all shadow-sm select-none",
+                              interactionFilter === item.id
+                                ? "border-indigo-500 bg-indigo-100 text-indigo-800 font-extrabold"
+                                : "border-slate-300/80 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
+                            )}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Section 2: 장르 및 주제 */}
+                    <div className="flex flex-col gap-1.5">
+                      <h4 className="text-[10px] font-bold text-slate-500 tracking-tight">장르 및 주제</h4>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          onClick={() => setSelectedCategories([])}
+                          className={cn(
+                            "flex items-center justify-center px-3.5 py-1.5 text-[10px] font-bold rounded-full border transition-all shadow-sm select-none",
+                            selectedCategories.length === 0
+                              ? "border-slate-700 bg-slate-300 text-slate-950 font-extrabold"
+                              : "border-slate-300/80 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
+                          )}
+                        >
+                          전체
+                        </button>
+                        {[
+                          { id: "game", label: "게임", activeClass: "border-blue-500 bg-blue-100 text-blue-800" },
+                          { id: "youtuber", label: "유튜버", activeClass: "border-red-500 bg-red-100 text-red-800" },
+                          { id: "festival", label: "축제", activeClass: "border-amber-500 bg-amber-100 text-amber-800" },
+                        ].map((cat) => (
+                          <button
+                            key={cat.id}
+                            onClick={() => toggleCategory(cat.id)}
+                            className={cn(
+                              "flex items-center justify-center px-3.5 py-1.5 text-[10px] font-bold rounded-full border transition-all shadow-sm select-none",
+                              selectedCategories.includes(cat.id)
+                                ? `${cat.activeClass} font-extrabold`
+                                : "border-slate-300/80 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
+                            )}
+                          >
+                            {cat.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Section 3: 진행 기간 */}
+                    <div className="flex flex-col gap-1.5">
+                      <h4 className="text-[10px] font-bold text-slate-500 tracking-tight">진행 기간</h4>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          onClick={() => toggleInteractionFilter("ongoing")}
+                          className={cn(
+                            "flex items-center justify-center px-3.5 py-1.5 text-[10px] font-bold rounded-full border transition-all shadow-sm select-none",
+                            interactionFilter === "ongoing"
+                              ? "border-slate-700 bg-slate-300 text-slate-950 font-extrabold"
+                              : "border-slate-300/80 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
+                          )}
+                        >
+                          진행 중
+                        </button>
+
+                        <div
+                          onClick={() => toggleInteractionFilter("within_weeks")}
+                          className={cn(
+                            "flex items-center justify-center px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all shadow-sm cursor-pointer select-none gap-0.5 group",
+                            interactionFilter === "within_weeks"
+                              ? "border-slate-700 bg-slate-300 text-slate-950 font-extrabold"
+                              : "border-slate-300/80 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
+                          )}
+                        >
+                          {/* Custom Stepper Buttons for Mobile */}
+                          <div className="flex flex-col justify-center gap-0 shrink-0 ml-0.5 mr-1" onClick={(e) => e.stopPropagation()}>
+                            <button 
+                              type="button" 
+                              className="hover:text-blue-600 active:scale-75 transition-all"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const current = parseInt(weeksThreshold as any) || 2;
+                                setWeeksThreshold(Math.min(52, current + 1));
+                                if (interactionFilter !== "within_weeks") {
+                                  setInteractionFilter("within_weeks");
+                                }
+                              }}
+                            >
+                              <ChevronUp className="h-2 w-2" />
+                            </button>
+                            <button 
+                              type="button" 
+                              className="hover:text-blue-600 active:scale-75 transition-all -mt-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const current = parseInt(weeksThreshold as any) || 2;
+                                setWeeksThreshold(Math.max(1, current - 1));
+                                if (interactionFilter !== "within_weeks") {
+                                  setInteractionFilter("within_weeks");
+                                }
+                              }}
+                            >
+                              <ChevronDown className="h-2 w-2" />
+                            </button>
+                          </div>
+
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={weeksThreshold}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              const valStr = e.target.value.replace(/[^0-9]/g, "");
+                              const val = parseInt(valStr);
+                              if (!isNaN(val) && val > 0) {
+                                setWeeksThreshold(Math.min(52, val));
+                                if (interactionFilter !== "within_weeks") {
+                                  setInteractionFilter("within_weeks");
+                                }
+                              } else if (valStr === "") {
+                                setWeeksThreshold("" as any);
+                              }
+                            }}
+                            onBlur={() => {
+                              if (!weeksThreshold) {
+                                setWeeksThreshold(2);
+                              }
+                            }}
+                            className={cn(
+                              "w-5 text-center bg-transparent focus:outline-none p-0 m-0 shrink-0 border-b border-dashed transition-all leading-none h-3.5 mr-1",
+                              interactionFilter === "within_weeks"
+                                ? "text-slate-950 border-slate-950 font-extrabold text-[10px]"
+                                : "text-slate-600 dark:text-slate-300 border-slate-400 font-bold text-[10px]"
+                            )}
+                          />
+                          <span className="shrink-0 tracking-tight">주 이내</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* CLOSED FLAT PILL */
+                <div 
+                  onClick={() => setIsFilterOpen(true)}
+                  className="w-fit bg-gradient-to-br from-[#dbeafe] to-[#f6e4ff] dark:from-slate-900/90 dark:to-slate-800/90 border border-primary/30 rounded-full shadow-md px-4 py-2 flex items-center gap-2 cursor-pointer select-none backdrop-blur-md animate-in fade-in duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span className="text-[12px] font-extrabold text-foreground tracking-tight">필터 설정</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground ml-0.5" />
+                </div>
+              )}
+            </div>
+
+            <div className={cn("relative flex-1 w-[calc(100%+32px)] md:w-full border-t md:border border-border rounded-none md:rounded-2xl bg-muted overflow-hidden shadow-none md:shadow-md md:h-[650px] mx-[-16px] md:mx-0 transition-all duration-300")}>
+              {/* New Floating Panel (PC only) */}
+              <div className="hidden md:flex absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-gradient-to-br from-[#dbeafe] to-[#f6e4ff] dark:from-primary/20 dark:to-primary/20 border border-primary/30 rounded-2xl sm:rounded-[1.75rem] shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden backdrop-blur-md">
+                {/* Master Header Toggle */}
+                <div
+                  className={cn(
+                    "p-2.5 sm:p-3.5 flex items-center justify-between cursor-pointer select-none hover:bg-primary/10 transition-all bg-white/20 dark:bg-black/10",
+                    isSidebarExpanded && "border-b border-primary/10"
+                  )}
+                  onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                >
                 <div className="flex items-center gap-1.5">
                   <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-foreground" />
                   <h3 className="text-[13px] sm:text-[14px] font-extrabold text-foreground tracking-tight">필터 설정</h3>
@@ -952,15 +1144,35 @@ function MapContent() {
 
             <div
               id="map-container"
-              className={cn("w-full h-[650px] bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")}
-              style={{ height: "650px", width: "100%" }}
+              className={cn("w-full h-full bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")}
+              style={{ height: "100%", width: "100%", touchAction: "none" }}
             />
 
+            <style>{`
+              .scrollbar-none::-webkit-scrollbar {
+                display: none;
+              }
+              .scrollbar-none {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+              }
+              @media (max-width: 767px) {
+                .map-outer-container {
+                  height: calc(100vh - env(safe-area-inset-bottom, 0px) - 64px) !important;
+                  overflow: hidden !important;
+                }
+                .map-inner-container {
+                  height: calc(100vh - env(safe-area-inset-bottom, 0px) - 168px) !important;
+                  overflow: hidden !important;
+                }
+              }
+            `}</style>
+
             {/* Bottom Right Floating Fit Bounds Action Button */}
-            {isMapReady && drawnMarkersCount > 0 && (
+            {isMapReady && filteredEvents.length > 0 && (
               <button
                 onClick={handleResetBounds}
-                className="absolute bottom-4 right-4 z-40 flex h-10 items-center gap-2 rounded-xl border border-border bg-background/90 backdrop-blur-sm px-3.5 font-bold text-foreground shadow-xl hover:bg-accent hover:text-accent-foreground hover:border-border/80 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]"
+                className="absolute bottom-6 right-8 md:bottom-4 md:right-4 z-40 flex h-10 items-center gap-2 rounded-xl border border-border bg-background/90 backdrop-blur-sm px-3.5 font-bold text-foreground shadow-xl hover:bg-accent hover:text-accent-foreground hover:border-border/80 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]"
                 title="지도를 맞추어 모든 행사 한눈에 보기"
               >
                 <Maximize2 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />

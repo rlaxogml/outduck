@@ -30,6 +30,7 @@ type EventDetail = {
   start_time: string | null;
   end_time: string | null;
   location: string;
+  locationsList: string[];
   image_url: string | null;
   reservation_type: string | null;
   reservation_starts_at: string | null;
@@ -220,6 +221,7 @@ export default function EventDetailPage() {
             start_time: data.start_time,
             end_time: data.end_time,
             location: data.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
+            locationsList: data.offline_event_locations?.map((l: any) => l.location).filter(Boolean) || [],
             image_url: data.image_url,
             reservation_type: data.reservation_type,
             reservation_starts_at: data.reservation_starts_at,
@@ -572,18 +574,6 @@ export default function EventDetailPage() {
                   </span>
                 </div>
               </div>
-              
-              {/* Mobile Bookmark Button */}
-              <button
-                onClick={handleBookmark}
-                className={`shrink-0 md:hidden flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-all duration-300
-                  ${isBookmarked ? "border-pink-500 text-pink-500 bg-pink-50/50 dark:bg-pink-950/30" : "border-border text-foreground hover:bg-muted"}
-                  ${heartAnim ? "scale-105" : "scale-100"}
-                `}
-              >
-                <Heart className={`w-3.5 h-3.5 ${isBookmarked ? "fill-pink-500 text-pink-500" : "text-muted-foreground"}`} />
-                <span>{isBookmarked ? "관심저장" : "알림받기"}</span>
-              </button>
             </div>
 
             {/* Owner Action Row */}
@@ -690,10 +680,18 @@ export default function EventDetailPage() {
                     <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
                       <MapPin className="w-[22px] h-[22px] stroke-[2]" />
                     </div>
-                    <div className="flex-1">
-                      <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 break-keep leading-snug">
-                        {event.location}
-                      </span>
+                    <div className="flex-1 flex flex-col gap-1.5">
+                      {event.locationsList && event.locationsList.length > 0 ? (
+                        event.locationsList.map((loc, idx) => (
+                          <span key={idx} className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 break-keep leading-snug">
+                            {loc}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 break-keep leading-snug">
+                          {event.location || "장소 정보 없음"}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -705,13 +703,30 @@ export default function EventDetailPage() {
                       <MapPin className="w-[22px] h-[22px] stroke-[2] group-hover:text-primary transition-colors" />
                     </div>
                     <div className="flex-1">
-                      <div className="inline-flex items-center gap-1.5 flex-wrap">
-                        <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors break-keep leading-snug">
-                          {event.location}
-                        </span>
-                        <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none ml-1 opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
-                          지도보기
-                        </span>
+                      <div className="flex flex-col gap-2">
+                        {event.locationsList && event.locationsList.length > 0 ? (
+                          event.locationsList.map((loc, idx) => (
+                            <div key={idx} className="inline-flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors break-keep leading-snug">
+                                {loc}
+                              </span>
+                              {idx === 0 && (
+                                <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none ml-1 opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
+                                  지도보기
+                                </span>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors break-keep leading-snug">
+                              {event.location || "장소 정보 없음"}
+                            </span>
+                            <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none ml-1 opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
+                              지도보기
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

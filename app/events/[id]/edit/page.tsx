@@ -78,7 +78,9 @@ export default function EditEventPage() {
     setImagePath,
     isUploading,
     handleImageUpload,
-  } = useEventImageUpload();
+    clearImage,
+    deletedPaths: mainDeletedPaths,
+  } = useEventImageUpload({ delayDelete: true });
   const [supportImages, setSupportImages] = useState<{ id?: number; url: string; path?: string }[]>([]);
   const [isUploadingSupport, setIsUploadingSupport] = useState(false);
   const [imagesToDelete, setImagesToDelete] = useState<{ id?: number; path?: string }[]>([]);
@@ -341,14 +343,41 @@ export default function EditEventPage() {
         }
         setUser(session.user);
 
-        // Fetch owned channels
-        const { data: channels, error: channelsError } = await supabase
+        // Fetch owned channels (owned directly by the user)
+        const { data: ownedChans, error: channelsError } = await supabase
           .from("channels")
-          .select("id, name, image_url, type")
+          .select("id, name, image_url, type, company, owner_id")
           .eq("owner_id", session.user.id);
 
+        // Fetch channels that belong to user's company and are NOT delegated yet
+        const { data: compData } = await supabase
+          .from("companies")
+          .select("name")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+
+        let companyChans: any[] = [];
+        if (compData?.name) {
+          const { data: compChans } = await supabase
+            .from("channels")
+            .select("id, name, image_url, type, company, owner_id")
+            .eq("company", compData.name)
+            .is("owner_id", null);
+          if (compChans) {
+            companyChans = compChans;
+          }
+        }
+
+        // Combine channels
+        const combined = [...(ownedChans || [])];
+        companyChans.forEach(cc => {
+          if (!combined.some(c => c.id === cc.id)) {
+            combined.push(cc);
+          }
+        });
+
         if (channelsError) throw channelsError;
-        setOwnedChannels(channels || []);
+        setOwnedChannels(combined);
 
         // Fetch Event Data to prepopulate
         if (eventId) {
@@ -358,7 +387,7 @@ export default function EditEventPage() {
               id, event_id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
               reservation_starts_at, reservation_ends_at, is_reservation_always, links,
               events (
-                event_channels ( channels ( id, name, type, image_url, owner_id ) ),
+                event_channels ( channels ( id, name, type, image_url, owner_id, company ) ),
                 event_images ( id, image_url, order )
               ),
               offline_event_locations ( location )
@@ -380,7 +409,17 @@ export default function EditEventPage() {
             setEventLinks(linksArray);
             const eventObj = event.events as any;
             const eventHost = eventObj?.event_channels?.[0]?.channels as any;
-            if (eventHost && eventHost.owner_id !== session.user.id) {
+            
+            let hasPermission = false;
+            if (eventHost) {
+              if (eventHost.owner_id === session.user.id) {
+                hasPermission = true;
+              } else if (compData?.name && eventHost.company === compData.name && !eventHost.owner_id) {
+                hasPermission = true;
+              }
+            }
+
+            if (!hasPermission) {
               toast.error("수정 권한이 없습니다.");
               router.push(`/events/${eventId}`);
               return;
@@ -389,9 +428,9 @@ export default function EditEventPage() {
             setTitle(event.title || "");
             setDescription(event.description || "");
             setImageUrl(event.image_url || null);
-            if (event.image_url && event.image_url.includes("/storage/v1/object/public/event_images/event-main-image/")) {
+            if (event.image_url && event.image_url.includes("event_images/event-main-image/")) {
               const parts = event.image_url.split("event-main-image/");
-              const fileName = parts[parts.length - 1];
+              const fileName = parts[parts.length - 1].split("?")[0].split("#")[0];
               if (fileName) {
                 setImagePath(`event-main-image/${fileName}`);
               }
@@ -465,9 +504,16 @@ export default function EditEventPage() {
               const sortedImages = [...eventObj.event_images].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
               setSupportImages(sortedImages.map((img: any) => {
                 let path = "";
-                if (img.image_url && img.image_url.includes("/storage/v1/object/public/event_images/event-support/")) {
-                  const parts = img.image_url.split("event-support/");
-                  path = `event-support/${parts[parts.length - 1]}`;
+                if (img.image_url) {
+                  if (img.image_url.includes("event_images/images/")) {
+                    const parts = img.image_url.split("images/");
+                    const cleanFileName = parts[parts.length - 1].split("?")[0].split("#")[0];
+                    path = `images/${cleanFileName}`;
+                  } else if (img.image_url.includes("event_images/event-support/")) {
+                    const parts = img.image_url.split("event-support/");
+                    const cleanFileName = parts[parts.length - 1].split("?")[0].split("#")[0];
+                    path = `event-support/${cleanFileName}`;
+                  }
                 }
                 return {
                   id: img.id,
@@ -604,7 +650,7 @@ export default function EditEventPage() {
         const fileExt = file.name.split(".").pop();
         const randomPart = Math.random().toString(36).substring(2);
         const fileName = `${randomPart}-${Date.now()}.${fileExt}`;
-        const filePath = `event-support/${fileName}`;
+        const filePath = `images/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from("event_images")
@@ -632,21 +678,14 @@ export default function EditEventPage() {
     }
   };
 
-  const handleRemoveSupportImage = async (idx: number) => {
+  const handleRemoveSupportImage = (idx: number) => {
     const img = supportImages[idx];
     if (img.id) {
       setImagesToDelete(prev => [...prev, { id: img.id, path: img.path }]);
-      setSupportImages(prev => prev.filter((_, i) => i !== idx));
-    } else {
-      if (img.path) {
-        try {
-          await supabase.storage.from("event_images").remove([img.path]);
-        } catch (storageErr) {
-          console.error("Failed to delete temp support image from storage:", storageErr);
-        }
-      }
-      setSupportImages(prev => prev.filter((_, i) => i !== idx));
+    } else if (img.path) {
+      setImagesToDelete(prev => [...prev, { path: img.path }]);
     }
+    setSupportImages(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -827,10 +866,17 @@ export default function EditEventPage() {
         if (upsertImgErr) throw upsertImgErr;
       }
 
-      const pathsToDelete = imagesToDelete.map(x => x.path).filter(Boolean) as string[];
+      const pathsToDelete = [
+        ...imagesToDelete.map(x => x.path).filter(Boolean),
+        ...mainDeletedPaths
+      ] as string[];
       if (pathsToDelete.length > 0) {
         try {
-          await supabase.storage.from("event_images").remove(pathsToDelete);
+          const { error: storageErr } = await supabase.storage.from("event_images").remove(pathsToDelete);
+          if (storageErr) {
+            console.error("Failed to delete support images from storage error:", storageErr);
+            toast.error("사용하지 않는 이미지 스토리지 삭제 실패: " + storageErr.message);
+          }
         } catch (storageErr) {
           console.error("Failed to delete support images from storage:", storageErr);
         }
@@ -1120,13 +1166,7 @@ export default function EditEventPage() {
                     <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
-                      onClick={async () => {
-                        setImageUrl(null);
-                        if (imagePath) {
-                          await supabase.storage.from("event_images").remove([imagePath]);
-                          setImagePath(null);
-                        }
-                      }}
+                      onClick={clearImage}
                       className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
                     >
                       <X className="w-4 h-4" />

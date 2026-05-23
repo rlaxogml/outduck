@@ -90,9 +90,11 @@ export default function NewEventPage() {
     setImagePath,
     isUploading,
     handleImageUpload,
-  } = useEventImageUpload();
+    deletedPaths: mainDeletedPaths,
+  } = useEventImageUpload({ delayDelete: true });
   const [supportImages, setSupportImages] = useState<{ id?: number; url: string; path?: string }[]>([]);
   const [isUploadingSupport, setIsUploadingSupport] = useState(false);
+  const [supportImagesToDelete, setSupportImagesToDelete] = useState<string[]>([]);
   const [hostId, setHostId] = useState<string>("");
   const [coHosts, setCoHosts] = useState<Channel[]>([]);
 
@@ -360,21 +362,48 @@ export default function NewEventPage() {
       }
       setUser(session.user);
 
-      // Fetch owned channels
-      const { data: channels, error } = await supabase
+      // Fetch owned channels (owned directly by the user)
+      const { data: ownedChans, error: ownedErr } = await supabase
         .from("channels")
-        .select("id, name, image_url, type")
+        .select("id, name, image_url, type, company, owner_id")
         .eq("owner_id", session.user.id);
 
-      if (error) {
-        console.error("Error fetching owned channels:", error);
+      // Fetch channels that belong to user's company and are NOT delegated yet
+      const { data: compData } = await supabase
+        .from("companies")
+        .select("name")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+
+      let companyChans: any[] = [];
+      if (compData?.name) {
+        const { data: compChans } = await supabase
+          .from("channels")
+          .select("id, name, image_url, type, company, owner_id")
+          .eq("company", compData.name)
+          .is("owner_id", null);
+        if (compChans) {
+          companyChans = compChans;
+        }
+      }
+
+      // Combine channels
+      const combined = [...(ownedChans || [])];
+      companyChans.forEach(cc => {
+        if (!combined.some(c => c.id === cc.id)) {
+          combined.push(cc);
+        }
+      });
+
+      if (ownedErr) {
+        console.error("Error fetching owned channels:", ownedErr);
         setIsLoading(false);
-      } else if (!channels || channels.length === 0) {
+      } else if (combined.length === 0) {
         toast.error("소유한 주최자 채널이 없어 행사 등록 페이지에 접근할 수 없습니다.");
         router.push("/");
       } else {
-        setOwnedChannels(channels);
-        setHostId(channels[0].id.toString());
+        setOwnedChannels(combined);
+        setHostId(combined[0].id.toString());
         setIsLoading(false);
       }
     };
@@ -444,7 +473,7 @@ export default function NewEventPage() {
         const fileExt = file.name.split(".").pop();
         const randomPart = Math.random().toString(36).substring(2);
         const fileName = `${randomPart}-${Date.now()}.${fileExt}`;
-        const filePath = `event-support/${fileName}`;
+        const filePath = `images/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from("event_images")
@@ -472,14 +501,11 @@ export default function NewEventPage() {
     }
   };
 
-  const handleRemoveSupportImage = async (idx: number) => {
+  const handleRemoveSupportImage = (idx: number) => {
     const img = supportImages[idx];
-    if (img.path) {
-      try {
-        await supabase.storage.from("event_images").remove([img.path]);
-      } catch (storageErr) {
-        console.error("Failed to delete support image from storage:", storageErr);
-      }
+    const path = img.path;
+    if (path) {
+      setSupportImagesToDelete(prev => [...prev, path]);
     }
     setSupportImages(prev => prev.filter((_, i) => i !== idx));
   };
@@ -679,7 +705,16 @@ export default function NewEventPage() {
             order: idx
           }));
           const { error: imgError } = await supabase.from("event_images").insert(imagesToInsert);
-          if (imgError) throw imgError;
+        }
+
+        // Delete delayed images from storage since the event was registered successfully!
+        const pathsToDelete = [...mainDeletedPaths, ...supportImagesToDelete];
+        if (pathsToDelete.length > 0) {
+          try {
+            await supabase.storage.from("event_images").remove(pathsToDelete);
+          } catch (err) {
+            console.error("Failed to delete unused images from storage:", err);
+          }
         }
 
         toast.success("오프라인 행사가 성공적으로 등록되었습니다!");
@@ -757,6 +792,16 @@ export default function NewEventPage() {
           }));
           const { error: imgError } = await supabase.from("event_images").insert(imagesToInsert);
           if (imgError) throw imgError;
+        }
+
+        // Delete delayed images from storage since the event was registered successfully!
+        const pathsToDelete = [...mainDeletedPaths, ...supportImagesToDelete];
+        if (pathsToDelete.length > 0) {
+          try {
+            await supabase.storage.from("event_images").remove(pathsToDelete);
+          } catch (err) {
+            console.error("Failed to delete unused images from storage:", err);
+          }
         }
 
         toast.success("온라인 행사가 성공적으로 등록되었습니다!");

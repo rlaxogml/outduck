@@ -10,7 +10,7 @@ import { Header } from "@/components/header";
 import { Star, Calendar, ShoppingBag, Link2, Settings2, ChevronDown, ChevronUp } from "lucide-react";
 import { EventCard } from "@/components/event-card";
 
-type OfflineEvent = {
+type ChannelEvent = {
   id: number;
   title: string;
   date: string;
@@ -22,6 +22,7 @@ type OfflineEvent = {
   channels: { id: number; name: string; image_url: string }[];
   startDateValue?: string | null;
   endDateValue?: string | null;
+  eventType: "offline" | "online";
 };
 
 type ChannelType = "game" | "youtuber" | "festival";
@@ -88,15 +89,15 @@ export default function ChannelProfilePage() {
   const [memberChannels, setMemberChannels] = useState<Channel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
-  const [activeTab, setActiveTab] = useState<"events" | "goods">("events");
+  const [activeTab, setActiveTab] = useState<"all" | "offline" | "online">("all");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [isLoadingSubscribe, setIsLoadingSubscribe] = useState(false);
   const [isMemberListOpen, setIsMemberListOpen] = useState(false);
   const [isManageMenuOpen, setIsManageMenuOpen] = useState(false);
-  const [offlineEvents, setOfflineEvents] = useState<OfflineEvent[]>([]);
-  const [onlineEvents, setOnlineEvents] = useState<OfflineEvent[]>([]);
+  const [offlineEvents, setOfflineEvents] = useState<ChannelEvent[]>([]);
+  const [onlineEvents, setOnlineEvents] = useState<ChannelEvent[]>([]);
   const [showPastEvents, setShowPastEvents] = useState(false);
 
   const isPastEvent = (endDateStr: string | null | undefined, startDateStr: string | null | undefined) => {
@@ -116,23 +117,44 @@ export default function ChannelProfilePage() {
     return targetDate < today;
   };
 
-  const activeOfflineEvents = offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
-  const pastOfflineEvents = offlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue));
-  const activeOnlineEvents = onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
-  const pastOnlineEvents = onlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue));
+  const activeOfflineEvents = useMemo(() => offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)), [offlineEvents]);
+  const pastOfflineEvents = useMemo(() => offlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue)), [offlineEvents]);
+  const activeOnlineEvents = useMemo(() => onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)), [onlineEvents]);
+  const pastOnlineEvents = useMemo(() => onlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue)), [onlineEvents]);
+
+  const activeAllEvents = useMemo(() => {
+    const combined = [...activeOfflineEvents, ...activeOnlineEvents];
+    return combined.sort((a, b) => {
+      const dateA = a.startDateValue || "";
+      const dateB = b.startDateValue || "";
+      return dateA.localeCompare(dateB);
+    });
+  }, [activeOfflineEvents, activeOnlineEvents]);
+
+  const pastAllEvents = useMemo(() => {
+    const combined = [...pastOfflineEvents, ...pastOnlineEvents];
+    return combined.sort((a, b) => {
+      const dateA = a.startDateValue || "";
+      const dateB = b.startDateValue || "";
+      return dateB.localeCompare(dateA);
+    });
+  }, [pastOfflineEvents, pastOnlineEvents]);
 
   useEffect(() => {
     if (isLoading) return;
     
-    const activeOfflineCount = offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)).length;
-    const activeOnlineCount = onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)).length;
+    const activeOfflineCount = activeOfflineEvents.length;
+    const activeOnlineCount = activeOnlineEvents.length;
+    const activeAllCount = activeAllEvents.length;
 
-    if (activeTab === "events") {
+    if (activeTab === "all") {
+      setShowPastEvents(activeAllCount === 0);
+    } else if (activeTab === "offline") {
       setShowPastEvents(activeOfflineCount === 0);
     } else {
       setShowPastEvents(activeOnlineCount === 0);
     }
-  }, [activeTab, offlineEvents, onlineEvents, isLoading]);
+  }, [activeTab, activeOfflineEvents, activeOnlineEvents, activeAllEvents, isLoading]);
 
   useEffect(() => {
     const loadChannel = async () => {
@@ -267,10 +289,11 @@ export default function ChannelProfilePage() {
               category: getChannelTypeText(sorted[0]?.type),
               imageColor: imageColors[index % imageColors.length],
               imageUrl: event.image_url,
-              reservationType: event.reservation_type as OfflineEvent["reservationType"],
+              reservationType: event.reservation_type as ChannelEvent["reservationType"],
               channels: sorted.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
               startDateValue: event.start_date,
               endDateValue: event.end_date,
+              eventType: "offline" as const,
             };
           });
         setOfflineEvents(formatted);
@@ -304,6 +327,7 @@ export default function ChannelProfilePage() {
               channels: sorted.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
               startDateValue: event.start_at,
               endDateValue: event.end_at,
+              eventType: "online" as const,
             };
           });
         setOnlineEvents(formatted);
@@ -520,23 +544,121 @@ export default function ChannelProfilePage() {
           <div className="flex gap-2 p-1 bg-muted/40 rounded-xl mb-6 w-full md:w-fit">
             <button
               type="button"
-              onClick={() => setActiveTab("events")}
-              className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "events" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              onClick={() => setActiveTab("all")}
+              className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                }`}
+            >
+              전체 <span className="ml-1 opacity-60">{activeAllEvents.length}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("offline")}
+              className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "offline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                 }`}
             >
               오프라인 일정 <span className="ml-1 opacity-60">{activeOfflineEvents.length}</span>
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab("goods")}
-              className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "goods" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              onClick={() => setActiveTab("online")}
+              className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "online" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                 }`}
             >
               온라인 일정 <span className="ml-1 opacity-60">{activeOnlineEvents.length}</span>
             </button>
           </div>
 
-          {activeTab === "events" ? (
+          {activeTab === "all" ? (
+            <>
+              {activeAllEvents.length === 0 ? (
+                <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
+                    <Calendar className="h-10 w-10 text-muted-foreground/60" />
+                  </div>
+                  <div className="text-center space-y-1.5 flex flex-col items-center">
+                    <h3 className="text-lg font-semibold text-foreground">등록된 일정이 없어요</h3>
+                    <p className="text-sm text-muted-foreground">새로운 일정이 추가되면 이곳에서 확인하실 수 있습니다.</p>
+                    {isOwner && (
+                      <div className="pt-4 animate-in fade-in zoom-in-95 duration-200">
+                        <Link
+                          href="/events/new"
+                          className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+                        >
+                          행사 등록하러 가기
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                  {activeAllEvents.map((event, index) => (
+                    <EventCard
+                      key={`${event.eventType}-${event.id}`}
+                      id={event.id}
+                      title={event.title}
+                      date={event.date}
+                      location={event.location}
+                      category={event.category}
+                      imageColor={event.imageColor}
+                      imageUrl={event.imageUrl}
+                      reservationType={event.reservationType}
+                      channels={event.channels}
+                      user={user}
+                      eventType={event.eventType}
+                      isRightCard={index % 2 === 1}
+                      showEventTypeBadge={true}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {pastAllEvents.length > 0 && (
+                <div className="mt-8 border-t border-border pt-6">
+                  <button
+                    onClick={() => setShowPastEvents(!showPastEvents)}
+                    className="w-full py-3.5 px-5 bg-card hover:bg-slate-50 dark:hover:bg-muted/10 border border-border rounded-xl flex items-center justify-between transition-all group font-bold text-sm text-foreground shadow-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>지나간 행사</span>
+                      <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">
+                        {pastAllEvents.length}
+                      </span>
+                    </span>
+                    {showPastEvents ? (
+                      <ChevronUp className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    )}
+                  </button>
+
+                  {showPastEvents && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
+                      {pastAllEvents.map((event, index) => (
+                        <div key={`${event.eventType}-${event.id}`} className="opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 transition-all duration-300">
+                          <EventCard
+                            id={event.id}
+                            title={event.title}
+                            date={event.date}
+                            location={event.location}
+                            category={event.category}
+                            imageColor={event.imageColor}
+                            imageUrl={event.imageUrl}
+                            reservationType={event.reservationType}
+                            channels={event.channels}
+                            user={user}
+                            eventType={event.eventType}
+                            isRightCard={index % 2 === 1}
+                            showEventTypeBadge={true}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          ) : activeTab === "offline" ? (
             <>
               {activeOfflineEvents.length === 0 ? (
                 <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
@@ -559,7 +681,7 @@ export default function ChannelProfilePage() {
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   {activeOfflineEvents.map((event, index) => (
                     <EventCard
                       key={event.id}
@@ -600,7 +722,7 @@ export default function ChannelProfilePage() {
                   </button>
 
                   {showPastEvents && (
-                    <div className="grid grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
                       {pastOfflineEvents.map((event, index) => (
                         <div key={event.id} className="opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 transition-all duration-300">
                           <EventCard
@@ -647,7 +769,7 @@ export default function ChannelProfilePage() {
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   {activeOnlineEvents.map((event, index) => (
                     <EventCard
                       key={event.id}
@@ -688,7 +810,7 @@ export default function ChannelProfilePage() {
                   </button>
 
                   {showPastEvents && (
-                    <div className="grid grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
                       {pastOnlineEvents.map((event, index) => (
                         <div key={event.id} className="opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 transition-all duration-300">
                           <EventCard
