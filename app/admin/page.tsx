@@ -23,8 +23,11 @@ import {
   AlertTriangle,
   Ban,
   UserX,
-  Heart
+  Heart,
+  ImageIcon,
+  Plus
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 type ChannelRequest = {
   id: number;
@@ -101,12 +104,16 @@ export default function AdminPage() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"requests" | "reports" | "bans" | "channels">("requests");
+  const [activeTab, setActiveTab] = useState<"requests" | "reports" | "bans" | "channels" | "posters">("requests");
 
   // 주최자 신청 관련 상태
   const [requests, setRequests] = useState<ChannelRequest[]>([]);
   const [teams, setTeams] = useState<Record<number, string>>({});
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // 포스터 관련 상태
+  const [posters, setPosters] = useState<any[]>([]);
+  const [isLoadingPosters, setIsLoadingPosters] = useState(false);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [processingId, setProcessingId] = useState<number | null>(null);
 
@@ -184,6 +191,8 @@ export default function AdminPage() {
         fetchBans();
       } else if (activeTab === "channels") {
         fetchCompanies();
+      } else if (activeTab === "posters") {
+        fetchPosters();
       }
     }
   }, [activeTab, isAuthorized, reportFilter]);
@@ -820,6 +829,60 @@ export default function AdminPage() {
     }
   };
 
+  const fetchPosters = async () => {
+    setIsLoadingPosters(true);
+    try {
+      const { data, error } = await supabase
+        .from("posters")
+        .select("*")
+        .order("order", { ascending: true });
+
+      if (error) throw error;
+      setPosters(data || []);
+    } catch (err: any) {
+      console.error("Error fetching posters:", err);
+      toast.error("포스터 목록을 가져오는 데 실패했습니다.");
+    } finally {
+      setIsLoadingPosters(false);
+    }
+  };
+
+  const handleUpdatePosterState = async (posterId: number, isActive: boolean, forceHide: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("posters")
+        .update({ is_active: isActive, force_hide: forceHide })
+        .eq("id", posterId);
+
+      if (error) throw error;
+
+      toast.success("포스터 노출 상태가 변경되었습니다.");
+      setPosters(prev => prev.map(p => p.id === posterId ? { ...p, is_active: isActive, force_hide: forceHide } : p));
+    } catch (err: any) {
+      console.error("Update poster state error:", err);
+      toast.error("상태 변경에 실패했습니다.");
+    }
+  };
+
+  const handleDeletePoster = async (posterId: number) => {
+    if (!confirm("⚠️ 정말 이 광고 포스터를 영구적으로 삭제하시겠습니까?\n이 작업은 복구할 수 없습니다.")) return;
+
+    try {
+      const { error } = await supabase
+        .from("posters")
+        .delete()
+        .eq("id", posterId);
+
+      if (error) throw error;
+
+      toast.success("광고 포스터가 성공적으로 삭제되었습니다.");
+      setPosters(prev => prev.filter(p => p.id !== posterId));
+    } catch (err: any) {
+      console.error("Delete poster error:", err);
+      toast.error("포스터 삭제에 실패했습니다.");
+    }
+  };
+
   const filteredRequests = requests.filter(r => filter === "all" ? true : r.status === filter);
 
   if (isLoadingAuth || !isAuthorized) {
@@ -830,6 +893,147 @@ export default function AdminPage() {
       </div>
     );
   }
+
+  const nowStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+  
+  const formatDisplayDate = (isoString: string | null) => {
+    if (!isoString) return "상시";
+    const datePart = isoString.split('T')[0];
+    const [y, m, d] = datePart.split('-');
+    return `${y}년 ${parseInt(m, 10)}월 ${parseInt(d, 10)}일`;
+  };
+
+  const activePosters = posters.filter(p => {
+    if (p.force_hide) return false;
+    if (p.is_active) return true;
+    const start = p.start_date ? p.start_date.split('T')[0] : null;
+    const end = p.end_date ? p.end_date.split('T')[0] : null;
+    if (start && start > nowStr) return false;
+    if (end && end < nowStr) return false;
+    return true;
+  });
+
+  const upcomingPosters = posters.filter(p => {
+    if (p.force_hide) return false;
+    if (p.is_active) return false;
+    const start = p.start_date ? p.start_date.split('T')[0] : null;
+    if (start && start > nowStr) return true;
+    return false;
+  });
+
+  const pastPosters = posters.filter(p => {
+    if (p.force_hide) return false;
+    if (p.is_active) return false;
+    const start = p.start_date ? p.start_date.split('T')[0] : null;
+    const end = p.end_date ? p.end_date.split('T')[0] : null;
+    if (start && start > nowStr) return false;
+    if (end && end < nowStr) return true;
+    return false;
+  });
+
+  const hiddenPosters = posters.filter(p => p.force_hide);
+
+  const renderPosterCard = (poster: any) => (
+    <div key={poster.id} className="group bg-background border border-border rounded-3xl p-5 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-orange-505" style={{ backgroundColor: '#f97316' }} />
+      
+      {/* Header: Title and Trash Action */}
+      <div className="flex justify-between items-start gap-4 mb-4">
+        <div>
+          <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-200">
+            {poster.advertiser_name || poster.title || "알 수 없는 광고주"}
+          </h4>
+          <p className="text-xs text-muted-foreground font-semibold mt-0.5 flex items-center gap-1.5">
+            연락처: {poster.contact || "미기재"}
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleDeletePoster(poster.id)}
+          className="w-8 h-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg shrink-0 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Banner Image Preview */}
+      <div className="relative rounded-2xl overflow-hidden border border-border bg-muted flex items-center justify-center w-full aspect-[21/9] mb-4">
+        {poster.image_url ? (
+          <img 
+            src={poster.image_url} 
+            alt="Banner Preview" 
+            className="w-full h-full object-cover object-center"
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-1 text-muted-foreground/50">
+            <ImageIcon className="w-8 h-8" />
+            <span className="text-[10px]">이미지 없음</span>
+          </div>
+        )}
+        {poster.link_url && (
+          <a 
+            href={poster.link_url} 
+            target="_blank" 
+            rel="noreferrer"
+            className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-white font-bold rounded-lg px-2.5 py-1 text-[9.5px] backdrop-blur-xs flex items-center gap-1 transition-all"
+          >
+            랜딩 연결 <ExternalLink className="w-2.5 h-2.5" />
+          </a>
+        )}
+      </div>
+
+      {/* Metadata & Toggle */}
+      <div className="flex flex-col gap-4 border-t border-border/40 pt-4 mt-1">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1 text-[11px] font-semibold text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <span className="text-slate-400">노출 기간:</span>
+              <span className="text-foreground">
+                {formatDisplayDate(poster.start_date)} ~ {formatDisplayDate(poster.end_date)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400">결제 상태:</span>
+              <Badge 
+                variant="outline"
+                className={`text-[9px] font-bold h-4.5 py-0 px-1.5 border-none shadow-none ${
+                  poster.payment_status === "paid" 
+                    ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400"
+                    : "bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400"
+                }`}
+              >
+                {poster.payment_status === "paid" ? "💳 결제 완료" : "⏳ 대기 중"}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        {/* State Toggle Buttons */}
+        <div className="flex bg-muted rounded-xl p-1 w-full gap-1 border border-border/40">
+          <button 
+            onClick={() => handleUpdatePosterState(poster.id, false, true)}
+            className={`flex-1 text-[10.5px] font-bold py-1.5 rounded-lg transition-all ${!poster.is_active && poster.force_hide ? "bg-red-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted-foreground/10"}`}
+          >
+            🛑 숨김
+          </button>
+          <button 
+            onClick={() => handleUpdatePosterState(poster.id, false, false)}
+            className={`flex-1 text-[10.5px] font-bold py-1.5 rounded-lg transition-all ${!poster.is_active && !poster.force_hide ? "bg-white dark:bg-slate-800 text-foreground shadow-sm" : "text-muted-foreground hover:bg-muted-foreground/10"}`}
+          >
+            ⏳ 자동
+          </button>
+          <button 
+            onClick={() => handleUpdatePosterState(poster.id, true, false)}
+            className={`flex-1 text-[10.5px] font-bold py-1.5 rounded-lg transition-all ${poster.is_active && !poster.force_hide ? "bg-orange-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted-foreground/10"}`}
+          >
+            🚀 노출
+          </button>
+        </div>
+      </div>
+
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50/50 dark:bg-[#0B0B0E] text-foreground flex flex-col pb-20">
@@ -914,6 +1118,17 @@ export default function AdminPage() {
           >
             <Building2 className="w-4 h-4" />
             <span>채널 관리</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("posters")}
+            className={`pb-3 px-5 text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 shrink-0 ${
+              activeTab === "posters"
+                ? "border-orange-500 text-orange-500"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span>포스터 관리</span>
           </button>
         </div>
 
@@ -1542,6 +1757,159 @@ CHECK (status IN ('pending', 'resolved', 'dismissed'));`}
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "posters" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-background border border-border/60 rounded-3xl p-5 shadow-sm">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50">홈 화면 포스터 배너 관리</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">결제가 완료된 공식 배너 목록 및 실시간 게재 상태를 조율합니다.</p>
+              </div>
+              <Button 
+                onClick={() => router.push("/ad-apply")}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs h-9 px-4 shrink-0 transition-all flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" /> 신규 광고 직접 등록
+              </Button>
+            </div>
+
+            {/* 1. Live Banner Slots Monitor (실시간 노출 중인 배너 모니터링) */}
+            {!isLoadingPosters && (
+              <div className="bg-background border border-border/60 rounded-3xl p-5 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <h4 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 select-none">
+                      실시간 게재 배너 슬롯 모니터
+                      <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full ml-1">
+                        {posters.filter(p => p.is_active).length}개 활성화
+                      </span>
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-semibold select-none">메인 슬라이더 실제 게재 배너 순서</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                  {/* Render actually active banners in sequential order */}
+                  {posters
+                    .filter(p => p.is_active)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .map((poster, index) => (
+                      <div 
+                        key={poster.id} 
+                        className="group relative aspect-[21/9] rounded-2xl overflow-hidden border border-border bg-muted/30 shadow-xs transition-all duration-300 hover:shadow-md hover:border-orange-500/30"
+                      >
+                        {poster.image_url ? (
+                          <img 
+                            src={poster.image_url} 
+                            alt={poster.advertiser_name || "배너"} 
+                            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground/60 font-semibold select-none">
+                            이미지 없음
+                          </div>
+                        )}
+                        {/* Number Badge */}
+                        <div className="absolute top-2 left-2 bg-orange-500 text-white font-black text-[10px] rounded-lg w-5 h-5 flex items-center justify-center shadow-xs border border-orange-400/20 select-none">
+                          {index + 1}
+                        </div>
+                        {/* Advertiser Badge Overlay */}
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent p-1.5 pt-4 flex flex-col justify-end select-none">
+                          <p className="text-[9.5px] font-extrabold text-white truncate drop-shadow-xs">
+                            {poster.advertiser_name || "공식 배너"}
+                          </p>
+                          <p className="text-[7.5px] font-bold text-white/60 truncate drop-shadow-xs">
+                            ~ {poster.end_date ? poster.end_date.slice(5) : "상시"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+
+                  {/* Dynamic Add Placeholder Slot (Always active as an appender) */}
+                  <div 
+                    onClick={() => router.push("/ad-apply")}
+                    className="group relative aspect-[21/9] rounded-2xl border-2 border-dashed border-border/80 hover:border-orange-500/50 hover:bg-orange-500/[0.01] transition-all duration-300 cursor-pointer flex flex-col items-center justify-center text-center p-2 select-none"
+                  >
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300 animate-pulse" />
+                    <span className="text-[9px] font-bold text-muted-foreground/80 group-hover:text-orange-500 transition-colors mt-1 select-none">
+                      새 배너 슬롯 추가
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+
+            {isLoadingPosters ? (
+              <div className="py-20 flex flex-col items-center justify-center text-muted-foreground">
+                <Loader2 className="w-8 h-8 animate-spin mb-4 text-orange-500" />
+                <p>배너 정보를 읽어오는 중...</p>
+              </div>
+            ) : posters.length === 0 ? (
+              <div className="py-20 border border-dashed border-border rounded-3xl bg-background/50 flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4 text-muted-foreground/40">
+                  <ImageIcon className="w-8 h-8" />
+                </div>
+                <h3 className="text-lg font-bold mb-1">등록된 포스터가 없습니다.</h3>
+                <p className="text-xs text-muted-foreground">신규 광고 배너를 등록하여 마케팅 영역을 활성화해보세요! 🚀</p>
+              </div>
+            ) : (
+              <div className="space-y-10">
+                {activePosters.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <h3 className="text-lg font-bold">실시간 노출 중인 배너</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {activePosters.map(renderPosterCard)}
+                    </div>
+                  </div>
+                )}
+                
+                {upcomingPosters.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-amber-500" />
+                      <h3 className="text-lg font-bold">노출 예정 배너</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-80">
+                      {upcomingPosters.map(renderPosterCard)}
+                    </div>
+                  </div>
+                )}
+                
+                {pastPosters.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-slate-400" />
+                      <h3 className="text-lg font-bold text-muted-foreground">노출 종료된 배너</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-60 grayscale-[50%] hover:grayscale-0 transition-all">
+                      {pastPosters.map(renderPosterCard)}
+                    </div>
+                  </div>
+                )}
+                
+                {hiddenPosters.length > 0 && (
+                  <div className="space-y-4 mt-8 pt-8 border-t border-border/40">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500" />
+                      <h3 className="text-lg font-bold text-red-500">강제 숨김된 배너</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-50 grayscale hover:grayscale-0 transition-all">
+                      {hiddenPosters.map(renderPosterCard)}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

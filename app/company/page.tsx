@@ -1140,6 +1140,16 @@ export default function CompanyPage() {
                 통합 파트너 관리 콘솔 • 소속 채널 {channels.length}개
               </p>
             </div>
+            
+            {/* Ad Application Button */}
+            <div className="relative z-10 sm:self-center mt-3 sm:mt-0 shrink-0">
+              <Button
+                onClick={() => router.push("/ad-apply")}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-2xl text-xs md:text-sm shadow-md h-10 px-5 transition-all flex items-center gap-1.5"
+              >
+                광고 신청
+              </Button>
+            </div>
           </div>
           
           {/* Bottom Invite Code Section */}

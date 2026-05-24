@@ -277,10 +277,19 @@ export function OrganizerSection({ user }: { user: User | null }) {
             <span className="text-[10px] md:text-sm text-muted-foreground font-semibold mt-0.5 md:mt-1">주최자 대시보드</span>
           </div>
         </div>
-        <Button onClick={() => router.push("/events/new")} className="gap-1.5 font-bold rounded-full h-10 px-4 md:px-5 bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80 shadow-sm border-0">
-          <Plus className="w-4 h-4 md:w-5 md:h-5" /> 
-          <span className="hidden md:inline">새 </span>행사 등록
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => router.push("/ad-apply")}
+            variant="outline"
+            className="font-bold rounded-full h-10 px-4 md:px-5 border-primary/20 hover:bg-primary/5 hover:text-primary dark:border-primary/30 transition-all"
+          >
+            광고 신청
+          </Button>
+          <Button onClick={() => router.push("/events/new")} className="gap-1.5 font-bold rounded-full h-10 px-4 md:px-5 bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80 shadow-sm border-0">
+            <Plus className="w-4 h-4 md:w-5 md:h-5" /> 
+            <span className="hidden md:inline">새 </span>행사 등록
+          </Button>
+        </div>
       </div>
 
       <div className="bg-gradient-to-br from-[#eefcf9] via-background to-[#fdf2ff] dark:from-primary/5 dark:via-background dark:to-primary/10 rounded-2xl p-3 md:p-4 border border-primary/10 shadow-sm relative overflow-hidden">

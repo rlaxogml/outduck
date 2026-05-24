@@ -1,0 +1,1 @@
+ALTER TABLE posters ADD COLUMN force_hide BOOLEAN DEFAULT false;

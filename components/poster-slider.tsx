@@ -69,7 +69,6 @@ export function PosterSlider() {
         const { data, error } = await supabase
           .from("posters")
           .select("*")
-          .eq("is_active", true)
           .order("order", { ascending: true });
 
         if (error) {
@@ -79,13 +78,17 @@ export function PosterSlider() {
 
         console.log("PosterSlider: Posters fetched. Count:", data?.length);
 
-        const now = new Date();
+        const nowStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
         const validPosters = (data || []).filter((p: any) => {
-          const start = p.start_date ? new Date(p.start_date) : null;
-          const end = p.end_date ? new Date(p.end_date) : null;
+          if (p.force_hide) return false; // Force hide takes highest precedence
+          if (p.is_active) return true;   // Force show
+          if (p.payment_status !== 'paid') return false; // Must be paid to auto show
+
+          const start = p.start_date ? p.start_date.split('T')[0] : null;
+          const end = p.end_date ? p.end_date.split('T')[0] : null;
           
-          if (start && start > now) return false;
-          if (end && end < now) return false;
+          if (start && start > nowStr) return false;
+          if (end && end < nowStr) return false;
           
           return true;
         });
