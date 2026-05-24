@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import RichTextEditor from "./rich-text-editor";
+import { CommentsSection } from "@/components/events/comments-section";
 
 interface ChannelInfo {
   id: number;
@@ -54,6 +56,17 @@ export default function EventNoticesBoard({
   const [isWritingNotice, setIsWritingNotice] = useState(false);
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeContent, setNoticeContent] = useState('');
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const noticeIdParam = searchParams.get("notice_id");
+    if (noticeIdParam) {
+      const parsedId = Number(noticeIdParam);
+      if (!isNaN(parsedId)) {
+        setSelectedNoticeId(parsedId);
+      }
+    }
+  }, [searchParams]);
 
   const pinnedNotices = useMemo(() => {
     return notices;
@@ -409,6 +422,11 @@ export default function EventNoticesBoard({
                       className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor-display"
                       dangerouslySetInnerHTML={{ __html: notice.content }}
                     />
+                  </div>
+
+                  {/* Comments Section */}
+                  <div className="mt-10 pt-8 border-t border-border/60">
+                    <CommentsSection noticeId={notice.id} isOrganizer={isOwner} user={user} />
                   </div>
                 </div>
 

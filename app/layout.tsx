@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner"
 import Script from "next/script"
 import './globals.css'
 import { BottomNav } from "@/components/ui/bottom-nav"
+import { InAppBrowserBarrier } from "@/components/in-app-browser-barrier"
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -52,6 +53,7 @@ export default function RootLayout({
             margin-right: 0px !important;
           }
         `}} />
+        <InAppBrowserBarrier />
         {children}
         <BottomNav />
         {process.env.NODE_ENV === 'production' && <Analytics />}

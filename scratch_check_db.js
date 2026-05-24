@@ -1,18 +1,45 @@
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config({ path: '.env.local' });
+const fs = require('fs');
+const path = require('path');
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Manually parse env
+const envContent = fs.readFileSync(path.join(__dirname, '.env.local'), 'utf8');
+const env = {};
+envContent.split('\n').forEach(line => {
+  const parts = line.split('=');
+  if (parts.length >= 2) {
+    const key = parts[0].trim();
+    const val = parts.slice(1).join('=').trim().replace(/^['"]|['"]$/g, '');
+    env[key] = val;
+  }
+});
+
+const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function check() {
+async function checkTable(tableName) {
   const { data, error } = await supabase
-    .from('offline_events')
-    .select('id, start_date, end_date, events ( event_schedules ( day_of_week ) )')
-    .eq('id', 14)
-    .maybeSingle();
-  console.log(JSON.stringify(data, null, 2));
+    .from(tableName)
+    .select('*')
+    .limit(1);
+  if (error) {
+    console.error(`${tableName} error:`, error.message);
+  } else {
+    console.log(`${tableName} columns:`, Object.keys(data?.[0] || {}));
+    console.log(`${tableName} sample:`, data?.[0] || 'No rows found');
+  }
+  console.log('--------------------------------------------------');
+}
+
+async function check() {
+  const tables = ['offline_events', 'online_events', 'event_bookmarks'];
+  for (const table of tables) {
+    await checkTable(table);
+  }
 }
 
 check();
+
+

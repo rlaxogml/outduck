@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, Fragment, useRef, useId } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,6 +10,7 @@ import { Heart, Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLi
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import ReactDOM from "react-dom";
+import { CommentsSection } from "@/components/events/comments-section";
 
 // React 19 findDOMNode Polyfill (react-quill 호환성 확보용)
 if (typeof window !== "undefined") {
@@ -97,6 +98,18 @@ export default function OnlineEventDetailPage() {
   }, [event]);
   
   const [activeTab, setActiveTab] = useState<'main' | 'notices'>('main');
+  
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const noticeId = searchParams.get("notice_id");
+    const activeTabParam = searchParams.get("activeTab");
+    const tabParam = searchParams.get("tab");
+    
+    if (noticeId || activeTabParam === "notices" || tabParam === "notices") {
+      setActiveTab("notices");
+    }
+  }, [searchParams]);
+
   const [notices, setNotices] = useState<any[]>([]);
   const [isNoticesLoaded, setIsNoticesLoaded] = useState(false);
   const [isNoticesLoading, setIsNoticesLoading] = useState(false);
@@ -1408,6 +1421,11 @@ export default function OnlineEventDetailPage() {
                               dangerouslySetInnerHTML={{ __html: notice.content }}
                             />
                           </div>
+
+                          {/* Comments Section */}
+                          <div className="mt-10 pt-8 border-t border-border/60">
+                            <CommentsSection noticeId={notice.id} isOrganizer={isOwner} user={user} />
+                          </div>
                         </div>
 
                         <div className="border-t border-border/60 mt-8 pt-6 flex justify-center">
@@ -1496,6 +1514,13 @@ export default function OnlineEventDetailPage() {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* Comments Section */}
+      {activeTab === 'main' && (
+        <div className="mx-4 md:mx-auto max-w-2xl md:max-w-6xl bg-background rounded-3xl p-6 md:p-10 border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 overflow-hidden animate-in fade-in duration-300">
+          <CommentsSection eventId={event.event_id} isOrganizer={isOwner} user={user} />
         </div>
       )}
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, Fragment } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,6 +10,7 @@ import { Heart, MapPin, Calendar, Clock, Info, User as UserIcon, X, ChevronDown,
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import EventNoticesBoard from "@/components/events/event-notices-board";
+import { CommentsSection } from "@/components/events/comments-section";
 
 type ScheduleItem = {
   id: number;
@@ -88,6 +89,18 @@ export default function EventDetailPage() {
   }, [event]);
 
   const [activeTab, setActiveTab] = useState<'main' | 'notices'>('main');
+  
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const noticeId = searchParams.get("notice_id");
+    const activeTabParam = searchParams.get("activeTab");
+    const tabParam = searchParams.get("tab");
+    
+    if (noticeId || activeTabParam === "notices" || tabParam === "notices") {
+      setActiveTab("notices");
+    }
+  }, [searchParams]);
+
   const isOwner = useMemo(() => {
     if (!user || !event) return false;
     return event.channels.some(ch => ch.owner_id === user.id);
@@ -1017,6 +1030,13 @@ export default function EventDetailPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 5. Comments Section */}
+      {activeTab === 'main' && (
+        <div className="mx-4 md:mx-auto max-w-2xl md:max-w-6xl bg-background rounded-3xl p-6 md:p-10 border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-12 overflow-hidden animate-in fade-in duration-300">
+          <CommentsSection eventId={event.event_id} isOrganizer={isOwner} user={user} />
         </div>
       )}
 
