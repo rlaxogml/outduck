@@ -161,6 +161,7 @@ function MapContent() {
     const fetchEvents = async () => {
       try {
         setLoading(true);
+        const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
         const { data, error } = await supabase
           .from("offline_events")
           .select(`
@@ -180,23 +181,17 @@ function MapContent() {
                 )
               )
             ),
-            offline_event_locations(
+            offline_event_locations!inner(
               location
             )
           `)
+          .or(`end_date.gte.${todayStr},end_date.is.null`)
           .abortSignal(abortController.signal);
 
         if (error) throw error;
 
         if (data) {
-          const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
-          const filteredData = data.filter((item: any) => {
-            if (!item.offline_event_locations || item.offline_event_locations.length === 0) return false;
-            if (item.end_date && item.end_date < todayStr) return false;
-            return true;
-          });
-
-          const formatted = filteredData.map((item: any) => {
+          const formatted = data.map((item: any) => {
             const channels = (item.events as any)?.event_channels
               ?.map((ec: any) => ec.channels)
               .filter(Boolean) || [];
@@ -659,50 +654,59 @@ function MapContent() {
 
             setTimeout(() => {
               if (!isMounted) return;
+              
+              // 1. Sync the Kakao Map canvas to the DOM size first
               map.relayout();
-              if (targetCoords.length > 0) {
-                userAdjustedMapView = true;
-                if (targetCoords.length === 1) {
-                  map.setLevel(3);
-                  setTimeout(() => {
-                    if (!isMounted) return;
-                    const projection = map.getProjection();
-                    if (projection) {
-                      const markerPoint = projection.pointFromCoords(targetCoords[0]);
-                      if (markerPoint) {
-                        const targetPoint = new kakao.maps.Point(markerPoint.x, markerPoint.y - 40);
-                        const offsetCenter = projection.coordsFromPoint(targetPoint);
-                        map.setCenter(offsetCenter);
+              
+              // 2. Allow a brief 50ms delay for the rendering engine to register the new dimensions,
+              // then perform the bounding and centering calculations on the updated canvas bounds.
+              setTimeout(() => {
+                if (!isMounted) return;
+
+                if (targetCoords.length > 0) {
+                  userAdjustedMapView = true;
+                  if (targetCoords.length === 1) {
+                    map.setLevel(3);
+                    setTimeout(() => {
+                      if (!isMounted) return;
+                      const projection = map.getProjection();
+                      if (projection) {
+                        const markerPoint = projection.pointFromCoords(targetCoords[0]);
+                        if (markerPoint) {
+                          const targetPoint = new kakao.maps.Point(markerPoint.x, markerPoint.y - 40);
+                          const offsetCenter = projection.coordsFromPoint(targetPoint);
+                          map.setCenter(offsetCenter);
+                        } else {
+                          map.setCenter(targetCoords[0]);
+                        }
                       } else {
                         map.setCenter(targetCoords[0]);
                       }
-                    } else {
-                      map.setCenter(targetCoords[0]);
+                    }, 50);
+                    
+                    // Ensure startup popup matches level 3 styling on first load
+                    const cNode = targetOverlays[0].getContent();
+                    if (cNode && cNode.querySelector) {
+                      const dBtn = cNode.querySelector(".detail-btn");
+                      const zBtn = cNode.querySelector(".zoom-btn");
+                      if (dBtn && zBtn) {
+                        dBtn.className = "detail-btn col-span-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer";
+                        zBtn.style.display = "none";
+                      }
                     }
-                  }, 50);
-                  
-                  // Ensure startup popup matches level 3 styling on first load
-                  const cNode = targetOverlays[0].getContent();
-                  if (cNode && cNode.querySelector) {
-                    const dBtn = cNode.querySelector(".detail-btn");
-                    const zBtn = cNode.querySelector(".zoom-btn");
-                    if (dBtn && zBtn) {
-                      dBtn.className = "detail-btn col-span-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer";
-                      zBtn.style.display = "none";
-                    }
-                  }
 
-                  targetOverlays[0].setMap(map);
-                  openOverlayRef.current = targetOverlays[0];
-                } else {
-                  const specificBounds = new kakao.maps.LatLngBounds();
-                  targetCoords.forEach((c) => specificBounds.extend(c));
-                  map.setBounds(specificBounds);
+                    targetOverlays[0].setMap(map);
+                    openOverlayRef.current = targetOverlays[0];
+                  } else {
+                    const specificBounds = new kakao.maps.LatLngBounds();
+                    targetCoords.forEach((c) => specificBounds.extend(c));
+                    map.setBounds(specificBounds);
+                  }
+                } else if (boundsChanged && !userAdjustedMapView) {
+                  map.setBounds(bounds);
                 }
-              } else if (boundsChanged && !userAdjustedMapView) {
-                map.setBounds(bounds);
-              }
-              setIsMapReady(true);
+                setIsMapReady(true);
+              }, 50);
             }, 1100);
           };
 
@@ -740,6 +744,57 @@ function MapContent() {
       clearInterval(interval);
     };
   }, [isScriptLoaded, loading, filteredEvents, focusedEventId]);
+
+  // Active ResizeObserver to trigger map relayout instantly when map container size changes in pixels
+  useEffect(() => {
+    const container = document.getElementById("map-container");
+    if (!container) return;
+
+    let resizeTimer: NodeJS.Timeout;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (mapRef.current) {
+          // Immediately sync Kakao Map internal size calculations
+          mapRef.current.relayout();
+          
+          // Debounce recentering / bounding to prevent stuttering during transition animations
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            const map = mapRef.current;
+            if (map && window.kakao) {
+              if (focusedEventId) {
+                if (markersRef.current && markersRef.current.length > 0) {
+                  const targetMarker = markersRef.current.find((m: any) => m.getMap() !== null);
+                  if (targetMarker) {
+                    map.setCenter(targetMarker.getPosition());
+                  }
+                }
+              } else if (markersRef.current && markersRef.current.length > 0) {
+                const bounds = new window.kakao.maps.LatLngBounds();
+                let markerCount = 0;
+                markersRef.current.forEach((marker: any) => {
+                  if (marker.getMap()) {
+                    bounds.extend(marker.getPosition());
+                    markerCount++;
+                  }
+                });
+                if (markerCount > 0) {
+                  map.setBounds(bounds);
+                }
+              }
+            }
+          }, 100);
+        }
+      }
+    });
+
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(resizeTimer);
+    };
+  }, [focusedEventId, filteredEvents]);
 
   if (!process.env.NEXT_PUBLIC_KAKAO_MAP_KEY) {
     return (
@@ -1183,8 +1238,7 @@ function MapContent() {
 
             <div
               id="map-container"
-              className={cn("w-full h-full bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")}
-              style={{ height: "100%", width: "100%" }}
+              className={cn("absolute inset-0 bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")}
             />
 
             <style>{`

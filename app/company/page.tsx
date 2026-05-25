@@ -524,12 +524,12 @@ export default function CompanyPage() {
           offline_event_locations(location)
         `)
         .in("events.id", eventIds)
+        .or(`end_date.gte.${todayStr},end_date.is.null`)
         .order("start_date", { ascending: true });
 
       if (offErr) throw offErr;
 
       const formattedOffline: Event[] = (offlineData || [])
-        .filter(e => !e.end_date || e.end_date >= todayStr)
         .map((event, index) => {
           const chs = (event.events as any)?.event_channels?.map((ec: any) => ec.channels).filter(Boolean) || [];
           return {
@@ -568,15 +568,12 @@ export default function CompanyPage() {
           )
         `)
         .in("events.id", eventIds)
+        .or(`end_at.gte.${todayStr},end_at.is.null`)
         .order("start_at", { ascending: true });
 
       if (onErr) throw onErr;
 
       const formattedOnline: Event[] = (onlineData || [])
-        .filter(event => {
-          const endAtDate = event.end_at ? event.end_at.split("T")[0] : null;
-          return !endAtDate || endAtDate >= todayStr;
-        })
         .map((event, index) => {
           const chs = (event.events as any)?.event_channels?.map((ec: any) => ec.channels).filter(Boolean) || [];
           return {

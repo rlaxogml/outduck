@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
@@ -291,42 +291,53 @@ function CalendarContent() {
     }
   };
 
-  const filteredEvents = events.filter((event) => {
-    if (focusEventId) {
-      return event.id === focusEventId;
-    }
-    if (activeFilters.includes("all")) return true;
+  // 1. Memoize filteredEvents to avoid looping the entire database list on unrelated ticks/scrolls
+  const filteredEvents = useMemo(() => {
+    return events.filter((event) => {
+      if (focusEventId) {
+        return event.id === focusEventId;
+      }
+      if (activeFilters.includes("all")) return true;
 
-    const activeModes = activeFilters.filter(f => f === "online" || f === "offline");
-    const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber" || f === "festival");
-    const activeInteractions = activeFilters.filter(f => f === "subscribed" || f === "bookmarks");
+      const activeModes = activeFilters.filter(f => f === "online" || f === "offline");
+      const activeCategories = activeFilters.filter(f => f === "game" || f === "youtuber" || f === "festival");
+      const activeInteractions = activeFilters.filter(f => f === "subscribed" || f === "bookmarks");
 
-    const modeMatched = activeModes.length === 0 || activeModes.includes(event.eventType);
-    const catMatched = activeCategories.length === 0 || activeCategories.some(f => categoryLabelMap[f] === event.category);
-    let intMatched = true;
+      const modeMatched = activeModes.length === 0 || activeModes.includes(event.eventType);
+      const catMatched = activeCategories.length === 0 || activeCategories.some(f => categoryLabelMap[f] === event.category);
+      let intMatched = true;
 
-    if (activeInteractions.length > 0) {
-      intMatched = activeInteractions.some(f => {
-        if (f === "subscribed") return event.channels.some(c => userSubscribedChannelIds.includes(c.id));
-        if (f === "bookmarks") return userBookmarkedEventIds.includes((event as any).baseEventId);
-        return false;
-      });
-    }
+      if (activeInteractions.length > 0) {
+        intMatched = activeInteractions.some(f => {
+          if (f === "subscribed") return event.channels.some(c => userSubscribedChannelIds.includes(c.id));
+          if (f === "bookmarks") return userBookmarkedEventIds.includes((event as any).baseEventId);
+          return false;
+        });
+      }
 
-    return modeMatched && catMatched && intMatched;
-  });
+      return modeMatched && catMatched && intMatched;
+    });
+  }, [events, focusEventId, activeFilters, userSubscribedChannelIds, userBookmarkedEventIds]);
 
-  const eventsOnSelectedDate = filteredEvents.filter((event) => {
-    if (!event.startDateValue) return false;
-    const start = new Date(event.startDateValue);
-    start.setHours(0, 0, 0, 0);
-    const end = event.endDateValue ? new Date(event.endDateValue) : start;
-    end.setHours(23, 59, 59, 999);
-
+  // 2. Cache selectedDate to reduce infinite 'new Date()' creation overhead in rendering loops
+  const selectedDateMidnight = useMemo(() => {
     const calDate = new Date(selectedDate);
     calDate.setHours(12, 0, 0, 0);
-    return calDate >= start && calDate <= end;
-  });
+    return calDate.getTime();
+  }, [selectedDate]);
+
+  // 3. Memoize daily filtered event items
+  const eventsOnSelectedDate = useMemo(() => {
+    return filteredEvents.filter((event: any) => {
+      if (!event.startDateValue) return false;
+      const start = new Date(event.startDateValue);
+      start.setHours(0, 0, 0, 0);
+      const end = event.endDateValue ? new Date(event.endDateValue) : start;
+      end.setHours(23, 59, 59, 999);
+
+      return selectedDateMidnight >= start.getTime() && selectedDateMidnight <= end.getTime();
+    });
+  }, [filteredEvents, selectedDateMidnight]);
 
   if (!isMounted) {
     return (
@@ -474,7 +485,7 @@ function CalendarContent() {
                   }
                   setSelectedDate(value);
 
-                  const hasEvents = filteredEvents.some((event) => {
+                  const hasEvents = filteredEvents.some((event: any) => {
                     if (!event.startDateValue) return false;
                     const start = new Date(event.startDateValue);
                     start.setHours(0, 0, 0, 0);
@@ -503,7 +514,7 @@ function CalendarContent() {
                 formatDay={(locale, date) => date.getDate().toString()}
                 tileClassName={({ date, view }) => {
                   if (view === "month") {
-                    const hasEvents = filteredEvents.some((event) => {
+                    const hasEvents = filteredEvents.some((event: any) => {
                       if (!event.startDateValue) return false;
                       const start = new Date(event.startDateValue);
                       start.setHours(0, 0, 0, 0);
@@ -515,7 +526,7 @@ function CalendarContent() {
                       return calDate >= start && calDate <= end;
                     });
 
-                    const isHighlightDate = filteredEvents.some((event) => {
+                    const isHighlightDate = filteredEvents.some((event: any) => {
                       if (event.id !== highlightId || !event.startDateValue) return false;
                       const start = new Date(event.startDateValue);
                       start.setHours(0, 0, 0, 0);
@@ -542,7 +553,7 @@ function CalendarContent() {
                 }}
                 tileContent={({ date, view }) => {
                   if (view === "month") {
-                    const dayEvents = filteredEvents.filter(event => {
+                    const dayEvents = filteredEvents.filter((event: any) => {
                       if (!event.startDateValue) return false;
                       const start = new Date(event.startDateValue);
                       start.setHours(0, 0, 0, 0);
@@ -556,12 +567,12 @@ function CalendarContent() {
 
                     const channelsWithProfile: any[] = [];
                     const seenChannelIds = new Set();
-                    dayEvents.forEach(event => {
+                    dayEvents.forEach((event: any) => {
                       const filteredChannels = activeFilters.includes("subscribed")
-                        ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
+                        ? event.channels.filter((ch: any) => userSubscribedChannelIds.includes(ch.id))
                         : event.channels;
 
-                      filteredChannels.forEach(ch => {
+                      filteredChannels.forEach((ch: any) => {
                         if (ch && !seenChannelIds.has(ch.id)) {
                           seenChannelIds.add(ch.id);
                           channelsWithProfile.push(ch);
@@ -635,7 +646,7 @@ function CalendarContent() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {eventsOnSelectedDate.map((event) => {
+                    {eventsOnSelectedDate.map((event: any) => {
                       const isHighlighted = event.id === highlightId;
                       return (
                         <div
@@ -655,9 +666,9 @@ function CalendarContent() {
                           <div className="flex items-center gap-2.5 md:gap-4 w-full md:w-[220px] flex-shrink-0">
                             <div className="flex -space-x-2.5 md:-space-x-4 flex-shrink-0">
                               {(activeFilters.includes("subscribed")
-                                ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
+                                ? event.channels.filter((ch: any) => userSubscribedChannelIds.includes(ch.id))
                                 : event.channels
-                              ).slice(0, 3).map((ch, idx) => (
+                              ).slice(0, 3).map((ch: any, idx: number) => (
                                 <div key={idx} className="w-10 h-10 md:w-16 md:h-16 rounded-full border-2 border-background overflow-hidden bg-muted flex-shrink-0 shadow-sm">
                                   {ch.image_url ? (
                                     <img src={ch.image_url} alt={ch.name} className="w-full h-full object-cover" />
@@ -672,9 +683,9 @@ function CalendarContent() {
                             <div className="min-w-0">
                               <span className="text-sm md:text-lg font-bold text-foreground truncate block">
                                 {(activeFilters.includes("subscribed")
-                                  ? event.channels.filter(ch => userSubscribedChannelIds.includes(ch.id))
+                                  ? event.channels.filter((ch: any) => userSubscribedChannelIds.includes(ch.id))
                                   : event.channels
-                                ).map(c => c.name).join(", ") || "일반"}
+                                ).map((c: any) => c.name).join(", ") || "일반"}
                               </span>
                             </div>
                           </div>

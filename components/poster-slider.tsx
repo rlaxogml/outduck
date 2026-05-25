@@ -35,9 +35,13 @@ const fallbackGradients = [
 
 let cachedPosters: Poster[] | null = null;
 
-export function PosterSlider() {
-  const [posters, setPosters] = useState<Poster[]>(cachedPosters || []);
-  const [isLoading, setIsLoading] = useState(cachedPosters === null);
+export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) {
+  const [posters, setPosters] = useState<Poster[]>(initialPosters || cachedPosters || []);
+  const [isLoading, setIsLoading] = useState(!initialPosters && cachedPosters === null);
+
+  if (initialPosters && !cachedPosters) {
+    cachedPosters = initialPosters;
+  }
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: true,
@@ -55,6 +59,10 @@ export function PosterSlider() {
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
 
   useEffect(() => {
+    if (initialPosters && initialPosters.length > 0) {
+      return;
+    }
+
     console.log("PosterSlider: Fetching posters...");
     let isMounted = true;
     const safetyTimeout = setTimeout(() => {

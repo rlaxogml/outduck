@@ -86,9 +86,15 @@ export default async function Home() {
     .or(`end_at.gte.${todayStr},end_at.is.null`)
     .order("start_at", { ascending: true });
 
-  const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
+  const posterQuery = supabase
+    .from("posters")
+    .select("*")
+    .order("order", { ascending: true });
+
+  const [{ data: offlineData }, { data: onlineData }, { data: posterData }] = await Promise.all([
     offlineQuery,
     onlineQuery,
+    posterQuery,
   ]);
 
   const formatEventDate = (start: string | null, end: string | null) => {
@@ -184,10 +190,28 @@ export default async function Home() {
     });
   }
 
+  let posters: any[] = [];
+  if (posterData) {
+    posters = (posterData || []).filter((p: any) => {
+      if (p.force_hide) return false; // Force hide takes highest precedence
+      if (p.is_active) return true;   // Force show
+      if (p.payment_status !== 'paid') return false; // Must be paid to auto show
+
+      const start = p.start_date ? p.start_date.split('T')[0] : null;
+      const end = p.end_date ? p.end_date.split('T')[0] : null;
+      
+      if (start && start > todayStr) return false;
+      if (end && end < todayStr) return false;
+      
+      return true;
+    });
+  }
+
   return (
     <HomeClient 
       initialOfflineEvents={offlineEvents} 
       initialOnlineEvents={onlineEvents} 
+      initialPosters={posters}
     />
   );
 }

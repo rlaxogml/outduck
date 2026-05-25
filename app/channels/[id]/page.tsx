@@ -241,13 +241,34 @@ export default function ChannelProfilePage() {
         return { user: null, isSubscribed: false, userCompany: null };
       });
 
+      // 1. Resolve team metadata and member metadata promises first to secure relatedChannelIds
+      const [teamData, membersData] = await Promise.all([
+        teamDataPromise,
+        membersDataPromise,
+      ]);
+
+      // 2. Define related channels based on resolved metadata
+      const relatedChannelIds = [
+        channelId,
+        ...(teamData ? [(teamData as Channel).id] : []),
+        ...((membersData as Channel[])?.map(m => m.id) || [])
+      ];
+
+      // 3. Initiate the massive event queries using relatedChannelIds
       const offlineEventsPromise = supabase
         .from("offline_events")
         .select(`
           id, title, start_date, end_date, image_url, reservation_type,
-          events ( event_channels ( channels ( id, name, type, image_url ) ) ),
+          events!inner ( 
+            event_channels!inner ( 
+              channels!inner ( 
+                id, name, type, image_url 
+              ) 
+            ) 
+          ),
           offline_event_locations ( location )
         `)
+        .in("events.event_channels.channels.id", relatedChannelIds)
         .order("start_date", { ascending: true })
         .then(res => res.data);
 
@@ -255,14 +276,20 @@ export default function ChannelProfilePage() {
         .from("online_events")
         .select(`
           id, title, start_at, end_at, image_url,
-          events ( event_channels ( channels ( id, name, type, image_url ) ) )
+          events!inner ( 
+            event_channels!inner ( 
+              channels!inner ( 
+                id, name, type, image_url 
+              ) 
+            ) 
+          )
         `)
+        .in("events.event_channels.channels.id", relatedChannelIds)
         .order("start_at", { ascending: true })
         .then(res => res.data);
 
-      const [teamData, membersData, favCount, { user: currentUser, isSubscribed, userCompany: fetchedCompany }, offlineData, onlineData] = await Promise.all([
-        teamDataPromise,
-        membersDataPromise,
+      // 4. Resolve events and rest of promises
+      const [favCount, { user: currentUser, isSubscribed, userCompany: fetchedCompany }, offlineData, onlineData] = await Promise.all([
         favoriteCountPromise,
         userAndFavPromise,
         offlineEventsPromise,
@@ -276,77 +303,63 @@ export default function ChannelProfilePage() {
       setIsSubscribed(isSubscribed);
       setUserCompany(fetchedCompany);
 
-      const relatedChannelIds = [
-        channelId,
-        ...(teamData ? [(teamData as Channel).id] : []),
-        ...((membersData as Channel[])?.map(m => m.id) || [])
-      ];
-
       if (offlineData) {
-        const formatted = offlineData
-          .filter(event =>
-            (event.events as any)?.event_channels?.some((ec: any) => relatedChannelIds.includes(ec.channels?.id))
-          )
-          .map((event, index) => {
-            const allChannels = ((event.events as any)?.event_channels || [])
-              .map((ec: any) => ec.channels)
-              .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
-            const sorted = [
-              ...allChannels.filter(c => c.id === channelId),
-              ...allChannels.filter(c => c.id !== channelId),
-            ];
-            const date = event.end_date
-              ? `${event.start_date.replaceAll("-", ".")} - ${event.end_date.replaceAll("-", ".")}`
-              : event.start_date?.replaceAll("-", ".") ?? "상시";
-            return {
-              id: event.id,
-              title: event.title,
-              date,
-              location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
-              category: getChannelTypeText(sorted[0]?.type),
-              imageColor: imageColors[index % imageColors.length],
-              imageUrl: event.image_url,
-              reservationType: event.reservation_type as ChannelEvent["reservationType"],
-              channels: sorted.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
-              startDateValue: event.start_date,
-              endDateValue: event.end_date,
-              eventType: "offline" as const,
-            };
-          });
+        const formatted = offlineData.map((event, index) => {
+          const allChannels = ((event.events as any)?.event_channels || [])
+            .map((ec: any) => ec.channels)
+            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
+          const sorted = [
+            ...allChannels.filter(c => c.id === channelId),
+            ...allChannels.filter(c => c.id !== channelId),
+          ];
+          const date = event.end_date
+            ? `${event.start_date.replaceAll("-", ".")} - ${event.end_date.replaceAll("-", ".")}`
+            : event.start_date?.replaceAll("-", ".") ?? "상시";
+          return {
+            id: event.id,
+            title: event.title,
+            date,
+            location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
+            category: getChannelTypeText(sorted[0]?.type),
+            imageColor: imageColors[index % imageColors.length],
+            imageUrl: event.image_url,
+            reservationType: event.reservation_type as ChannelEvent["reservationType"],
+            channels: sorted.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+            startDateValue: event.start_date,
+            endDateValue: event.end_date,
+            eventType: "offline" as const,
+          };
+        });
         setOfflineEvents(formatted);
       }
 
       if (onlineData) {
-        const formatted = onlineData
-          .filter(event =>
-            (event.events as any)?.event_channels?.some((ec: any) => relatedChannelIds.includes(ec.channels?.id))
-          )
-          .map((event, index) => {
-            const allChannels = ((event.events as any)?.event_channels || [])
-              .map((ec: any) => ec.channels)
-              .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
-            const sorted = [
-              ...allChannels.filter(c => c.id === channelId),
-              ...allChannels.filter(c => c.id !== channelId),
-            ];
-            const date = event.end_at
-              ? `${event.start_at.replaceAll("-", ".").slice(0, 10)} - ${event.end_at.replaceAll("-", ".").slice(0, 10)}`
-              : event.start_at?.replaceAll("-", ".").slice(0, 10) ?? "상시";
-            return {
-              id: event.id,
-              title: event.title,
-              date,
-              location: "온라인",
-              category: getChannelTypeText(sorted[0]?.type),
-              imageColor: imageColors[index % imageColors.length],
-              imageUrl: event.image_url,
-              reservationType: undefined,
-              channels: sorted.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
-              startDateValue: event.start_at,
-              endDateValue: event.end_at,
-              eventType: "online" as const,
-            };
-          });
+        const formatted = onlineData.map((event, index) => {
+          const allChannels = ((event.events as any)?.event_channels || [])
+            .map((ec: any) => ec.channels)
+            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
+          const sorted = [
+            ...allChannels.filter(c => c.id === channelId),
+            ...allChannels.filter(c => c.id !== channelId),
+          ];
+          const date = event.end_at
+            ? `${event.start_at.replaceAll("-", ".").slice(0, 10)} - ${event.end_at.replaceAll("-", ".").slice(0, 10)}`
+            : event.start_at?.replaceAll("-", ".").slice(0, 10) ?? "상시";
+          return {
+            id: event.id,
+            title: event.title,
+            date,
+            location: "온라인",
+            category: getChannelTypeText(sorted[0]?.type),
+            imageColor: imageColors[index % imageColors.length],
+            imageUrl: event.image_url,
+            reservationType: undefined,
+            channels: sorted.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+            startDateValue: event.start_at,
+            endDateValue: event.end_at,
+            eventType: "online" as const,
+          };
+        });
         setOnlineEvents(formatted);
       }
 
@@ -381,61 +394,59 @@ export default function ChannelProfilePage() {
     <>
       <Header />
       <main className="mx-auto w-full max-w-6xl px-4 py-8">
-        <section className="rounded-2xl border border-border bg-card p-6">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-24 w-24 border border-border">
+        <section className="rounded-2xl border border-border bg-card p-4 md:p-6">
+          <div className="flex flex-row items-center justify-between gap-3 md:gap-5">
+            <div className="flex items-center gap-3 md:gap-4 min-w-0">
+              <Avatar className="h-14 w-14 md:h-24 md:w-24 border border-border shrink-0">
                 <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
-                <AvatarFallback className="bg-muted text-2xl font-bold text-foreground">
+                <AvatarFallback className="bg-muted text-lg md:text-2xl font-bold text-foreground">
                   {getInitialText(channel.name)}
                 </AvatarFallback>
               </Avatar>
 
-              <div className="space-y-2">
-                <h1 className="text-3xl font-extrabold tracking-tight">{channel.name}</h1>
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className="px-2.5 py-0.5 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-transparent">
+              <div className="space-y-1.5 md:space-y-2 min-w-0">
+                <h1 className="text-xl md:text-3xl font-extrabold tracking-tight truncate">{channel.name}</h1>
+                <div className="flex items-center gap-2 md:gap-3">
+                  <Badge variant="secondary" className="px-2 py-0.5 text-[10px] md:text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-transparent">
                     {getChannelTypeText(channel.type)}
                   </Badge>
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                    <Star className="h-3.5 w-3.5 fill-muted-foreground/30 text-muted-foreground/50" /> {favoriteCount}
+                  <span className="text-xs md:text-sm font-medium text-muted-foreground flex items-center gap-1">
+                    <Star className="h-3 w-3 md:h-3.5 md:w-3.5 fill-muted-foreground/30 text-muted-foreground/50" /> {favoriteCount}
                   </span>
                 </div>
-
-
 
                 {!channel.is_team && channel.team_id && teamChannel && (
                   <Link
                     href={`/channels/${teamChannel.id}`}
-                    className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 md:px-3 md:py-1.5 text-[9px] md:text-xs text-muted-foreground hover:bg-muted truncate max-w-[130px] sm:max-w-none"
                   >
-                    <Avatar className="h-5 w-5 border border-border">
+                    <Avatar className="h-3.5 w-3.5 md:h-5 md:w-5 border border-border shrink-0">
                       <AvatarImage src={teamChannel.image_url ?? undefined} alt={`${teamChannel.name} 팀 이미지`} className="object-cover" />
-                      <AvatarFallback className="bg-muted text-[10px]">
+                      <AvatarFallback className="bg-muted text-[6px] md:text-[10px]">
                         {getInitialText(teamChannel.name)}
                       </AvatarFallback>
                     </Avatar>
-                    소속팀: {teamChannel.name}
+                    <span className="truncate">소속팀: {teamChannel.name}</span>
                   </Link>
                 )}
               </div>
             </div>
 
             {isOwner ? (
-              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 md:gap-2 shrink-0">
                 <Link
                   href="/settings?tab=advanced"
-                  className="inline-flex items-center gap-1.5 justify-center rounded-full h-11 px-5 font-bold text-sm bg-white text-black border border-black/20 transition-all hover:scale-105 active:scale-95 shadow-sm dark:bg-white dark:text-black dark:border-black/20"
+                  className="inline-flex items-center gap-1 justify-center rounded-full h-9 md:h-11 px-3 md:px-5 font-bold text-xs md:text-sm bg-white text-black border border-black/20 transition-all hover:scale-105 active:scale-95 shadow-sm dark:bg-white dark:text-black dark:border-black/20"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
-                  채널 수정
+                  <Pencil className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                  수정
                 </Link>
                 <Link
                   href="/events/new"
-                  className="inline-flex items-center gap-1.5 justify-center rounded-full h-11 px-5 font-bold text-sm bg-primary/5 text-primary hover:bg-primary/10 border border-primary/60 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                  className="inline-flex items-center gap-1 justify-center rounded-full h-9 md:h-11 px-3 md:px-5 font-bold text-xs md:text-sm bg-primary/5 text-primary hover:bg-primary/10 border border-primary/60 transition-all hover:scale-105 active:scale-95 shadow-sm"
                 >
-                  <Plus className="h-4 w-4" />
-                  행사 등록
+                  <Plus className="h-3 w-3 md:h-4 md:w-4" />
+                  등록
                 </Link>
               </div>
             ) : (
@@ -461,13 +472,13 @@ export default function ChannelProfilePage() {
                   }
                 }}
                 disabled={isLoadingSubscribe}
-                className={`flex items-center justify-center rounded-full h-11 font-semibold transition-all duration-500 hover:scale-105 active:scale-95 shadow-sm disabled:opacity-90 disabled:pointer-events-none ${isSubscribed
-                  ? "px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40"
-                  : "px-6 bg-muted text-muted-foreground border border-border hover:bg-muted/80"
+                className={`flex items-center justify-center rounded-full h-9 md:h-11 font-semibold transition-all duration-500 hover:scale-105 active:scale-95 shadow-sm disabled:opacity-90 disabled:pointer-events-none shrink-0 ${isSubscribed
+                  ? "w-fit px-2.5 md:px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/40"
+                  : "w-fit px-3.5 md:px-6 bg-muted text-muted-foreground border border-border hover:bg-muted/80 text-xs md:text-sm"
                   }`}
               >
-                <Star className={`h-5 w-5 transition-all duration-300 ${isSubscribed ? "fill-white text-white" : "text-muted-foreground"}`} />
-                <span className={`transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap ${isSubscribed ? "max-w-0 opacity-0 ml-0" : "max-w-[100px] opacity-100 ml-2"
+                <Star className={`h-4 w-4 md:h-5 md:w-5 transition-all duration-300 ${isSubscribed ? "fill-white text-white" : "text-muted-foreground"}`} />
+                <span className={`transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap ${isSubscribed ? "max-w-0 opacity-0 ml-0" : "max-w-[100px] opacity-100 ml-1.5"
                   }`}>
                   팔로우
                 </span>
@@ -548,30 +559,33 @@ export default function ChannelProfilePage() {
         </section>
 
         <section className="mt-6 rounded-2xl border border-border bg-card p-6">
-          <div className="flex gap-2 p-1 bg-muted/40 rounded-xl mb-6 w-full md:w-fit">
+          <div className="flex gap-1.5 p-1 bg-muted/40 rounded-xl mb-6 w-full md:w-fit overflow-x-auto no-scrollbar">
             <button
               type="button"
               onClick={() => setActiveTab("all")}
-              className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                }`}
+              className={`flex-1 md:flex-none px-2 py-2 md:px-6 md:py-2.5 text-xs md:text-sm font-bold transition-all rounded-lg whitespace-nowrap ${
+                activeTab === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
             >
-              전체 <span className="ml-1 opacity-60">{activeAllEvents.length}</span>
+              전체 <span className="ml-1 opacity-60 text-[10px] md:text-xs">{activeAllEvents.length}</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("offline")}
-              className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "offline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                }`}
+              className={`flex-1 md:flex-none px-2 py-2 md:px-6 md:py-2.5 text-xs md:text-sm font-bold transition-all rounded-lg whitespace-nowrap ${
+                activeTab === "offline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
             >
-              오프라인 일정 <span className="ml-1 opacity-60">{activeOfflineEvents.length}</span>
+              오프라인<span className="hidden min-[370px]:inline"> 일정</span> <span className="ml-1 opacity-60 text-[10px] md:text-xs">{activeOfflineEvents.length}</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("online")}
-              className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "online" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                }`}
+              className={`flex-1 md:flex-none px-2 py-2 md:px-6 md:py-2.5 text-xs md:text-sm font-bold transition-all rounded-lg whitespace-nowrap ${
+                activeTab === "online" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
             >
-              온라인 일정 <span className="ml-1 opacity-60">{activeOnlineEvents.length}</span>
+              온라인<span className="hidden min-[370px]:inline"> 일정</span> <span className="ml-1 opacity-60 text-[10px] md:text-xs">{activeOnlineEvents.length}</span>
             </button>
           </div>
 

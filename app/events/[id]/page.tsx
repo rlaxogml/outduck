@@ -67,6 +67,74 @@ export default function EventDetailPage() {
   const [heartAnim, setHeartAnim] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isScheduleExpanded, setIsScheduleExpanded] = useState(false);
+  const [isMapAvailable, setIsMapAvailable] = useState(true);
+
+  useEffect(() => {
+    if (!event?.location) return;
+
+    let isMounted = true;
+    const checkGeocodability = () => {
+      const kakao = (window as any).kakao;
+      if (!kakao?.maps) return;
+
+      kakao.maps.load(() => {
+        if (!isMounted) return;
+        const geocoder = new kakao.maps.services.Geocoder();
+        const places = new kakao.maps.services.Places();
+        
+        const locs = event.locationsList && event.locationsList.length > 0
+          ? event.locationsList
+          : [event.location];
+
+        let geocodableCount = 0;
+        let checksCompleted = 0;
+
+        const checkSingleLoc = (loc: string) => {
+          geocoder.addressSearch(loc.trim(), (result: any, status: any) => {
+            if (!isMounted) return;
+            if (status === kakao.maps.services.Status.OK) {
+              geocodableCount++;
+              nextCheck();
+            } else {
+              places.keywordSearch(loc.trim(), (data: any, placeStatus: any) => {
+                if (!isMounted) return;
+                if (placeStatus === kakao.maps.services.Status.OK) {
+                  geocodableCount++;
+                }
+                nextCheck();
+              });
+            }
+          });
+        };
+
+        const nextCheck = () => {
+          checksCompleted++;
+          if (checksCompleted === locs.length) {
+            setIsMapAvailable(geocodableCount > 0);
+          }
+        };
+
+        locs.forEach(loc => checkSingleLoc(loc));
+      });
+    };
+
+    const interval = setInterval(() => {
+      if (typeof window !== "undefined" && (window as any).kakao && (window as any).kakao.maps) {
+        clearInterval(interval);
+        checkGeocodability();
+      }
+    }, 200);
+
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [event?.location, event?.locationsList]);
 
   const isPastEvent = useMemo(() => {
     if (!event) return false;
@@ -526,7 +594,7 @@ export default function EventDetailPage() {
         </button>
 
         {/* Floating Map Button (Mobile Only) */}
-        {!isPastEvent && (
+        {!isPastEvent && isMapAvailable && (
           <button
             onClick={() => router.push(`/map?eventId=${event.id}`)}
             className="absolute right-6 top-2 z-40 flex items-center justify-center w-10 h-10 rounded-full border border-border/60 bg-white/90 dark:bg-muted/90 text-foreground shadow-md backdrop-blur-sm hover:scale-105 active:scale-95 transition-all md:hidden"
@@ -692,7 +760,7 @@ export default function EventDetailPage() {
                 <span className="text-sm font-semibold">{isBookmarked ? "관심저장" : "저장"}</span>
               </button>
 
-              {!isPastEvent && (
+              {!isPastEvent && isMapAvailable && (
                 <button 
                   onClick={() => router.push(`/map?eventId=${event.id}`)}
                   className="flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border border-[#4f6b94]/30 dark:border-[#627fa6]/30 bg-background hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10 text-[#3a5378] dark:text-[#a0b8d6] text-sm font-semibold shadow-sm transition-colors"
@@ -776,21 +844,27 @@ export default function EventDetailPage() {
                   </div>
                 ) : (
                   <div 
-                    onClick={() => router.push(`/map?eventId=${event.id}`)}
-                    className="flex items-start gap-4 py-4 sm:py-5 first:pt-0 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all rounded-xl -mx-4 px-4 group"
+                    onClick={isMapAvailable ? () => router.push(`/map?eventId=${event.id}`) : undefined}
+                    className={cn(
+                      "flex items-start gap-4 py-4 sm:py-5 first:pt-0 rounded-xl -mx-4 px-4",
+                      isMapAvailable && "cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all group"
+                    )}
                   >
                     <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
-                      <MapPin className="w-[22px] h-[22px] stroke-[2] group-hover:text-primary transition-colors" />
+                      <MapPin className={cn("w-[22px] h-[22px] stroke-[2]", isMapAvailable && "group-hover:text-primary transition-colors")} />
                     </div>
                     <div className="flex-1">
                       <div className="flex flex-col gap-2">
                         {event.locationsList && event.locationsList.length > 0 ? (
                           event.locationsList.map((loc, idx) => (
                             <div key={idx} className="inline-flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors break-keep leading-snug">
+                              <span className={cn(
+                                "font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 break-keep leading-snug",
+                                isMapAvailable && "group-hover:text-primary transition-colors"
+                              )}>
                                 {loc}
                               </span>
-                              {idx === 0 && (
+                              {isMapAvailable && idx === 0 && (
                                 <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none ml-1 opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
                                   지도보기
                                 </span>
@@ -799,12 +873,17 @@ export default function EventDetailPage() {
                           ))
                         ) : (
                           <div className="inline-flex items-center gap-1.5 flex-wrap">
-                            <span className="font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors break-keep leading-snug">
+                            <span className={cn(
+                              "font-semibold text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 break-keep leading-snug",
+                              isMapAvailable && "group-hover:text-primary transition-colors"
+                            )}>
                               {event.location || "장소 정보 없음"}
                             </span>
-                            <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none ml-1 opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
-                              지도보기
-                            </span>
+                            {isMapAvailable && (
+                              <span className="text-[12px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 py-0.5 px-2 rounded font-bold select-none ml-1 opacity-80 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shrink-0">
+                                지도보기
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>

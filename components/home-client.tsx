@@ -34,9 +34,10 @@ type Event = {
 interface HomeClientProps {
   initialOfflineEvents: Event[];
   initialOnlineEvents: Event[];
+  initialPosters?: any[];
 }
 
-export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeClientProps) {
+export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialPosters = [] }: HomeClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
   const [activeCategory, setActiveCategory] = useState("all");
@@ -179,6 +180,34 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
     return result;
   })();
 
+  // 4. Infinite Scroll Observer to seamlessly load additional events as the user scrolls
+  useEffect(() => {
+    if (visibleCount >= filteredEvents.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          // A minor timeout creates a premium delay to show the loader elegantly
+          setTimeout(() => {
+            setVisibleCount((prev) => Math.min(prev + 10, filteredEvents.length));
+          }, 150);
+        }
+      },
+      { rootMargin: "250px" } // Load events slightly earlier for a seamless user experience
+    );
+
+    const trigger = document.getElementById("infinite-scroll-trigger");
+    if (trigger) {
+      observer.observe(trigger);
+    }
+
+    return () => {
+      if (trigger) {
+        observer.unobserve(trigger);
+      }
+    };
+  }, [visibleCount, filteredEvents.length]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Left Google Ad */}
@@ -194,7 +223,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
         <main className="pb-8">
           {/* Poster Slider */}
           <section className="pt-1 pb-4 md:py-4">
-            <PosterSlider />
+            <PosterSlider initialPosters={initialPosters} />
           </section>
 
           {/* Company Owner Banner */}
@@ -291,13 +320,11 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
             </div>
 
             {visibleCount < filteredEvents.length && (
-              <div className="mt-8 flex justify-center">
-                <button
-                  onClick={() => setVisibleCount((prev) => prev + 10)}
-                  className="px-6 py-2.5 bg-secondary text-secondary-foreground text-sm font-semibold rounded-full shadow-sm hover:bg-secondary/80 transition-colors"
-                >
-                  더보기 ({visibleCount} / {filteredEvents.length})
-                </button>
+              <div id="infinite-scroll-trigger" className="mt-8 mb-4 flex justify-center items-center py-6">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[11px] md:text-xs text-muted-foreground font-semibold">행사를 더 불러오는 중...</span>
+                </div>
               </div>
             )}
           </section>

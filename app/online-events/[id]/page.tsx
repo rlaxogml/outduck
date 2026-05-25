@@ -1353,7 +1353,7 @@ export default function OnlineEventDetailPage() {
                     });
 
                     return (
-                      <div className="border border-border/60 rounded-2xl bg-background shadow-sm min-h-[500px] flex flex-col p-5 md:p-8 animate-in fade-in duration-300">
+                      <div className="md:border md:border-border/60 md:rounded-2xl bg-transparent md:bg-background md:shadow-sm min-h-[500px] flex flex-col p-0 md:p-8 animate-in fade-in duration-300">
                         <div className="flex items-center pb-3">
                           <button
                             onClick={() => setSelectedNoticeId(null)}
@@ -1440,7 +1440,7 @@ export default function OnlineEventDetailPage() {
                     );
                   })()
                 ) : (
-                  <div className="border border-border/60 rounded-2xl overflow-hidden bg-background shadow-sm min-h-[500px] flex flex-col animate-in fade-in duration-300">
+                  <div className="md:border md:border-border/60 md:rounded-2xl md:overflow-hidden bg-transparent md:bg-background md:shadow-sm min-h-[500px] flex flex-col animate-in fade-in duration-300 -mx-5 md:mx-0 border-t border-b border-border/60 md:border-t-0 md:border-b-0">
                     <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3.5 border-b border-border bg-muted/30 text-sm font-extrabold text-muted-foreground select-none">
                       <div className="col-span-9">제목</div>
                       <div className="col-span-2 text-center">작성일</div>
@@ -1461,21 +1461,39 @@ export default function OnlineEventDetailPage() {
                             <div key={`pinned-${notice.id}`} className="bg-rose-50/15 dark:bg-rose-950/5">
                               <button
                                 onClick={() => handleViewNotice(notice.id)}
-                                className="w-full px-4 md:px-6 py-3.5 flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 items-stretch md:items-center hover:bg-muted/15 transition-colors text-left font-bold text-[14px]"
+                                className="w-full px-5 md:px-6 py-3.5 hover:bg-muted/15 transition-colors text-left text-[14px]"
                               >
-                                <div className="col-span-9 flex items-center gap-2">
-                                  <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold select-none">
-                                    📌 공지
-                                  </span>
-                                  <span className="text-foreground hover:underline line-clamp-1 flex-1 font-bold text-[14px]">{notice.title}</span>
-                                </div>
-                                
-                                <div className="col-span-2 text-left md:text-center text-sm text-muted-foreground font-semibold flex items-center gap-1.5 md:block">
-                                  <span className="md:hidden text-muted-foreground font-bold">작성일:</span>{dateStr}
+                                {/* Mobile View Layout */}
+                                <div className="flex flex-col gap-1.5 md:hidden">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold select-none">
+                                      📌 공지
+                                    </span>
+                                    <span className="text-foreground hover:underline line-clamp-1 flex-1 font-bold text-[14px]">{notice.title}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold pl-1">
+                                    <span>{notice.channels?.name || "공식 채널"}</span>
+                                    <span>{dateStr}</span>
+                                    <span>조회 {views}</span>
+                                  </div>
                                 </div>
 
-                                <div className="col-span-1 text-left md:text-center text-sm text-muted-foreground font-semibold flex items-center gap-1.5 md:block">
-                                  <span className="md:hidden font-bold">조회수:</span>{views}
+                                {/* Desktop View Layout */}
+                                <div className="hidden md:grid md:grid-cols-12 gap-4 items-center font-bold">
+                                  <div className="col-span-9 flex items-center gap-2">
+                                    <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold select-none">
+                                      📌 공지
+                                    </span>
+                                    <span className="text-foreground hover:underline line-clamp-1 flex-1 font-bold text-[14px]">{notice.title}</span>
+                                  </div>
+                                  
+                                  <div className="col-span-2 text-center text-sm text-muted-foreground font-semibold">
+                                    {dateStr}
+                                  </div>
+
+                                  <div className="col-span-1 text-center text-sm text-muted-foreground font-semibold">
+                                    {views}
+                                  </div>
                                 </div>
                               </button>
                             </div>

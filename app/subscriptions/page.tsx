@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Header } from "@/components/header";
 import { FavoriteChannels } from "@/components/favorite-channels";
 import { EventTabs } from "@/components/event-tabs";
@@ -18,43 +18,65 @@ export default function SubscriptionsPage() {
   const [onlineEvents, setOnlineEvents] = useState<any[]>([]);
   const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
 
-  const isPastEvent = (endDateStr: string | null, startDateStr: string | null) => {
-    if (!endDateStr && !startDateStr) return false;
-    const dateStr = endDateStr || startDateStr;
-    if (!dateStr) return false;
-
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return false;
-
+  // 1. Cache the reference timestamp for "today" to avoid endless new Date() instantiations inside loops
+  const todayTimestamp = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    return today.getTime();
+  }, []);
 
-    const targetDate = new Date(date);
-    targetDate.setHours(23, 59, 59, 999);
+  const isPastEvent = useMemo(() => {
+    return (endDateStr: string | null, startDateStr: string | null) => {
+      if (!endDateStr && !startDateStr) return false;
+      const dateStr = endDateStr || startDateStr;
+      if (!dateStr) return false;
 
-    return targetDate < today;
-  };
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return false;
 
-  const activeOfflineEvents = offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
-  const activeOnlineEvents = onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
+      const targetDate = new Date(date);
+      targetDate.setHours(23, 59, 59, 999);
 
-  const sortEvents = (list: any[]) => {
-    let result = [...list];
+      return targetDate.getTime() < todayTimestamp;
+    };
+  }, [todayTimestamp]);
+
+  // 2. Memoize event partitions to completely skip filtering iterations during unrelated UI renders
+  const activeOfflineEvents = useMemo(() => offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)), [offlineEvents, isPastEvent]);
+  const activeOnlineEvents = useMemo(() => onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)), [onlineEvents, isPastEvent]);
+
+  // 3. Cache sorting and list mapping displays
+  const displayedOfflineEvents = useMemo(() => {
+    let result = [...activeOfflineEvents];
     if (sortType === "upcoming") {
-      result = result.filter(e => !e.isAlways);
-      return result.sort((a, b) => {
-        if (!a.startDateValue || !b.startDateValue) return 0;
-        return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
-      });
+      return result
+        .filter(e => !e.isAlways)
+        .sort((a, b) => {
+          if (!a.startDateValue || !b.startDateValue) return 0;
+          return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
+        });
     } else {
       return result.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
     }
-  };
+  }, [activeOfflineEvents, sortType]);
 
-  const displayedOfflineEvents = sortEvents(activeOfflineEvents);
-  const displayedOnlineEvents = sortEvents(activeOnlineEvents);
+  const displayedOnlineEvents = useMemo(() => {
+    let result = [...activeOnlineEvents];
+    if (sortType === "upcoming") {
+      return result
+        .filter(e => !e.isAlways)
+        .sort((a, b) => {
+          if (!a.startDateValue || !b.startDateValue) return 0;
+          return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
+        });
+    } else {
+      return result.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+  }, [activeOnlineEvents, sortType]);
 
   const imageColors = [
     "bg-gradient-to-br from-indigo-400 to-indigo-600",

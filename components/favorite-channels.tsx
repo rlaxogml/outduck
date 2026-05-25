@@ -45,16 +45,7 @@ export function FavoriteChannels({ user }: { user: any }) {
     console.log("FavoriteChannels: Auth changed or mounted.", { hasUser: !!user, mounted });
     if (!mounted) return;
 
-    if (!user) {
-      console.log("FavoriteChannels: No user prop. Resetting channels.");
-      cachedChannels = null;
-      setChannels([]);
-      setIsLoading(false);
-      return;
-    }
-
     let isMounted = true;
-    setIsLoading(true);
     setHasTimedOut(false);
 
     let safetyTimeout = setTimeout(() => {
@@ -65,127 +56,202 @@ export function FavoriteChannels({ user }: { user: any }) {
       }
     }, 15000);
 
-    const fetchFavoritesAndBookmarks = async (currentUser: any) => {
-      console.log("FavoriteChannels: Starting fetchFavoritesAndBookmarks for user:", currentUser.id);
+    const checkAuthAndProgressiveFetch = async () => {
       try {
-        const [{ data: favoritesData, error: favError }, { data: bookmarksData }] = await Promise.all([
-          supabase
-            .from("favorites")
-            .select("channel_id, created_at, channels(id, name, type, image_url, event_channels(events(id, offline_events(id, created_at, end_date), online_events(id, created_at, end_at))))")
-            .eq("user_id", currentUser.id)
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("event_bookmarks")
-            .select("event_id")
-            .eq("user_id", currentUser.id),
-        ]);
+        let currentUser = user;
+        if (!currentUser) {
+          // Verify supabase session directly to bypass initial React prop loading delay
+          const { data: { session } } = await supabase.auth.getSession();
+          currentUser = session?.user ?? null;
+        }
+
+        if (!currentUser) {
+          console.log("FavoriteChannels: No active session. Resetting.");
+          cachedChannels = null;
+          if (isMounted) {
+            setChannels([]);
+            setIsLoading(false);
+          }
+          clearTimeout(safetyTimeout);
+          return;
+        }
+
+        if (isMounted && cachedChannels) {
+          setChannels(cachedChannels);
+          setIsLoading(false);
+        } else if (isMounted) {
+          setIsLoading(true);
+        }
+
+        console.log("FavoriteChannels: Fetching initial channel metadata for user:", currentUser.id);
+        
+        // 1단계: 초고속 단일 조회 (소속 관계 매핑을 위해 team_id, is_team 추가 조회)
+        const { data: favoritesData, error: favError } = await supabase
+          .from("favorites")
+          .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
+          .eq("user_id", currentUser.id)
+          .order("created_at", { ascending: false });
 
         if (favError) {
           console.error("FavoriteChannels: Error fetching favorites:", favError);
           throw favError;
         }
 
-        if (isMounted) {
-          const bookmarkedEventIds = new Set((bookmarksData || []).map(b => b.event_id).filter(Boolean));
-          const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+        if (!isMounted) return;
 
-          const zone1: Channel[] = [];
-          const zone2: Channel[] = [];
+        // 메타데이터 매핑 및 렌더링 시작 (배지 개수는 일단 로딩)
+        const initialChannels: (Channel & { team_id?: number | null; is_team?: boolean; relatedChannelIds?: number[] })[] = (favoritesData || []).map((fav: any) => {
+          const ch = fav.channels;
+          return {
+            id: ch?.id,
+            name: ch?.name || "기타",
+            type: ch?.type,
+            image_url: ch?.image_url || null,
+            team_id: ch?.team_id,
+            is_team: ch?.is_team || false,
+            activeEventCount: undefined, // 배지는 백그라운드 로드
+            favoriteCreatedAt: fav.created_at,
+            relatedChannelIds: ch?.id ? [ch.id] : []
+          };
+        }).filter(c => c.id !== undefined);
 
-          if (favoritesData) {
-            favoritesData.forEach((fav: any) => {
-              const ch = fav.channels;
-              if (!ch) return;
+        // 소속 팀 채널들의 멤버 채널 목록 수집
+        const teamIds = initialChannels.filter(c => c.is_team).map(c => c.id);
+        let membersList: { id: number; team_id: number }[] = [];
 
-              let activeEventCount = 0;
-              let hasBookmarkedEvent = false;
-              let latestEventCreatedAt = "";
+        if (teamIds.length > 0) {
+          const { data: membersData } = await supabase
+            .from("channels")
+            .select("id, team_id")
+            .in("team_id", teamIds)
+            .eq("is_team", false);
+          
+          membersList = (membersData || []) as { id: number; team_id: number }[];
+        }
 
-              if (ch.event_channels) {
-                ch.event_channels.forEach((ec: any) => {
-                  const ev = ec.events;
-                  if (!ev) return;
-
-                  let isEventActive = false;
-                  let eventCreatedAt = "";
-
-                  if (ev.offline_events && ev.offline_events.length > 0) {
-                    const off = ev.offline_events[0];
-                    if (!off.end_date || off.end_date >= todayStr) {
-                      isEventActive = true;
-                    }
-                    eventCreatedAt = off.created_at || "";
-                  } else if (ev.online_events && ev.online_events.length > 0) {
-                    const on = ev.online_events[0];
-                    const endAtDate = on.end_at ? on.end_at.split("T")[0] : null;
-                    if (!endAtDate || endAtDate >= todayStr) {
-                      isEventActive = true;
-                    }
-                    eventCreatedAt = on.created_at || "";
-                  }
-
-                  if (isEventActive) {
-                    activeEventCount++;
-                    if (bookmarkedEventIds.has(ev.id)) {
-                      hasBookmarkedEvent = true;
-                    }
-                    if (eventCreatedAt && (!latestEventCreatedAt || eventCreatedAt > latestEventCreatedAt)) {
-                      latestEventCreatedAt = eventCreatedAt;
-                    }
-                  }
-                });
-              }
-
-              const formattedChannel: Channel = {
-                id: ch.id,
-                name: ch.name,
-                type: ch.type,
-                image_url: ch.image_url,
-                activeEventCount,
-                hasBookmarkedEvent,
-                latestEventCreatedAt,
-                favoriteCreatedAt: fav.created_at
-              };
-
-              if (activeEventCount > 0) {
-                zone1.push(formattedChannel);
-              } else {
-                zone2.push(formattedChannel);
-              }
-            });
-
-            // Sort zone1: bookmarked events first, then latest created event first
-            zone1.sort((a, b) => {
-              if (a.hasBookmarkedEvent && !b.hasBookmarkedEvent) return -1;
-              if (!a.hasBookmarkedEvent && b.hasBookmarkedEvent) return 1;
-              if (a.latestEventCreatedAt && b.latestEventCreatedAt) {
-                return b.latestEventCreatedAt.localeCompare(a.latestEventCreatedAt);
-              }
-              return (b.favoriteCreatedAt || "").localeCompare(a.favoriteCreatedAt || "");
-            });
-
-            // Sort zone2: latest favorite first
-            zone2.sort((a, b) => {
-              return (b.favoriteCreatedAt || "").localeCompare(a.favoriteCreatedAt || "");
-            });
-
-            cachedChannels = [...zone1, ...zone2];
-            setChannels(cachedChannels);
-            setHasTimedOut(false);
+        // 각 채널별 연관 채널 ID 바인딩 (팀은 멤버들 포함, 멤버는 팀 포함)
+        initialChannels.forEach(c => {
+          if (c.is_team) {
+            const memberIds = membersList.filter(m => m.team_id === c.id).map(m => m.id);
+            c.relatedChannelIds = [c.id, ...memberIds];
+          } else if (c.team_id) {
+            c.relatedChannelIds = [c.id, c.team_id];
+          } else {
+            c.relatedChannelIds = [c.id];
           }
+        });
+
+        cachedChannels = initialChannels;
+        setChannels(initialChannels);
+        setIsLoading(false);
+        clearTimeout(safetyTimeout);
+
+        // 연관 채널들의 고유 ID 목록 추출하여 통합 조회 목록 정의
+        const allQueryChannelIds = Array.from(new Set(
+          initialChannels.flatMap(c => c.relatedChannelIds || [])
+        ));
+
+        // 2단계: 백그라운드에서 조용히 활성 행사 개수(Red Badge) 및 북마크 매핑 병렬 계산
+        if (allQueryChannelIds.length > 0) {
+          const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+          
+          const [{ data: eventsData }, { data: bookmarksData }] = await Promise.all([
+            supabase
+              .from("event_channels")
+              .select(`
+                channel_id,
+                events!inner (
+                  id,
+                  offline_events(id, end_date),
+                  online_events(id, end_at)
+                )
+              `)
+              .in("channel_id", allQueryChannelIds),
+            supabase
+              .from("event_bookmarks")
+              .select("event_id")
+              .eq("user_id", currentUser.id),
+          ]);
+
+          if (!isMounted) return;
+
+          const bookmarkedEventIds = new Set((bookmarksData || []).map(b => b.event_id).filter(Boolean));
+          
+          // 채널별 활성 행사 매핑 수집
+          const channelActiveEventsMap: Record<number, { eventId: number; isBookmarked: boolean }[]> = {};
+
+          (eventsData || []).forEach((ec: any) => {
+            const ev = ec.events;
+            if (!ev) return;
+
+            let isEventActive = false;
+            if (ev.offline_events && ev.offline_events.length > 0) {
+              const off = ev.offline_events[0];
+              if (!off.end_date || off.end_date >= todayStr) {
+                isEventActive = true;
+              }
+            } else if (ev.online_events && ev.online_events.length > 0) {
+              const on = ev.online_events[0];
+              const endAtDate = on.end_at ? on.end_at.split("T")[0] : null;
+              if (!endAtDate || endAtDate >= todayStr) {
+                isEventActive = true;
+              }
+            }
+
+            if (isEventActive) {
+              if (!channelActiveEventsMap[ec.channel_id]) {
+                channelActiveEventsMap[ec.channel_id] = [];
+              }
+              channelActiveEventsMap[ec.channel_id].push({
+                eventId: ev.id,
+                isBookmarked: bookmarkedEventIds.has(ev.id)
+              });
+            }
+          });
+
+          // 채널 상태 업데이트 (연관 채널의 행사 개수를 수집하되 co-host 중복 제거)
+          setChannels(prev => {
+            const updated = prev.map(ch => {
+              const extraCh = ch as any;
+              const relatedIds: number[] = extraCh.relatedChannelIds || [ch.id];
+              
+              const allRelatedEvents: { eventId: number; isBookmarked: boolean }[] = [];
+              relatedIds.forEach(rid => {
+                const evs = channelActiveEventsMap[rid] || [];
+                allRelatedEvents.push(...evs);
+              });
+
+              // eventId 기준 중복 제거 및 수치 합산
+              const seenEventIds = new Set<number>();
+              let uniqueActiveCount = 0;
+              let hasBookmarkedEvent = false;
+
+              allRelatedEvents.forEach(e => {
+                if (!seenEventIds.has(e.eventId)) {
+                  seenEventIds.add(e.eventId);
+                  uniqueActiveCount++;
+                  if (e.isBookmarked) {
+                    hasBookmarkedEvent = true;
+                  }
+                }
+              });
+
+              return {
+                ...ch,
+                activeEventCount: uniqueActiveCount,
+                hasBookmarkedEvent
+              };
+            });
+            cachedChannels = updated;
+            return updated;
+          });
         }
       } catch (error) {
-        console.error("FavoriteChannels: Failed to fetch user or favorites:", error);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-        clearTimeout(safetyTimeout);
-        console.log("FavoriteChannels: fetchFavoritesAndBookmarks finished.");
+        console.error("FavoriteChannels: Failed progressive load:", error);
       }
     };
 
-    fetchFavoritesAndBookmarks(user);
+    checkAuthAndProgressiveFetch();
 
     return () => {
       isMounted = false;

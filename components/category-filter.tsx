@@ -33,7 +33,7 @@ export function CategoryFilter({
             <button
               key={category.id}
               className={cn(
-                "px-3 py-1.5 text-sm rounded-full border transition-all whitespace-nowrap",
+                "px-2.5 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-full border transition-all whitespace-nowrap",
                 activeCategory === category.id
                   ? "bg-primary text-primary-foreground border-primary font-semibold shadow-sm"
                   : "bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-primary"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Header } from "@/components/header";
 import { FavoriteChannels } from "@/components/favorite-channels";
 import { EventTabs } from "@/components/event-tabs";
@@ -20,45 +20,67 @@ export default function BookmarksPage() {
   const [showPastEvents, setShowPastEvents] = useState(true);
   const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
 
-  const isPastEvent = (endDateStr: string | null, startDateStr: string | null) => {
-    if (!endDateStr && !startDateStr) return false;
-    const dateStr = endDateStr || startDateStr;
-    if (!dateStr) return false;
-
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return false;
-
+  // 1. Cache the reference timestamp for "today" to avoid endless new Date() instantiations inside loops
+  const todayTimestamp = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    return today.getTime();
+  }, []);
 
-    const targetDate = new Date(date);
-    targetDate.setHours(23, 59, 59, 999);
+  const isPastEvent = useMemo(() => {
+    return (endDateStr: string | null, startDateStr: string | null) => {
+      if (!endDateStr && !startDateStr) return false;
+      const dateStr = endDateStr || startDateStr;
+      if (!dateStr) return false;
 
-    return targetDate < today;
-  };
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return false;
 
-  const activeOfflineEvents = offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
-  const pastOfflineEvents = offlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue));
-  const activeOnlineEvents = onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue));
-  const pastOnlineEvents = onlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue));
+      const targetDate = new Date(date);
+      targetDate.setHours(23, 59, 59, 999);
 
-  const sortEvents = (list: any[]) => {
-    let result = [...list];
+      return targetDate.getTime() < todayTimestamp;
+    };
+  }, [todayTimestamp]);
+
+  // 2. Memoize event partitions to completely skip filtering iterations during unrelated UI renders
+  const activeOfflineEvents = useMemo(() => offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)), [offlineEvents, isPastEvent]);
+  const pastOfflineEvents = useMemo(() => offlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue)), [offlineEvents, isPastEvent]);
+  const activeOnlineEvents = useMemo(() => onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)), [onlineEvents, isPastEvent]);
+  const pastOnlineEvents = useMemo(() => onlineEvents.filter(e => isPastEvent(e.endDateValue, e.startDateValue)), [onlineEvents, isPastEvent]);
+
+  // 3. Cache display and sorting configurations
+  const displayedOfflineEvents = useMemo(() => {
+    let result = [...activeOfflineEvents];
     if (sortType === "upcoming") {
-      result = result.filter(e => !e.isAlways);
-      return result.sort((a, b) => {
-        if (!a.startDateValue || !b.startDateValue) return 0;
-        return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
-      });
+      return result
+        .filter(e => !e.isAlways)
+        .sort((a, b) => {
+          if (!a.startDateValue || !b.startDateValue) return 0;
+          return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
+        });
     } else {
       return result.sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
     }
-  };
+  }, [activeOfflineEvents, sortType]);
 
-  const displayedOfflineEvents = sortEvents(activeOfflineEvents);
-  const displayedOnlineEvents = sortEvents(activeOnlineEvents);
+  const displayedOnlineEvents = useMemo(() => {
+    let result = [...activeOnlineEvents];
+    if (sortType === "upcoming") {
+      return result
+        .filter(e => !e.isAlways)
+        .sort((a, b) => {
+          if (!a.startDateValue || !b.startDateValue) return 0;
+          return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
+        });
+    } else {
+      return result.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+  }, [activeOnlineEvents, sortType]);
 
   const imageColors = [
     "bg-gradient-to-br from-indigo-400 to-indigo-600",
@@ -99,6 +121,7 @@ export default function BookmarksPage() {
         const { data: offlineBookmarks } = await supabase
           .from("event_bookmarks")
           .select(`
+            created_at,
             events!inner(
               event_channels(
                 channels(
@@ -127,6 +150,7 @@ export default function BookmarksPage() {
         const { data: onlineBookmarks } = await supabase
           .from("event_bookmarks")
           .select(`
+            created_at,
             events!inner(
               event_channels(
                 channels(
@@ -202,7 +226,7 @@ export default function BookmarksPage() {
               reservationType: event.reservation_type,
               channels: extracted.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
               isAlways: !event.start_date,
-              createdAt: event.created_at,
+              createdAt: b.created_at,
               startDateValue: event.start_date,
               endDateValue: event.end_date,
             }));
@@ -227,7 +251,7 @@ export default function BookmarksPage() {
               reservationType: undefined,
               channels: extracted.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
               isAlways: !event.start_at,
-              createdAt: event.created_at,
+              createdAt: b.created_at,
               startDateValue: event.start_at,
               endDateValue: event.end_at,
             }));
@@ -283,7 +307,7 @@ export default function BookmarksPage() {
                     )}
                     onClick={() => setSortType("recent")}
                   >
-                    최근 등록
+                    최근 저장
                   </button>
                   <button
                     className={cn(
@@ -337,7 +361,7 @@ export default function BookmarksPage() {
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                            {displayedOfflineEvents.map((event, index) => (
+                            {displayedOfflineEvents.map((event: any, index: number) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}
@@ -378,7 +402,7 @@ export default function BookmarksPage() {
 
                             {showPastEvents && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
-                                {pastOfflineEvents.map((event, index) => (
+                                {pastOfflineEvents.map((event: any, index: number) => (
                                   <div key={event.id} className="opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 transition-all duration-300">
                                     <EventCard
                                       id={event.id}
@@ -411,7 +435,7 @@ export default function BookmarksPage() {
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                            {displayedOnlineEvents.map((event, index) => (
+                            {displayedOnlineEvents.map((event: any, index: number) => (
                               <EventCard
                                 key={event.id}
                                 id={event.id}
@@ -452,7 +476,7 @@ export default function BookmarksPage() {
 
                             {showPastEvents && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-4 animate-in fade-in slide-in-from-top-3 duration-250">
-                                {pastOnlineEvents.map((event, index) => (
+                                {pastOnlineEvents.map((event: any, index: number) => (
                                   <div key={event.id} className="opacity-70 saturate-50 hover:opacity-100 hover:saturate-100 transition-all duration-300">
                                     <EventCard
                                       id={event.id}
