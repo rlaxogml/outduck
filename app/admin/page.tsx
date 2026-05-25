@@ -25,7 +25,8 @@ import {
   UserX,
   Heart,
   ImageIcon,
-  Plus
+  Plus,
+  LayoutGrid
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
@@ -104,7 +105,7 @@ export default function AdminPage() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"requests" | "reports" | "bans" | "channels" | "posters">("requests");
+  const [activeTab, setActiveTab] = useState<"all" | "requests" | "reports" | "bans" | "channels" | "posters">("all");
 
   // 주최자 신청 관련 상태
   const [requests, setRequests] = useState<ChannelRequest[]>([]);
@@ -183,7 +184,13 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (isAuthorized) {
-      if (activeTab === "requests") {
+      if (activeTab === "all") {
+        fetchPosters();
+        fetchCompanies();
+        fetchInitialData();
+        fetchReports();
+        fetchBans();
+      } else if (activeTab === "requests") {
         fetchInitialData();
       } else if (activeTab === "reports") {
         fetchReports();
@@ -913,6 +920,18 @@ export default function AdminPage() {
     return true;
   });
 
+  // 실시간 게재 배너 슬롯 모니터에 표시할 실제 노출 중인 배너 (메인 페이지 PosterSlider 와 완전히 동일한 조건 필터링)
+  const liveBanners = posters.filter(p => {
+    if (p.force_hide) return false;
+    if (p.is_active) return true;
+    if (p.payment_status !== "paid") return false;
+    const start = p.start_date ? p.start_date.split('T')[0] : null;
+    const end = p.end_date ? p.end_date.split('T')[0] : null;
+    if (start && start > nowStr) return false;
+    if (end && end < nowStr) return false;
+    return true;
+  });
+
   const upcomingPosters = posters.filter(p => {
     if (p.force_hide) return false;
     if (p.is_active) return false;
@@ -934,16 +953,16 @@ export default function AdminPage() {
   const hiddenPosters = posters.filter(p => p.force_hide);
 
   const renderPosterCard = (poster: any) => (
-    <div key={poster.id} className="group bg-background border border-border rounded-3xl p-5 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
+    <div key={poster.id} className="group bg-background border border-border rounded-2xl p-4 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
       <div className="absolute top-0 left-0 right-0 h-1 bg-orange-505" style={{ backgroundColor: '#f97316' }} />
       
       {/* Header: Title and Trash Action */}
-      <div className="flex justify-between items-start gap-4 mb-4">
+      <div className="flex justify-between items-start gap-3 mb-2.5">
         <div>
-          <h4 className="font-extrabold text-base text-slate-800 dark:text-slate-200">
+          <h4 className="font-extrabold text-sm text-slate-800 dark:text-slate-200">
             {poster.advertiser_name || poster.title || "알 수 없는 광고주"}
           </h4>
-          <p className="text-xs text-muted-foreground font-semibold mt-0.5 flex items-center gap-1.5">
+          <p className="text-[10px] text-muted-foreground font-semibold mt-0.5 flex items-center gap-1">
             연락처: {poster.contact || "미기재"}
           </p>
         </div>
@@ -951,14 +970,14 @@ export default function AdminPage() {
           variant="ghost"
           size="icon"
           onClick={() => handleDeletePoster(poster.id)}
-          className="w-8 h-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg shrink-0 transition-colors"
+          className="w-7 h-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg shrink-0 transition-colors"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-3.5 h-3.5" />
         </Button>
       </div>
 
       {/* Banner Image Preview */}
-      <div className="relative rounded-2xl overflow-hidden border border-border bg-muted flex items-center justify-center w-full aspect-[21/9] mb-4">
+      <div className="relative rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center w-full aspect-[21/9] mb-3">
         {poster.image_url ? (
           <img 
             src={poster.image_url} 
@@ -967,8 +986,8 @@ export default function AdminPage() {
           />
         ) : (
           <div className="flex flex-col items-center gap-1 text-muted-foreground/50">
-            <ImageIcon className="w-8 h-8" />
-            <span className="text-[10px]">이미지 없음</span>
+            <ImageIcon className="w-6 h-6" />
+            <span className="text-[9px]">이미지 없음</span>
           </div>
         )}
         {poster.link_url && (
@@ -976,7 +995,7 @@ export default function AdminPage() {
             href={poster.link_url} 
             target="_blank" 
             rel="noreferrer"
-            className="absolute bottom-2 right-2 bg-black/60 hover:bg-black/80 text-white font-bold rounded-lg px-2.5 py-1 text-[9.5px] backdrop-blur-xs flex items-center gap-1 transition-all"
+            className="absolute bottom-1.5 right-1.5 bg-black/60 hover:bg-black/80 text-white font-bold rounded-md px-2 py-0.5 text-[8.5px] backdrop-blur-xs flex items-center gap-0.5 transition-all"
           >
             랜딩 연결 <ExternalLink className="w-2.5 h-2.5" />
           </a>
@@ -984,20 +1003,20 @@ export default function AdminPage() {
       </div>
 
       {/* Metadata & Toggle */}
-      <div className="flex flex-col gap-4 border-t border-border/40 pt-4 mt-1">
+      <div className="flex flex-col gap-2.5 border-t border-border/40 pt-2.5 mt-0.5">
         <div className="flex items-center justify-between">
-          <div className="space-y-1 text-[11px] font-semibold text-muted-foreground">
+          <div className="space-y-0.5 text-[10px] font-semibold text-muted-foreground">
             <div className="flex items-center gap-1">
               <span className="text-slate-400">노출 기간:</span>
               <span className="text-foreground">
                 {formatDisplayDate(poster.start_date)} ~ {formatDisplayDate(poster.end_date)}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <span className="text-slate-400">결제 상태:</span>
               <Badge 
                 variant="outline"
-                className={`text-[9px] font-bold h-4.5 py-0 px-1.5 border-none shadow-none ${
+                className={`text-[8.5px] font-bold h-4 py-0 px-1 border-none shadow-none ${
                   poster.payment_status === "paid" 
                     ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400"
                     : "bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400"
@@ -1010,22 +1029,22 @@ export default function AdminPage() {
         </div>
 
         {/* State Toggle Buttons */}
-        <div className="flex bg-muted rounded-xl p-1 w-full gap-1 border border-border/40">
+        <div className="flex bg-muted rounded-lg p-0.5 w-full gap-0.5 border border-border/40">
           <button 
             onClick={() => handleUpdatePosterState(poster.id, false, true)}
-            className={`flex-1 text-[10.5px] font-bold py-1.5 rounded-lg transition-all ${!poster.is_active && poster.force_hide ? "bg-red-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted-foreground/10"}`}
+            className={`flex-1 text-[9.5px] font-bold py-1 rounded-md transition-all ${!poster.is_active && poster.force_hide ? "bg-red-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted-foreground/10"}`}
           >
             🛑 숨김
           </button>
           <button 
             onClick={() => handleUpdatePosterState(poster.id, false, false)}
-            className={`flex-1 text-[10.5px] font-bold py-1.5 rounded-lg transition-all ${!poster.is_active && !poster.force_hide ? "bg-white dark:bg-slate-800 text-foreground shadow-sm" : "text-muted-foreground hover:bg-muted-foreground/10"}`}
+            className={`flex-1 text-[9.5px] font-bold py-1 rounded-md transition-all ${!poster.is_active && !poster.force_hide ? "bg-green-700 text-white shadow-sm" : "text-muted-foreground hover:bg-muted-foreground/10"}`}
           >
             ⏳ 자동
           </button>
           <button 
             onClick={() => handleUpdatePosterState(poster.id, true, false)}
-            className={`flex-1 text-[10.5px] font-bold py-1.5 rounded-lg transition-all ${poster.is_active && !poster.force_hide ? "bg-orange-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted-foreground/10"}`}
+            className={`flex-1 text-[9.5px] font-bold py-1 rounded-md transition-all ${poster.is_active && !poster.force_hide ? "bg-orange-500 text-white shadow-sm" : "text-muted-foreground hover:bg-muted-foreground/10"}`}
           >
             🚀 노출
           </button>
@@ -1062,6 +1081,28 @@ export default function AdminPage() {
 
         {/* Main Tabs */}
         <div className="flex border-b border-border/60 mb-6 select-none overflow-x-auto scrollbar-none">
+          <button
+            onClick={() => setActiveTab("all")}
+            className={`pb-3 px-5 text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 shrink-0 ${
+              activeTab === "all"
+                ? "border-blue-500 text-blue-500"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            <span>전체</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("posters")}
+            className={`pb-3 px-5 text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 shrink-0 ${
+              activeTab === "posters"
+                ? "border-orange-500 text-orange-500"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span>포스터 관리</span>
+          </button>
           <button
             onClick={() => setActiveTab("requests")}
             className={`pb-3 px-5 text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 shrink-0 ${
@@ -1119,18 +1160,560 @@ export default function AdminPage() {
             <Building2 className="w-4 h-4" />
             <span>채널 관리</span>
           </button>
-          <button
-            onClick={() => setActiveTab("posters")}
-            className={`pb-3 px-5 text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 shrink-0 ${
-              activeTab === "posters"
-                ? "border-orange-500 text-orange-500"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <ImageIcon className="w-4 h-4" />
-            <span>포스터 관리</span>
-          </button>
         </div>
+
+        {activeTab === "all" && (
+          <div className="space-y-12 animate-in fade-in duration-300">
+            {/* Section 1: 포스터 (모니터링 + 활성화 배너) */}
+            <div className="space-y-6 border-b border-border/40 pb-10">
+              <div className="flex items-center gap-2 mb-2">
+                <ImageIcon className="w-5 h-5 text-orange-500" />
+                <h2 className="text-xl font-extrabold tracking-tight">실시간 포스터 배너 모니터링 및 노출 현황</h2>
+              </div>
+              
+              {/* 1. Live Banner Slots Monitor */}
+              {!isLoadingPosters && (
+                <div className="bg-background border border-border/60 rounded-3xl p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                      </span>
+                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 select-none">
+                        실시간 게재 배너 슬롯 모니터
+                        <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full ml-1">
+                          {liveBanners.length}개 활성화
+                        </span>
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-semibold select-none">메인 슬라이더 실제 게재 배너 순서</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                    {liveBanners
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map((poster, index) => (
+                        <div 
+                          key={poster.id} 
+                          className="group relative aspect-[21/9] rounded-2xl overflow-hidden border border-border bg-muted/30 shadow-xs transition-all duration-300 hover:shadow-md hover:border-orange-500/30"
+                        >
+                          {poster.image_url ? (
+                            <img 
+                              src={poster.image_url} 
+                              alt={poster.advertiser_name || "배너"} 
+                              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground/60 font-semibold select-none">
+                              이미지 없음
+                            </div>
+                          )}
+                          <div className="absolute top-2 left-2 bg-orange-500 text-white font-black text-[10px] rounded-lg w-5 h-5 flex items-center justify-center shadow-xs border border-orange-400/20 select-none">
+                            {index + 1}
+                          </div>
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent p-1.5 pt-4 flex flex-col justify-end select-none">
+                            <p className="text-[9.5px] font-extrabold text-white truncate drop-shadow-xs">
+                              {poster.advertiser_name || "공식 배너"}
+                            </p>
+                            <p className="text-[7.5px] font-bold text-white/60 truncate drop-shadow-xs">
+                              ~ {poster.end_date ? poster.end_date.slice(5) : "상시"}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    <div 
+                      onClick={() => router.push("/ad-apply")}
+                      className="group relative aspect-[21/9] rounded-2xl border-2 border-dashed border-border/80 hover:border-orange-500/50 hover:bg-orange-500/[0.01] transition-all duration-300 cursor-pointer flex flex-col items-center justify-center text-center p-2 select-none"
+                    >
+                      <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground group-hover:text-orange-500 group-hover:scale-110 transition-all duration-300 animate-pulse" />
+                      <span className="text-[9px] font-bold text-muted-foreground/80 group-hover:text-orange-500 transition-colors mt-1 select-none">
+                        새 배너 슬롯 추가
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. Active Banners list */}
+              {isLoadingPosters ? (
+                <div className="py-10 flex flex-col items-center justify-center text-muted-foreground">
+                  <Loader2 className="w-8 h-8 animate-spin mb-4 text-orange-500" />
+                  <p>배너 정보를 읽어오는 중...</p>
+                </div>
+              ) : activePosters.length === 0 ? (
+                <div className="py-10 border border-dashed border-border rounded-3xl bg-background/50 flex flex-col items-center justify-center text-center">
+                  <h3 className="text-sm font-bold text-muted-foreground">노출 중인 포스터 배너가 없습니다.</h3>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <h3 className="text-sm font-bold">실시간 노출 중인 배너</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {activePosters.map(renderPosterCard)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section 2: 채널 관리 검색 창 */}
+            <div className="space-y-6 border-b border-border/40 pb-10">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-purple-500" />
+                <h2 className="text-xl font-extrabold tracking-tight">채널 관리</h2>
+              </div>
+              <div className="bg-background border border-border rounded-3xl p-5 shadow-sm space-y-4">
+                <h3 className="text-sm font-bold text-foreground">채널 이름으로 검색</h3>
+                <form onSubmit={handleSearchChannels} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={searchChannelQuery}
+                    onChange={(e) => setSearchChannelQuery(e.target.value)}
+                    placeholder="검색할 채널 이름을 입력해 주세요."
+                    className="flex-1 bg-muted/20 border border-border/80 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:border-primary placeholder:text-muted-foreground/60"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={isLoadingChannels}
+                    className="h-10 px-5 font-bold bg-primary hover:bg-primary/95 text-white rounded-xl text-xs whitespace-nowrap"
+                  >
+                    {isLoadingChannels ? <Loader2 className="w-4 h-4 animate-spin" /> : "검색"}
+                  </Button>
+                </form>
+              </div>
+              
+              {searchedChannels.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
+                  {searchedChannels.map((channel) => (
+                    <div key={channel.id} className="group bg-background border border-border rounded-3xl p-5 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col justify-between">
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-purple-500" />
+                      
+                      <div className="flex gap-4 mb-5">
+                        <Avatar className="w-14 h-14 rounded-2xl border border-border/50 shrink-0">
+                          <AvatarImage src={channel.image_url || undefined} className="object-cover" />
+                          <AvatarFallback className="rounded-2xl bg-muted font-bold text-lg">{channel.name.slice(0, 1).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-base truncate">{channel.name}</h4>
+                            <Badge variant="outline" className="bg-purple-500/5 text-purple-600 border-purple-500/10 text-[9px] font-bold py-0.5 px-1.5 shrink-0 select-none">
+                              {channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "축제" : "게임"}
+                            </Badge>
+                          </div>
+                          
+                          <div className="space-y-1 text-xs font-semibold text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] uppercase text-muted-foreground/60 w-12 shrink-0">소유주:</span>
+                              {channel.owner_id ? (
+                                <span className="text-foreground/90 font-bold bg-muted/60 px-2 py-0.5 rounded-md truncate max-w-[120px]">
+                                  {channel.ownerNickname || "알 수 없는 사용자"}
+                                </span>
+                              ) : (
+                                <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[9px] font-extrabold select-none">
+                                  🔓 소유주 없음 (회사 소유)
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] uppercase text-muted-foreground/60 w-12 shrink-0">회사 소속:</span>
+                              {channel.company ? (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-orange-500 font-bold bg-orange-500/5 border border-orange-500/10 px-2 py-0.5 rounded-md truncate max-w-[120px]">
+                                    🏢 {channel.company}
+                                  </span>
+                                  <button
+                                    onClick={() => handleDisconnectCompany(channel.id, channel.name)}
+                                    className="text-[10px] font-bold text-red-500 hover:underline shrink-0 ml-1"
+                                  >
+                                    해제
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="italic font-normal text-muted-foreground/50">소속 없음</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border/40">
+                        {channel.owner_id ? (
+                          <Button
+                            variant="outline"
+                            onClick={() => handleDisconnectOwner(channel.id, channel.name, channel.owner_id)}
+                            className="w-full h-9 font-bold border-orange-200 hover:bg-orange-50 text-orange-600 dark:border-orange-950/40 dark:hover:bg-orange-950/20 rounded-xl text-xs whitespace-nowrap flex items-center justify-center gap-1 transition-all"
+                          >
+                            <UserX className="w-3.5 h-3.5" />
+                            소유주 끊기
+                          </Button>
+                        ) : (
+                          <div className="relative w-full">
+                            {connectingChannelId === channel.id ? (
+                              <div className="flex items-center gap-1 w-full">
+                                <select
+                                  value={selectedCompanyForChannel}
+                                  onChange={(e) => setSelectedCompanyForChannel(e.target.value)}
+                                  className="w-full bg-background border border-border/80 rounded-xl px-2 h-9 text-[10px] font-bold focus:outline-none focus:border-primary text-center"
+                                >
+                                  <option value="none">회사 선택...</option>
+                                  {companiesList.map((comp) => (
+                                    <option key={comp.id} value={comp.name}>
+                                      {comp.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <Button
+                                  onClick={() => handleConnectCompany(channel.id)}
+                                  size="sm"
+                                  className="h-9 px-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] shrink-0 font-bold"
+                                >
+                                  연결
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setConnectingChannelId(null);
+                                    setSelectedCompanyForChannel("none");
+                                  }}
+                                  size="sm"
+                                  className="h-9 px-2 border-border hover:bg-muted text-muted-foreground rounded-xl text-[10px] shrink-0 font-bold"
+                                >
+                                  취소
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setConnectingChannelId(channel.id);
+                                  setSelectedCompanyForChannel("none");
+                                }}
+                                className="w-full h-9 font-bold border-emerald-200 hover:bg-emerald-50 text-emerald-600 dark:border-emerald-950/40 dark:hover:bg-emerald-950/20 rounded-xl text-xs whitespace-nowrap flex items-center justify-center gap-1 transition-all"
+                              >
+                                <Building2 className="w-3.5 h-3.5" />
+                                회사 연결
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                        <Button
+                          onClick={() => handleDeleteChannel(channel.id, channel.name)}
+                          disabled={connectingChannelId === channel.id}
+                          className="w-full h-9 font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs whitespace-nowrap flex items-center justify-center gap-1 transition-all"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          채널 강제 삭제
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Section 3: 주최자 신청 */}
+            <div className="space-y-6 border-b border-border/40 pb-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-extrabold tracking-tight">주최자 신청 현황</h2>
+                </div>
+                <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border/50">
+                  {(["all", "pending", "approved", "rejected"] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${filter === f ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        }`}
+                    >
+                      {f === "all" && "전체"}
+                      {f === "pending" && "대기 중"}
+                      {f === "approved" && "승인됨"}
+                      {f === "rejected" && "거절됨"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {isLoadingData ? (
+                <div className="py-10 flex flex-col items-center justify-center text-muted-foreground">
+                  <Loader2 className="w-8 h-8 animate-spin mb-4 opacity-50" />
+                  <p>데이터 동기화 중...</p>
+                </div>
+              ) : filteredRequests.length === 0 ? (
+                <div className="py-10 border-2 border-dashed border-border rounded-3xl bg-background/50 flex flex-col items-center justify-center text-center">
+                  <h3 className="text-sm font-bold text-muted-foreground">신청 내역이 없습니다.</h3>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {filteredRequests.map((req) => (
+                    <div key={req.id} className="group bg-background border border-border rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col relative overflow-hidden">
+                      <div className={`absolute top-0 left-0 right-0 h-1 ${req.status === "approved" ? "bg-green-500" : req.status === "rejected" ? "bg-destructive" : "bg-amber-400"}`} />
+                      <div className="flex gap-5 mb-6">
+                        <div className="relative flex-shrink-0">
+                          <Avatar className="w-16 h-16 rounded-2xl border border-border/50">
+                            <AvatarImage src={req.image_url || undefined} className="object-cover" />
+                            <AvatarFallback className="rounded-2xl bg-muted font-bold">{req.name.slice(0, 1)}</AvatarFallback>
+                          </Avatar>
+                          {req.is_team && <div className="absolute -bottom-1 -right-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">Team</div>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-lg font-bold truncate">{req.name}</h3>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Badge variant={req.status === "approved" ? "default" : req.status === "rejected" ? "destructive" : "secondary"}>
+                                {req.status.toUpperCase()}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteRequest(req.id)}
+                                className="w-7 h-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg shrink-0 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-x-3 mt-1.5 text-xs text-muted-foreground">
+                            {req.request_type === "company" ? (
+                              <div className="flex items-center font-bold text-orange-500"><Building2 className="w-3 h-3 mr-1" /> 관리자(회사)</div>
+                            ) : (
+                              <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "축제" : "게임"}</div>
+                            )}
+                            <div className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> {new Date(req.created_at).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-3 mb-6 flex-1 bg-muted/20 rounded-2xl p-4 border border-border/50">
+                        {req.request_type === "company" ? (
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <div className="text-[10px] font-bold text-muted-foreground mb-1">연락처</div>
+                              <div className="font-semibold flex items-center gap-1.5">{req.contact || "미기재"}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-bold text-muted-foreground mb-1">사업자등록번호</div>
+                              <div className="font-semibold flex items-center gap-1.5">{req.business_number || "미기재"}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <div className="text-[10px] font-bold text-muted-foreground mb-1">소속사</div>
+                                <div className="font-semibold flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 opacity-50" /> {req.company || <span className="text-muted-foreground font-normal italic">없음</span>}</div>
+                              </div>
+                              {!req.is_team && (
+                                <div>
+                                  <div className="text-[10px] font-bold text-muted-foreground mb-1">소속 팀</div>
+                                  <div className="font-semibold flex items-center gap-1.5"><Users className="w-3.5 h-3.5 opacity-50" /> {req.team_id ? (teams[req.team_id] || "...") : <span className="text-muted-foreground font-normal italic">없음</span>}</div>
+                                </div>
+                              )}
+                            </div>
+                            {req.links && (
+                              <div className="pt-2 border-t border-border/40">
+                                <div className="text-[10px] font-bold text-muted-foreground mb-1">링크</div>
+                                <div className="text-xs bg-background/80 rounded-lg p-2.5 break-all flex flex-col gap-1.5">
+                                  {(() => {
+                                    try {
+                                      const parsed = typeof req.links === 'string' ? JSON.parse(req.links) : req.links;
+                                      if (Array.isArray(parsed)) {
+                                        return parsed.map((l: any, i: number) => (
+                                          <div key={i} className="flex items-center gap-1.5">
+                                            <span className="font-semibold text-foreground/75 shrink-0">{l.name}:</span>
+                                            <a href={l.url} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate flex items-center gap-0.5">
+                                              {l.url} <ExternalLink className="w-2.5 h-2.5 inline shrink-0 opacity-50" />
+                                            </a>
+                                          </div>
+                                        ));
+                                      } else if (parsed && typeof parsed === 'object') {
+                                        return Object.entries(parsed).map(([k, v]: any, i) => (
+                                          <div key={i} className="flex items-center gap-1.5">
+                                            <span className="font-semibold text-foreground/75 shrink-0">{k}:</span>
+                                            <a href={v} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate flex items-center gap-0.5">
+                                              {v} <ExternalLink className="w-2.5 h-2.5 inline shrink-0 opacity-50" />
+                                            </a>
+                                          </div>
+                                        ));
+                                      }
+                                    } catch (e) {}
+                                    return <span className="whitespace-pre-wrap">{String(req.links)}</span>;
+                                  })()}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {req.status === "pending" ? (
+                          <>
+                            <Button onClick={() => handleAction(req, "approve")} disabled={processingId !== null} className="flex-1 h-11 font-bold bg-green-600 hover:bg-green-700 text-white rounded-xl">
+                              {processingId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle2 className="w-4 h-4 mr-2" /> 승인</>}
+                            </Button>
+                            <Button variant="outline" onClick={() => handleAction(req, "reject")} disabled={processingId !== null} className="flex-1 h-11 font-bold border-destructive/20 hover:bg-destructive/5 text-destructive hover:text-destructive rounded-xl">
+                              <XCircle className="w-4 h-4 mr-2" /> 거절
+                            </Button>
+                          </>
+                        ) : (
+                          <div className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold border ${req.status === "approved" ? "bg-green-500/5 text-green-600 border-green-500/20" : "bg-red-500/5 text-red-600 border-red-500/20"}`}>
+                            {req.status === "approved" ? "승인 완료" : "거절 처리 완료"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Section 4: 댓글 신고 및 댓글 차단 관리 */}
+            <div className="space-y-8 pb-10">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Reports half */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-5 h-5 text-amber-500" />
+                    <h2 className="text-xl font-extrabold tracking-tight">댓글 신고 현황</h2>
+                  </div>
+                  <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border/50 self-start">
+                    {(["pending", "resolved", "dismissed"] as const).map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => setReportFilter(status)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${
+                          reportFilter === status
+                            ? "bg-background text-foreground shadow-sm border border-border/50"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {status === "pending" && "⏳ 미처리"}
+                        {status === "resolved" && "✅ 해결됨"}
+                        {status === "dismissed" && "❌ 반려됨"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {isLoadingReports ? (
+                    <div className="py-10 flex flex-col items-center justify-center text-muted-foreground">
+                      <Loader2 className="w-6 h-6 animate-spin mb-2 opacity-50" />
+                      <p className="text-xs">로딩 중...</p>
+                    </div>
+                  ) : reports.length === 0 ? (
+                    <div className="py-10 border border-dashed border-border rounded-3xl bg-background/50 flex flex-col items-center justify-center text-center">
+                      <p className="text-xs text-muted-foreground">신고 내역이 없습니다.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin">
+                      {reports.map((report) => (
+                        <div key={report.id} className="group bg-background border border-border rounded-3xl p-4 shadow-xs relative overflow-hidden flex flex-col gap-4">
+                          <div className="flex-1 space-y-3 pl-2">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[9px] font-bold">
+                                ⚠️ {report.reason}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground/60">{new Date(report.created_at).toLocaleDateString()}</span>
+                            </div>
+                            {report.details && (
+                              <div className="text-xs bg-amber-500/5 text-amber-800 dark:text-amber-300 rounded-xl px-3 py-2 border border-amber-500/10 leading-relaxed font-semibold">
+                                의견: &quot;{report.details}&quot;
+                              </div>
+                            )}
+                            <div className="border border-border/80 bg-muted/20 rounded-2xl p-3 text-xs">
+                              {report.comment ? (
+                                <p className="font-medium text-foreground/90 break-words leading-relaxed">
+                                  <strong className="text-foreground/80">{report.comment.author.nickname}:</strong> {report.comment.content}
+                                </p>
+                              ) : (
+                                <span className="italic text-muted-foreground/50">댓글이 이미 삭제되었습니다.</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-2">
+                            {reportFilter === "pending" && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleDismissReport(report.id)}
+                                className="flex-1 h-8 font-bold bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs"
+                              >
+                                반려
+                              </Button>
+                            )}
+                            {reportFilter === "pending" && report.comment && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleDeleteReportedComment(report.comment_id, report.id, report.comment.user_id, report.comment.content)}
+                                className="flex-1 h-8 font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs"
+                              >
+                                삭제
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Bans half */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2">
+                    <Ban className="w-5 h-5 text-red-500" />
+                    <h2 className="text-xl font-extrabold tracking-tight">댓글 차단 관리</h2>
+                  </div>
+
+                  {isLoadingBans ? (
+                    <div className="py-10 flex flex-col items-center justify-center text-muted-foreground">
+                      <Loader2 className="w-6 h-6 animate-spin mb-2 opacity-50" />
+                      <p className="text-xs">로딩 중...</p>
+                    </div>
+                  ) : bans.length === 0 ? (
+                    <div className="py-10 border border-dashed border-border rounded-3xl bg-background/50 flex flex-col items-center justify-center text-center">
+                      <p className="text-xs text-muted-foreground">차단된 사용자가 없습니다.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin">
+                      {bans.map((ban) => (
+                        <div key={ban.id} className="group bg-background border border-border rounded-3xl p-4 shadow-xs relative overflow-hidden flex items-center justify-between">
+                          <div className="flex items-center gap-3 pl-2">
+                            <Avatar className="w-8 h-8 border">
+                              <AvatarImage src={ban.user.avatar_url || undefined} className="object-cover bg-muted" />
+                              <AvatarFallback className="font-bold text-xs bg-muted">{ban.user.nickname.slice(0, 1)}</AvatarFallback>
+                            </Avatar>
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-sm truncate">{ban.user.nickname}</h4>
+                                <Badge variant="outline" className={`${ban.is_active ? "bg-red-500/10 text-red-600" : "bg-gray-500/10 text-gray-500"} text-[8px] px-1 py-0.2`}>
+                                  {ban.is_active ? "🚨 차단됨" : "🔓 해제됨"}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">사유: {ban.reason}</p>
+                            </div>
+                          </div>
+                          {ban.is_active && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUnbanUser(ban.id, ban.user_id)}
+                              className="h-8 font-bold text-xs text-red-600 border-red-200 hover:bg-red-50"
+                            >
+                              해제
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {activeTab === "requests" && (
           <>
@@ -1789,7 +2372,7 @@ CHECK (status IN ('pending', 'resolved', 'dismissed'));`}
                     <h4 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 select-none">
                       실시간 게재 배너 슬롯 모니터
                       <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full ml-1">
-                        {posters.filter(p => p.is_active).length}개 활성화
+                        {liveBanners.length}개 활성화
                       </span>
                     </h4>
                   </div>
@@ -1798,8 +2381,7 @@ CHECK (status IN ('pending', 'resolved', 'dismissed'));`}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                   {/* Render actually active banners in sequential order */}
-                  {posters
-                    .filter(p => p.is_active)
+                  {liveBanners
                     .sort((a, b) => (a.order || 0) - (b.order || 0))
                     .map((poster, index) => (
                       <div 
@@ -1869,7 +2451,7 @@ CHECK (status IN ('pending', 'resolved', 'dismissed'));`}
                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                       <h3 className="text-lg font-bold">실시간 노출 중인 배너</h3>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {activePosters.map(renderPosterCard)}
                     </div>
                   </div>

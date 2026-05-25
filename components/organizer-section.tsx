@@ -264,30 +264,58 @@ export function OrganizerSection({ user }: { user: User | null }) {
   return (
     <section className="mx-4 mb-8 pt-2">
       {/* Header Outside the box */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-4 cursor-pointer group" onClick={() => router.push(`/channels/${channel.id}`)}>
-          <div className="p-[3px] md:p-[4px] rounded-full bg-brand-gradient shadow-md group-hover:scale-105 transition-transform">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 px-1">
+        <div className="flex items-center gap-3 md:gap-4 cursor-pointer group flex-1 min-w-0" onClick={() => router.push(`/channels/${channel.id}`)}>
+          <div className="p-[3px] md:p-[4px] rounded-full bg-brand-gradient shadow-md group-hover:scale-105 transition-transform shrink-0">
             <Avatar className="w-16 h-16 md:w-28 md:h-28 border-2 border-white bg-background shrink-0 overflow-hidden">
               <AvatarImage src={channel.image_url || undefined} className="object-cover" />
               <AvatarFallback className="font-bold text-2xl text-muted-foreground">{channel.name.slice(0, 1)}</AvatarFallback>
             </Avatar>
           </div>
-          <div className="flex flex-col justify-center">
-            <h2 className="text-xl md:text-3xl font-bold group-hover:text-primary transition-colors leading-tight">{channel.name}</h2>
-            <span className="text-[10px] md:text-sm text-muted-foreground font-semibold mt-0.5 md:mt-1">주최자 대시보드</span>
+          <div className="flex-1 flex flex-col justify-center min-w-0">
+            <div className="flex flex-col justify-center min-w-0 mt-1 md:mt-0">
+              <h2 className="text-xl md:text-3xl font-bold group-hover:text-primary transition-colors leading-tight truncate">{channel.name}</h2>
+              <span className="text-[10px] md:text-sm text-muted-foreground font-semibold mt-0.5 md:mt-1 whitespace-nowrap shrink-0">주최자 대시보드</span>
+            </div>
+            
+            {/* Mobile Buttons: Aligned to the right, below text, but to the right of the avatar */}
+            <div className="flex md:hidden items-center gap-2 justify-end mt-2 w-full">
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push("/ad-apply");
+                }}
+                variant="outline"
+                className="font-bold rounded-full h-8 px-3 border-primary/20 hover:bg-primary/5 hover:text-primary dark:border-primary/30 transition-all text-[11px] whitespace-nowrap shrink-0 animate-in fade-in duration-200"
+              >
+                광고 신청
+              </Button>
+              <Button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push("/events/new");
+                }}
+                className="gap-1 font-bold rounded-full h-8 px-3 bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80 shadow-sm border-0 text-[11px] whitespace-nowrap shrink-0 animate-in fade-in duration-200"
+              >
+                <Plus className="w-3 h-3" /> 
+                행사 등록
+              </Button>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Desktop Buttons: Rendered on the far right on PC */}
+        <div className="hidden md:flex items-center gap-2 shrink-0">
           <Button
             onClick={() => router.push("/ad-apply")}
             variant="outline"
-            className="font-bold rounded-full h-10 px-4 md:px-5 border-primary/20 hover:bg-primary/5 hover:text-primary dark:border-primary/30 transition-all"
+            className="font-bold rounded-full h-10 px-5 border-primary/20 hover:bg-primary/5 hover:text-primary dark:border-primary/30 transition-all"
           >
             광고 신청
           </Button>
-          <Button onClick={() => router.push("/events/new")} className="gap-1.5 font-bold rounded-full h-10 px-4 md:px-5 bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80 shadow-sm border-0">
-            <Plus className="w-4 h-4 md:w-5 md:h-5" /> 
-            <span className="hidden md:inline">새 </span>행사 등록
+          <Button onClick={() => router.push("/events/new")} className="gap-1.5 font-bold rounded-full h-10 px-5 bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80 shadow-sm border-0">
+            <Plus className="w-5 h-5" /> 
+            행사 등록
           </Button>
         </div>
       </div>

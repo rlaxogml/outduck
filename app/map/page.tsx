@@ -421,6 +421,8 @@ function MapContent() {
           const targetEvent = filteredEvents.find((ev) => String(ev.id) === String(focusedEventId));
 
           const initializeMapAndPlaceMarkers = (centerCoords: any, level: number, initialLoad: boolean) => {
+            const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
             if (initialLoad) {
               setTimeout(() => {
                 if (!isMounted) return;
@@ -494,16 +496,25 @@ function MapContent() {
                   bounds.extend(coords);
                   boundsChanged = true;
 
+                  const markerWidth = isMobile ? 54 : 68;
+                  const markerHeight = isMobile ? 60 : 76;
+                  const offsetX = isMobile ? 27 : 34;
+                  const offsetY = isMobile ? 60 : 76;
+
                   const markerImage = new kakao.maps.MarkerImage(
                     event.canvasDataUrl,
-                    new kakao.maps.Size(68, 76),
-                    { offset: new kakao.maps.Point(34, 76) }
+                    new kakao.maps.Size(markerWidth, markerHeight),
+                    { offset: new kakao.maps.Point(offsetX, offsetY) }
                   );
+
+                  // 축제(festival) 채널인 경우 마커가 다른 마커보다 항상 위에 노출되도록 zIndex 설정
+                  const isFestival = event.channelType === "festival" || event.channels?.some((c: any) => c.type === "festival");
+                  const markerZIndex = isFestival ? 10 : 2;
 
                   const marker = new kakao.maps.Marker({
                     position: coords,
                     image: markerImage,
-                    zIndex: 2,
+                    zIndex: markerZIndex,
                   });
                   marker.setMap(map);
 
@@ -1145,7 +1156,7 @@ function MapContent() {
             <div
               id="map-container"
               className={cn("w-full h-full bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")}
-              style={{ height: "100%", width: "100%", touchAction: "none" }}
+              style={{ height: "100%", width: "100%" }}
             />
 
             <style>{`
