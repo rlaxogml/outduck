@@ -593,7 +593,19 @@ function MapContent() {
                     openOverlayRef.current = null;
 
                     // 1. Smoothly pan to the marker without zooming
-                    map.panTo(coords);
+                    const projection = map.getProjection();
+                    if (projection) {
+                      const markerPoint = projection.pointFromCoords(coords);
+                      if (markerPoint) {
+                        const targetPoint = new kakao.maps.Point(markerPoint.x, markerPoint.y - 40);
+                        const targetCoords = projection.coordsFromPoint(targetPoint);
+                        map.panTo(targetCoords);
+                      } else {
+                        map.panTo(coords);
+                      }
+                    } else {
+                      map.panTo(coords);
+                    }
 
                     // 2. Update and synchronize popup buttons for correct scale view
                     if (!isMounted) return;
@@ -647,11 +659,27 @@ function MapContent() {
 
             setTimeout(() => {
               if (!isMounted) return;
+              map.relayout();
               if (targetCoords.length > 0) {
                 userAdjustedMapView = true;
                 if (targetCoords.length === 1) {
-                  map.setCenter(targetCoords[0]);
                   map.setLevel(3);
+                  setTimeout(() => {
+                    if (!isMounted) return;
+                    const projection = map.getProjection();
+                    if (projection) {
+                      const markerPoint = projection.pointFromCoords(targetCoords[0]);
+                      if (markerPoint) {
+                        const targetPoint = new kakao.maps.Point(markerPoint.x, markerPoint.y - 40);
+                        const offsetCenter = projection.coordsFromPoint(targetPoint);
+                        map.setCenter(offsetCenter);
+                      } else {
+                        map.setCenter(targetCoords[0]);
+                      }
+                    } else {
+                      map.setCenter(targetCoords[0]);
+                    }
+                  }, 50);
                   
                   // Ensure startup popup matches level 3 styling on first load
                   const cNode = targetOverlays[0].getContent();
@@ -736,9 +764,9 @@ function MapContent() {
   }
 
   return (
-    <div className="map-outer-container h-[calc(100vh-64px)] md:h-auto md:min-h-screen bg-background">
+    <div className="map-outer-container h-[calc(100vh-56px)] md:h-auto md:min-h-screen bg-background">
       <Header />
-      <div className="map-inner-container w-full h-[calc(100vh-120px)] md:h-auto md:mx-auto md:max-w-6xl md:px-4 md:py-3 relative">
+      <div className="map-inner-container w-full h-[calc(100vh-112px)] md:h-auto md:mx-auto md:max-w-6xl md:px-4 md:py-3 relative">
         <main className="w-full h-full md:h-auto flex flex-col md:block py-0 md:py-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 py-2 md:px-0 md:py-0 mb-1 md:mb-2 shrink-0">
             <div className="space-y-1">
@@ -1169,11 +1197,11 @@ function MapContent() {
               }
               @media (max-width: 767px) {
                 .map-outer-container {
-                  height: calc(100vh - env(safe-area-inset-bottom, 0px) - 64px) !important;
+                  height: calc(100vh - env(safe-area-inset-bottom, 0px) - 56px) !important;
                   overflow: hidden !important;
                 }
                 .map-inner-container {
-                  height: calc(100vh - env(safe-area-inset-bottom, 0px) - 168px) !important;
+                  height: calc(100vh - env(safe-area-inset-bottom, 0px) - 112px) !important;
                   overflow: hidden !important;
                 }
               }

@@ -2,18 +2,76 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { EventCard } from "@/components/event-card";
-import { Plus } from "lucide-react";
+import { Plus, Settings2, Pencil, Megaphone, Trash2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ChannelSettingsCard } from "@/app/settings/page";
+
+const channelTypeLabel: Record<string, string> = {
+  game: "게임",
+  youtuber: "유튜버",
+  festival: "축제",
+};
+
+function getChannelTypeText(type: string | null) {
+  if (!type) return "기타";
+  const normalized = type.trim().toLowerCase();
+  return channelTypeLabel[normalized] || "기타";
+}
+
+function getInitialText(name: string) {
+  return name.trim().slice(0, 1).toUpperCase() || "?";
+}
 
 export function OrganizerSection({ user }: { user: User | null }) {
   const [channel, setChannel] = useState<any>(null);
   const [events, setEvents] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"all" | "offline" | "online">("all");
   const router = useRouter();
+
+  const handleDeleteEvent = async (eventId: number, baseEventId: number) => {
+    const userInput = prompt("이 행사를 삭제하려면 '행사/삭제한다'를 입력해 주세요.");
+    if (userInput !== "행사/삭제한다") {
+      if (userInput !== null) {
+        toast.error("입력하신 문구가 일치하지 않아 삭제가 취소되었습니다.");
+      }
+      return;
+    }
+
+    try {
+      // 1. Manually delete specific child records satisfying manual referential cleanup
+      await supabase.from("offline_event_locations").delete().eq("offline_event_id", eventId);
+      await supabase.from("event_channels").delete().eq("event_id", baseEventId);
+      await supabase.from("event_bookmarks").delete().eq("event_id", baseEventId);
+      await supabase.from("event_images").delete().eq("event_id", baseEventId);
+      
+      // 2. Delete offline specific row
+      const { error: delOffErr } = await supabase.from("offline_events").delete().eq("id", eventId);
+      if (delOffErr) throw delOffErr;
+
+      // 3. Finally delete underlying universal event record
+      const { error: delBaseErr } = await supabase.from("events").delete().eq("id", baseEventId);
+      if (delBaseErr) throw delBaseErr;
+      
+      toast.success("행사가 성공적으로 삭제되었습니다.");
+      
+      // Refresh state without reload
+      setEvents(prev => prev.filter(e => e.id !== eventId));
+    } catch (err: any) {
+      console.error(err);
+      toast.error("행사 삭제 중 오류가 발생했습니다.");
+    }
+  };
 
   const imageColors = [
     "bg-gradient-to-br from-indigo-400 to-indigo-600",
@@ -45,6 +103,13 @@ export function OrganizerSection({ user }: { user: User | null }) {
         }
 
         setChannel(channelData);
+
+        const { data: teamsData } = await supabase
+          .from("channels")
+          .select("id, name")
+          .eq("is_team", true)
+          .order("name");
+        setTeams(teamsData || []);
 
         const { data: mappingData, error: mappingError } = await supabase
           .from("event_channels")
@@ -261,115 +326,242 @@ export function OrganizerSection({ user }: { user: User | null }) {
   if (loading) return null;
   if (!channel) return null;
 
+  const filteredEvents = events.filter(e => {
+    if (activeTab === "all") return true;
+    return e.eventType === activeTab;
+  });
+
+  const offlineCount = events.filter(e => e.eventType === "offline").length;
+  const onlineCount = events.filter(e => e.eventType === "online").length;
+
   return (
-    <section className="mx-4 mb-8 pt-2">
-      {/* Header Outside the box */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 px-1">
-        <div className="flex items-center gap-3 md:gap-4 cursor-pointer group flex-1 min-w-0" onClick={() => router.push(`/channels/${channel.id}`)}>
-          <div className="p-[3px] md:p-[4px] rounded-full bg-brand-gradient shadow-md group-hover:scale-105 transition-transform shrink-0">
-            <Avatar className="w-16 h-16 md:w-28 md:h-28 border-2 border-white bg-background shrink-0 overflow-hidden">
-              <AvatarImage src={channel.image_url || undefined} className="object-cover" />
-              <AvatarFallback className="font-bold text-2xl text-muted-foreground">{channel.name.slice(0, 1)}</AvatarFallback>
+    <div className="flex flex-col gap-6">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4 cursor-pointer group" onClick={() => router.push(`/channels/${channel.id}`)}>
+            <Avatar className="h-20 w-20 md:h-24 md:w-24 border border-border group-hover:scale-105 transition-transform">
+              <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
+              <AvatarFallback className="bg-muted text-2xl font-bold text-foreground">
+                {getInitialText(channel.name)}
+              </AvatarFallback>
             </Avatar>
+
+            <div className="space-y-2">
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight group-hover:text-primary transition-colors leading-tight truncate">{channel.name}</h1>
+              <div className="flex items-center gap-3">
+                {channel.type && getChannelTypeText(channel.type) !== "기타" && (
+                  <Badge variant="secondary" className="px-2.5 py-0.5 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 border-transparent">
+                    {getChannelTypeText(channel.type)}
+                  </Badge>
+                )}
+                <span className="text-[11px] md:text-sm text-muted-foreground font-semibold shrink-0">주최자 대시보드</span>
+              </div>
+            </div>
           </div>
-          <div className="flex-1 flex flex-col justify-center min-w-0">
-            <div className="flex flex-col justify-center min-w-0 mt-1 md:mt-0">
-              <h2 className="text-xl md:text-3xl font-bold group-hover:text-primary transition-colors leading-tight truncate">{channel.name}</h2>
-              <span className="text-[10px] md:text-sm text-muted-foreground font-semibold mt-0.5 md:mt-1 whitespace-nowrap shrink-0">주최자 대시보드</span>
-            </div>
-            
-            {/* Mobile Buttons: Aligned to the right, below text, but to the right of the avatar */}
-            <div className="flex md:hidden items-center gap-2 justify-end mt-2 w-full">
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push("/ad-apply");
-                }}
-                variant="outline"
-                className="font-bold rounded-full h-8 px-3 border-primary/20 hover:bg-primary/5 hover:text-primary dark:border-primary/30 transition-all text-[11px] whitespace-nowrap shrink-0 animate-in fade-in duration-200"
-              >
-                광고 신청
-              </Button>
-              <Button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push("/events/new");
-                }}
-                className="gap-1 font-bold rounded-full h-8 px-3 bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80 shadow-sm border-0 text-[11px] whitespace-nowrap shrink-0 animate-in fade-in duration-200"
-              >
-                <Plus className="w-3 h-3" /> 
-                행사 등록
-              </Button>
-            </div>
+
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 mt-2 md:mt-0 w-full md:w-auto">
+            <Button
+              onClick={(e) => { e.stopPropagation(); router.push("/ad-apply"); }}
+              className="flex-1 md:flex-none inline-flex items-center gap-1.5 justify-center rounded-full h-11 px-5 font-bold text-sm bg-white text-black border border-black/20 transition-all hover:scale-105 active:scale-95 shadow-sm dark:bg-white dark:text-black dark:border-black/20"
+            >
+              광고 신청
+            </Button>
+            <Button
+              onClick={(e) => { e.stopPropagation(); setIsSettingsOpen(true); }}
+              className="flex-1 md:flex-none inline-flex items-center gap-1.5 justify-center rounded-full h-11 px-5 font-bold text-sm bg-white text-black border border-black/20 transition-all hover:scale-105 active:scale-95 shadow-sm dark:bg-white dark:text-black dark:border-black/20"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              채널 수정
+            </Button>
+            <Button
+              onClick={(e) => { e.stopPropagation(); router.push("/events/new"); }}
+              className="flex-1 md:flex-none inline-flex items-center gap-1.5 justify-center rounded-full h-11 px-5 font-bold text-sm bg-primary/5 text-primary hover:bg-primary/10 border border-primary/60 transition-all hover:scale-105 active:scale-95 shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              행사 등록
+            </Button>
           </div>
         </div>
+      </section>
 
-        {/* Desktop Buttons: Rendered on the far right on PC */}
-        <div className="hidden md:flex items-center gap-2 shrink-0">
-          <Button
-            onClick={() => router.push("/ad-apply")}
-            variant="outline"
-            className="font-bold rounded-full h-10 px-5 border-primary/20 hover:bg-primary/5 hover:text-primary dark:border-primary/30 transition-all"
-          >
-            광고 신청
-          </Button>
-          <Button onClick={() => router.push("/events/new")} className="gap-1.5 font-bold rounded-full h-10 px-5 bg-black text-white hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80 shadow-sm border-0">
-            <Plus className="w-5 h-5" /> 
-            행사 등록
-          </Button>
+      <div className="flex flex-col gap-3 mt-6">
+        <h2 className="text-lg font-bold text-foreground flex items-center gap-2 px-1">
+          <div className="w-[5px] h-[18px] bg-blue-600 dark:bg-blue-400 rounded-full shrink-0" />
+          <span>간편 관리창</span>
+        </h2>
+        <div className="bg-gradient-to-br from-[#eefcf9] via-background to-[#fdf2ff] dark:from-primary/5 dark:via-background dark:to-primary/10 rounded-2xl p-3 md:p-4 border border-primary/10 shadow-sm relative overflow-hidden">
+          {events.length === 0 ? (
+            <div className="py-10 text-center bg-background/60 rounded-xl border border-border/50">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-2">
+                <Plus className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <p className="font-semibold text-sm md:text-base text-foreground">아직 등록된 행사가 없어요</p>
+              <p className="text-xs md:text-sm text-muted-foreground mt-1">새로운 행사를 등록하고 팬들과 만나보세요!</p>
+            </div>
+          ) : (
+            <div className="flex overflow-x-auto gap-4 md:gap-5 pb-2 md:pb-3 snap-x items-center [&::-webkit-scrollbar]:h-1.5 md:[&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-primary/5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary/20 hover:[&::-webkit-scrollbar-thumb]:bg-primary/40 [&::-webkit-scrollbar-thumb]:rounded-full transition-colors">
+              <button 
+                onClick={() => router.push("/events/new")}
+                className="flex flex-col items-center justify-center gap-2.5 group min-w-[110px] ml-4 mr-2 pr-2 shrink-0 snap-start mt-4"
+              >
+                <div className="w-16 h-16 rounded-full border-[2.5px] border-dashed border-neutral-400 dark:border-neutral-500 flex items-center justify-center group-hover:border-primary group-hover:bg-primary/5 transition-all shadow-sm">
+                  <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+                <div className="text-center">
+                  <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors whitespace-nowrap">새 행사 등록</span>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">New</p>
+                </div>
+              </button>
+              {events.map((event) => (
+                <div key={event.id} className="min-w-[280px] w-[280px] md:min-w-[320px] md:w-[320px] snap-start shrink-0 flex flex-col gap-2.5">
+                  <EventCard
+                    id={event.id}
+                    title={event.title}
+                    date={event.date}
+                    location={event.location}
+                    category={event.category}
+                    imageColor={event.imageColor}
+                    imageUrl={event.imageUrl}
+                    reservationType={event.reservationType}
+                    channels={event.channels}
+                    user={user}
+                    eventType={event.eventType}
+                    baseEventId={event.baseEventId}
+                    showEventTypeBadge={true}
+                  />
+                  <div className="flex items-center gap-1.5 px-0.5 select-none shrink-0 w-full">
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/events/${event.id}/edit`);
+                      }}
+                      variant="outline"
+                      className="flex-1 h-9 rounded-xl text-xs font-bold border-border bg-background hover:bg-muted text-foreground transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Pencil className="h-3 w-3 text-slate-500 shrink-0" />
+                      <span>수정</span>
+                    </Button>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/events/${event.id}?tab=notices`);
+                      }}
+                      variant="outline"
+                      className="flex-1 h-9 rounded-xl text-xs font-bold border-border bg-background hover:bg-muted text-foreground transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Megaphone className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      <span>공지</span>
+                    </Button>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteEvent(event.id, event.baseEventId);
+                      }}
+                      variant="outline"
+                      className="flex-1 h-9 rounded-xl text-xs font-bold border-red-200/60 bg-red-50/10 hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:border-red-950/40 dark:bg-red-950/10 dark:hover:bg-red-950/30 text-rose-500 transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                      <span>삭제</span>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-[#eefcf9] via-background to-[#fdf2ff] dark:from-primary/5 dark:via-background dark:to-primary/10 rounded-2xl p-3 md:p-4 border border-primary/10 shadow-sm relative overflow-hidden">
-        {events.length === 0 ? (
-          <div className="py-10 text-center bg-background/60 rounded-xl border border-border/50">
+      <section className="mt-6 rounded-2xl border border-border bg-card p-6">
+        <div className="flex gap-2 p-1 bg-muted/40 rounded-xl mb-6 w-full md:w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab("all")}
+            className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
+          >
+            전체 <span className="ml-1 opacity-60">{events.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("offline")}
+            className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "offline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
+          >
+            오프라인 일정 <span className="ml-1 opacity-60">{offlineCount}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("online")}
+            className={`flex-1 md:flex-none px-6 py-2.5 text-sm font-semibold transition-all rounded-lg ${activeTab === "online" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              }`}
+          >
+            온라인 일정 <span className="ml-1 opacity-60">{onlineCount}</span>
+          </button>
+        </div>
+
+        {filteredEvents.length === 0 ? (
+          <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
             <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-2">
               <Plus className="w-5 h-5 text-muted-foreground" />
             </div>
             <p className="font-semibold text-sm md:text-base text-foreground">아직 등록된 행사가 없어요</p>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">새로운 행사를 등록하고 팬들과 만나보세요!</p>
-          </div>
-        ) : (
-          <div className="flex overflow-x-auto gap-3 md:gap-4 pb-2 md:pb-3 snap-x [&::-webkit-scrollbar]:h-1.5 md:[&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-primary/5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary/20 hover:[&::-webkit-scrollbar-thumb]:bg-primary/40 [&::-webkit-scrollbar-thumb]:rounded-full transition-colors">
-            {events.map((event) => (
-              <div key={event.id} className="min-w-[280px] w-[280px] md:min-w-[320px] md:w-[320px] snap-start shrink-0">
-                <EventCard
-                  id={event.id}
-                  title={event.title}
-                  date={event.date}
-                  location={event.location}
-                  category={event.category}
-                  imageColor={event.imageColor}
-                  imageUrl={event.imageUrl}
-                  reservationType={event.reservationType}
-                  channels={event.channels}
-                  user={user}
-                  eventType={event.eventType}
-                  baseEventId={event.baseEventId}
-                  showEventTypeBadge={true}
-                />
-              </div>
-            ))}
-            {/* + Card for adding new events */}
-            <div 
-              onClick={() => router.push("/events/new")}
-              className="min-w-[280px] w-[280px] md:min-w-[320px] md:w-[320px] snap-start shrink-0"
-            >
-              <div className="border border-dashed border-primary/30 hover:border-primary/60 bg-background/50 hover:bg-background/80 rounded-2xl overflow-hidden transition-all h-full cursor-pointer group shadow-sm flex flex-col">
-                <div className="aspect-[16/9] w-full border-b border-dashed border-primary/20 bg-primary/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                  <div className="w-12 h-12 rounded-full bg-background border border-dashed border-primary/30 group-hover:border-primary/60 flex items-center justify-center transition-all group-hover:scale-105">
-                    <Plus className="w-6 h-6 text-primary" />
-                  </div>
-                </div>
-                <div className="p-4 flex-1 flex flex-col justify-center">
-                  <p className="font-bold text-sm md:text-base text-foreground group-hover:text-primary transition-colors text-center">새 행사 등록</p>
-                  <p className="text-[11px] md:text-xs text-muted-foreground mt-1 text-center">이벤트를 개최하여 팬들과 소통해보세요</p>
-                </div>
-              </div>
+            <div className="pt-4">
+              <Link
+                href="/events/new"
+                className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+              >
+                새 행사 등록하러 가기
+              </Link>
             </div>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+            {filteredEvents.map((event, index) => (
+              <EventCard
+                key={event.id}
+                id={event.id}
+                title={event.title}
+                date={event.date}
+                location={event.location}
+                category={event.category}
+                imageColor={event.imageColor}
+                imageUrl={event.imageUrl}
+                reservationType={event.reservationType}
+                channels={event.channels}
+                user={user}
+                eventType={event.eventType}
+                baseEventId={event.baseEventId}
+                isRightCard={index % 2 === 1}
+                showEventTypeBadge={true}
+              />
+            ))}
+          </div>
         )}
-      </div>
-    </section>
+      </section>
+
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-0 bg-transparent shadow-none">
+          <DialogTitle className="sr-only">채널 수정 팝업</DialogTitle>
+          <div className="bg-card rounded-2xl overflow-hidden shadow-xl border border-border">
+            <div className="p-6">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold tracking-tight mb-1 flex items-center gap-2">
+                  <Settings2 className="h-5 w-5" /> 채널 수정
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  오너 권한을 가진 채널의 프로필 및 정보를 관리합니다.
+                </p>
+              </div>
+              <ChannelSettingsCard 
+                channel={channel} 
+                teams={teams}
+                onUpdated={() => window.location.reload()} 
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

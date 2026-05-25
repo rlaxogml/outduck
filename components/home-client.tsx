@@ -14,7 +14,7 @@ import { OrganizerSection } from "@/components/organizer-section";
 import { FavoriteChannels } from "@/components/favorite-channels";
 import { MiniCalendar } from "@/components/mini-calendar";
 import { GoogleAd } from "@/components/google-ad";
-import { Building2, ArrowRight } from "lucide-react";
+import { Building2, ArrowRight, UserCircle } from "lucide-react";
 
 type Event = {
   id: number;
@@ -46,6 +46,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
   const [onlineEvents, setOnlineEvents] = useState<Event[]>(initialOnlineEvents);
   const [user, setUser] = useState<User | null>(null);
   const [isCompanyUser, setIsCompanyUser] = useState(false);
+  const [isHostUser, setIsHostUser] = useState(false);
   const [visibleCount, setVisibleCount] = useState(10);
 
   // Reset visible count when filters change
@@ -112,7 +113,25 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
       }
     };
 
+    const checkHostUser = async (userId: string) => {
+      try {
+        const { data } = await supabase
+          .from("channels")
+          .select("id")
+          .eq("owner_id", userId)
+          .limit(1)
+          .maybeSingle();
+
+        if (data && isMounted) {
+          setIsHostUser(true);
+        }
+      } catch (err) {
+        console.error("HomeClient: Host user check failed:", err);
+      }
+    };
+
     checkCompanyUser(user.id);
+    checkHostUser(user.id);
 
     return () => {
       isMounted = false;
@@ -171,10 +190,10 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
       <Header />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 py-3">
+      <div className="mx-auto max-w-7xl px-4 pt-1 pb-3 md:py-3">
         <main className="pb-8">
           {/* Poster Slider */}
-          <section className="py-4">
+          <section className="pt-1 pb-4 md:py-4">
             <PosterSlider />
           </section>
 
@@ -199,8 +218,26 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents }: HomeCl
             </div>
           )}
 
-          {/* Organizer Section */}
-          <OrganizerSection user={user} />
+          {/* Host Owner Banner */}
+          {isHostUser && (
+            <div className="mb-6 p-4 md:p-5 bg-gradient-to-r from-indigo-500/15 to-purple-500/10 border border-indigo-500/20 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-2 fade-in duration-300">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-indigo-500 text-white rounded-2xl shrink-0">
+                  <UserCircle className="w-5 h-5" />
+                </div>
+                <div className="space-y-0.5">
+                  <h4 className="text-sm md:text-base font-extrabold text-foreground">주최자 관리 콘솔</h4>
+                  <p className="text-xs text-muted-foreground font-medium">주최자 계정으로 소속 채널과 등록된 행사를 관리하세요.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push("/host")}
+                className="h-11 px-6 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-md shrink-0 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              >
+                콘솔 바로가기 <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* Favorite Channels */}
           <FavoriteChannels user={user} />

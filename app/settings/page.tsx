@@ -10,13 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { User } from "@supabase/supabase-js";
-import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft } from "lucide-react";
+import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner"; // Assuming sonner is available, or use alert
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { Users } from "lucide-react";
 
-type Tab = "account" | "notifications" | "advanced";
+type Tab = "account" | "advanced";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -51,7 +54,33 @@ export default function SettingsPage() {
       supabase.from("channels").select("*").eq("owner_id", userId).order("name"),
       supabase.from("channels").select("id, name").eq("is_team", true).order("name")
     ]);
-    setOwnedChannels(channelsData || []);
+
+    let combinedChannels = channelsData || [];
+
+    const { data: compData } = await supabase
+      .from("companies")
+      .select("name")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (compData?.name) {
+      const { data: companyChans } = await supabase
+        .from("channels")
+        .select("*")
+        .eq("company", compData.name)
+        .is("owner_id", null)
+        .order("name");
+
+      if (companyChans && companyChans.length > 0) {
+        companyChans.forEach(cc => {
+          if (!combinedChannels.some(c => c.id === cc.id)) {
+            combinedChannels.push(cc);
+          }
+        });
+      }
+    }
+
+    setOwnedChannels(combinedChannels);
     setTeams(teamsData || []);
   };
 
@@ -59,7 +88,7 @@ export default function SettingsPage() {
     if (typeof window !== "undefined") {
       const searchParams = new URLSearchParams(window.location.search);
       const tab = searchParams.get("tab");
-      if (tab === "account" || tab === "notifications" || tab === "advanced") {
+      if (tab === "account" || tab === "advanced") {
         setActiveTab(tab as Tab);
       }
     }
@@ -302,17 +331,7 @@ export default function SettingsPage() {
               계정
             </button>
             
-            <button
-              onClick={() => setActiveTab("notifications")}
-              className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === "notifications" 
-                  ? "bg-primary/10 text-primary" 
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Bell className="h-5 w-5" />
-              알림
-            </button>
+
             
             <button
               onClick={() => setActiveTab("advanced")}
@@ -399,40 +418,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeTab === "notifications" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div>
-                <h3 className="text-2xl font-bold tracking-tight mb-1">알림 설정</h3>
-                <p className="text-muted-foreground text-sm">받고 싶은 알림을 선택하세요.</p>
-              </div>
 
-              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-8">
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                      <Label className="text-base font-semibold">구독 채널 새 행사 알림</Label>
-                      <p className="text-sm text-muted-foreground">구독 중인 채널에서 새로운 행사를 등록하면 알림을 받습니다.</p>
-                    </div>
-                    <Switch 
-                      checked={notifyNewEvent} 
-                      onCheckedChange={handleToggleNotifyNewEvent} 
-                    />
-                  </div>
-                  <div className="h-px w-full bg-border" />
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                      <Label className="text-base font-semibold">찜한 행사 공지 알림</Label>
-                      <p className="text-sm text-muted-foreground">찜한 행사와 관련된 중요 공지사항 알림을 받습니다.</p>
-                    </div>
-                    <Switch 
-                      checked={notifyBookmarkNotice} 
-                      onCheckedChange={handleToggleNotifyBookmarkNotice} 
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {activeTab === "advanced" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -509,7 +495,7 @@ export default function SettingsPage() {
   );
 }
 
-function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; teams: any[]; onUpdated: () => void }) {
+export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; teams: any[]; onUpdated: () => void }) {
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string>(channel.team_id ? String(channel.team_id) : "none");
   const [linksForm, setLinksForm] = useState<any[]>([]);
@@ -519,6 +505,8 @@ function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; team
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [teamSearch, setTeamSearch] = useState("");
 
   useEffect(() => {
     if (!showDeleteDialog) {
@@ -751,19 +739,70 @@ function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; team
 
           <div className="space-y-1.5">
             <Label className="text-sm font-semibold flex items-center gap-1"><Users className="w-4 h-4"/> 소속 팀</Label>
-            <Select value={teamId} onValueChange={setTeamId}>
-              <SelectTrigger className="h-10 border-neutral-300 dark:border-neutral-600">
-                <SelectValue placeholder="소속 팀 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">소속 없음</SelectItem>
-                {teams.map(team => (
-                  <SelectItem key={team.id} value={String(team.id)}>
-                    {team.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={teamOpen} onOpenChange={setTeamOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={teamOpen}
+                  className="w-full justify-between h-10 border-neutral-300 dark:border-neutral-600 font-normal"
+                >
+                  <span className="truncate">
+                    {teamId !== "none"
+                      ? teams.find((team) => String(team.id) === teamId)?.name || "소속 없음"
+                      : "소속 없음"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0" align="start">
+                <Command className="overflow-visible" shouldFilter={false}>
+                  <CommandInput 
+                    placeholder="팀 이름 검색" 
+                    value={teamSearch}
+                    onValueChange={setTeamSearch}
+                  />
+                  {teamSearch.length > 0 && (
+                    <div className="border-t border-neutral-200 dark:border-neutral-700">
+                      <CommandList className="max-h-[160px] overflow-y-auto">
+                        <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
+                        <CommandGroup>
+                          {"소속 없음".includes(teamSearch) && (
+                            <CommandItem
+                              value="none"
+                              onSelect={() => {
+                                setTeamId("none");
+                                setTeamSearch("");
+                                setTeamOpen(false);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", teamId === "none" ? "opacity-100" : "opacity-0")} />
+                              소속 없음
+                            </CommandItem>
+                          )}
+                          {teams.filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase())).map((team) => (
+                            <CommandItem
+                              key={team.id}
+                              value={team.name}
+                              onSelect={() => {
+                                setTeamId(String(team.id));
+                                setTeamSearch("");
+                                setTeamOpen(false);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", teamId === String(team.id) ? "opacity-100" : "opacity-0")} />
+                              {team.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </div>
+                  )}
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 

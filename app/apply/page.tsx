@@ -13,12 +13,14 @@ import {
   CheckCircle2
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
+import { cn } from "@/lib/utils";
 import { CompanyApplyForm } from "@/components/apply/company-apply-form";
 import { OrganizerApplyForm } from "@/components/apply/organizer-apply-form";
 
 export default function ApplyPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [hasChannel, setHasChannel] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   
   const [mode, setMode] = useState<"selection" | "admin" | "organizer">("selection");
@@ -33,6 +35,19 @@ export default function ApplyPage() {
         return;
       }
       setUser(session.user);
+      
+      try {
+        const { data, error } = await supabase
+          .from("channels")
+          .select("id")
+          .eq("owner_id", session.user.id)
+          .limit(1);
+        
+        if (!error && data && data.length > 0) {
+          setHasChannel(true);
+        }
+      } catch (e) {}
+
       setIsLoadingAuth(false);
     };
     checkAuth();
@@ -100,14 +115,27 @@ export default function ApplyPage() {
 
               {/* Organizer Option */}
               <button
-                onClick={() => setMode("organizer")}
-                className="group relative flex flex-col items-center justify-center p-8 bg-background border-2 border-border rounded-3xl shadow-sm transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 text-left"
+                onClick={() => !hasChannel && setMode("organizer")}
+                disabled={hasChannel}
+                className={cn(
+                  "group relative flex flex-col items-center justify-center p-8 bg-background border-2 rounded-3xl transition-all duration-300 text-left",
+                  hasChannel 
+                    ? "border-border/50 opacity-50 cursor-not-allowed grayscale" 
+                    : "border-border shadow-sm hover:border-primary/50 hover:shadow-lg hover:-translate-y-1"
+                )}
               >
-                <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <div className={cn(
+                  "w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-transform duration-300",
+                  hasChannel ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary group-hover:scale-110"
+                )}>
                   <UserCircle2 className="w-8 h-8" />
                 </div>
                 <h3 className="text-xl font-bold mb-2 text-center">주최자 신청</h3>
-                <p className="text-muted-foreground text-sm text-center">개인 크리에이터, 게임 등<br/>행사를 주최하고 싶으신 분</p>
+                {hasChannel ? (
+                  <p className="text-primary font-bold text-sm text-center">이미 주최자 계정이 있습니다</p>
+                ) : (
+                  <p className="text-muted-foreground text-sm text-center">개인 크리에이터, 게임 등<br/>행사를 주최하고 싶으신 분</p>
+                )}
               </button>
             </div>
           </div>

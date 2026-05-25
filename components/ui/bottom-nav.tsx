@@ -20,11 +20,14 @@ export function BottomNav() {
     <nav 
       className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background border-t border-border/50 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] px-2 flex items-stretch justify-around select-none"
       style={{
-        height: "calc(env(safe-area-inset-bottom, 0px) + 64px)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)",
         paddingTop: "8px",
+        minHeight: "calc(env(safe-area-inset-bottom, 0px) + 64px)",
       }}
     >
+      {/* iOS Safari 등에서 주소창이 숨겨지며 바텀 바가 붕 뜰 때 빈 공간이 보이지 않도록 아래쪽으로 배경을 확장합니다 */}
+      <div className="absolute top-full left-0 right-0 h-[50vh] bg-background -z-10" />
+
       {navItems.map((item) => {
         const isActive = pathname === item.path;
         const Icon = item.icon;
@@ -35,10 +38,7 @@ export function BottomNav() {
             onClick={() => router.push(item.path)}
             className="flex flex-col items-center justify-center flex-1 h-full py-1 text-muted-foreground transition-all duration-200 cursor-pointer relative"
           >
-            {/* Active Top indicator line */}
-            {isActive && (
-              <span className="absolute top-0 w-8 h-[3px] rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 animate-in fade-in slide-in-from-top-1 duration-300" />
-            )}
+
 
             <Icon
               className={cn(

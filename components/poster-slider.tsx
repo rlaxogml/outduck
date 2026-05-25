@@ -181,13 +181,13 @@ export function PosterSlider() {
 
   return (
     /* Contained within normal 6xl container limits */
-    <div className="w-full relative overflow-hidden py-2 group">
+    <div className="w-[calc(100%+16px)] -mx-2 md:w-full md:mx-0 relative overflow-hidden py-2 group">
       <div className="overflow-visible" ref={emblaRef}>
         <div className="flex items-center touch-pan-y">
           {posters.map((poster, index) => (
             <div
               key={poster.id}
-              className="flex-[0_0_100%] md:flex-[0_0_75%] min-[1152px]:flex-[0_0_950px] min-w-0 px-2 md:px-4 relative"
+              className="flex-[0_0_100%] md:flex-[0_0_75%] min-[1152px]:flex-[0_0_950px] min-w-0 px-1 md:px-4 relative"
               style={{ backfaceVisibility: "hidden" }}
             >
               <div

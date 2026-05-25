@@ -267,12 +267,12 @@ export function MiniCalendar({ user }: { user: User | null }) {
         <div className="flex flex-row items-center justify-between gap-2 mb-3.5">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-5 bg-primary rounded-full" />
-            <h2 className="text-base md:text-lg font-bold text-foreground">
+            <h2 className="text-sm md:text-lg font-bold text-foreground whitespace-nowrap">
               이번 주 일정
             </h2>
             <Link 
               href="/calendar" 
-              className="ml-1.5 flex items-center gap-0.5 text-[11px] md:text-xs font-semibold text-muted-foreground hover:text-primary transition-all group bg-muted/40 hover:bg-primary/10 px-2 py-0.5 md:py-1 rounded-full border border-border/30 hover:border-primary/20"
+              className="ml-1.5 hidden md:flex items-center gap-0.5 text-[11px] md:text-xs font-semibold text-muted-foreground hover:text-primary transition-all group bg-muted/40 hover:bg-primary/10 px-2 py-0.5 md:py-1 rounded-full border border-border/30 hover:border-primary/20"
             >
               전체보기
               <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />

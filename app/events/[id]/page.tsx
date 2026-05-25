@@ -519,10 +519,10 @@ export default function EventDetailPage() {
         {/* Floating Back Button */}
         <button
           onClick={() => router.back()}
-          className="absolute left-4 md:-left-24 top-6 md:top-8 z-40 flex items-center justify-center w-16 h-16 rounded-full border border-border/60 bg-white/90 dark:bg-muted/90 text-foreground shadow-md backdrop-blur-sm hover:scale-105 active:scale-95 transition-all"
+          className="absolute left-6 md:-left-24 top-2 md:top-8 z-40 flex items-center justify-center w-10 h-10 md:w-16 md:h-16 rounded-full border border-border/60 bg-white/90 dark:bg-muted/90 text-foreground shadow-md backdrop-blur-sm hover:scale-105 active:scale-95 transition-all"
           aria-label="뒤로가기"
         >
-          <ChevronLeft className="w-8 h-8 stroke-[2.5]" />
+          <ChevronLeft className="w-5 h-5 md:w-8 md:h-8 stroke-[2.5]" />
         </button>
 
         {/* Hero Card content */}

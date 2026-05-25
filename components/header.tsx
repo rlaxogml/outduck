@@ -201,9 +201,8 @@ export function Header() {
       router.push(`/channels/${notif.channel_id}`);
     } else if (notif.type === "new_company_request") {
       router.push("/company");
-    } else if (notif.type === "request_status") {
-      router.push("/apply");
     }
+    // request_status 타입 알림은 클릭 시 이동하지 않음
   };
 
   useEffect(() => {
@@ -668,78 +667,7 @@ export function Header() {
           </div>
 
           <div className="flex-shrink-0 justify-self-end flex items-center gap-2.5 md:gap-3.5">
-            {user && (
-              <DropdownMenu modal={false} open={isNotifDropdownOpen} onOpenChange={handleDropdownOpen}>
-                <DropdownMenuTrigger asChild>
-                  <button className="relative p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200 focus:outline-none">
-                    <Bell className="h-[21px] w-[21px] md:h-6 md:w-6" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white ring-2 ring-background animate-in zoom-in duration-200">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
-                    )}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[320px] sm:w-[380px] p-0 rounded-2xl shadow-xl mt-1.5 overflow-hidden border border-border bg-background">
-                  <div className="p-3.5 border-b border-border bg-muted/20 flex items-center justify-between">
-                    <span className="font-extrabold text-sm flex items-center gap-1.5">
-                      <Bell className="w-4 h-4 text-slate-500" /> 알림
-                    </span>
-                    {unreadCount > 0 && (
-                      <span className="text-[10px] font-bold text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-full">
-                        새 알림 {unreadCount}개
-                      </span>
-                    )}
-                  </div>
-                  <div className="max-h-[340px] overflow-y-auto no-scrollbar">
-                    {isNotificationsLoading && notifications.length === 0 ? (
-                      <div className="py-8 flex flex-col items-center justify-center text-muted-foreground gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground/60" />
-                        <span className="text-xs font-medium">알림을 불러오는 중...</span>
-                      </div>
-                    ) : notifications.length === 0 ? (
-                      <div className="py-10 text-center text-muted-foreground select-none">
-                        <span className="text-xs font-semibold">새로운 알림이 없습니다.</span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col">
-                        {notifications.map((notif) => (
-                          <button
-                            key={notif.id}
-                            onClick={() => handleNotificationClick(notif)}
-                            className={cn(
-                              "w-full text-left px-3.5 py-3 border-b border-border/40 hover:bg-muted/40 transition-colors flex gap-3 items-start",
-                              !notif.is_read && "bg-blue-500/5 dark:bg-blue-500/2"
-                            )}
-                          >
-                            <div className={cn(
-                              "p-2 rounded-xl shrink-0 flex items-center justify-center mt-0.5",
-                              getNotificationColorClass(notif.type)
-                            )}>
-                              {getNotificationIcon(notif.type)}
-                            </div>
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <p className={cn(
-                                "text-xs leading-relaxed font-medium break-words text-foreground/90",
-                                !notif.is_read && "font-bold text-foreground"
-                              )}>
-                                {notif.message}
-                              </p>
-                              <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
-                                <span>{getRelativeTime(notif.created_at)}</span>
-                                {!notif.is_read && (
-                                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-                                )}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+
 
             {user ? (
               <DropdownMenu modal={false}>
@@ -752,8 +680,8 @@ export function Header() {
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuLabel>{userName}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
-                    설정
+                  <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer font-semibold">
+                    마이페이지
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10">
@@ -775,99 +703,101 @@ export function Header() {
       </div>
 
       {/* Mobile Search Bar Row */}
-      <div className="border-b border-border/50 bg-background px-3.5 py-2 block md:hidden">
-        <div className="relative w-full max-w-lg mx-auto">
-          <div className="relative flex w-full items-center">
-            <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
-            <input
-              type="text"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              onKeyDown={handleSearchInputKeyDown}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => {
-                window.setTimeout(() => {
-                  setIsSearchFocused(false);
-                }, 120);
-              }}
-              placeholder="채널명을 검색해보세요"
-              className="h-10 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
-            />
-          </div>
+      {pathname !== "/map" && (
+        <div className="border-b border-border/50 bg-background px-3.5 py-2 block md:hidden">
+          <div className="relative w-full max-w-lg mx-auto">
+            <div className="relative flex w-full items-center">
+              <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
+              <input
+                type="text"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                onKeyDown={handleSearchInputKeyDown}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setIsSearchFocused(false);
+                  }, 120);
+                }}
+                placeholder="채널명을 검색해보세요"
+                className="h-10 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
+              />
+            </div>
 
-          {isSearchFocused && (
-            <div className="absolute top-[48px] left-0 right-0 z-[100] w-full rounded-2xl border border-border bg-background p-2 shadow-xl">
-              {displayedChannels.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {hasTypedInput
-                    ? showNoResultsMessage
-                      ? "검색 결과가 없습니다."
-                      : "검색 결과를 확인하는 중..."
-                    : "최근 검색한 채널이 없습니다."}
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  {!hasTypedInput && displayedChannels.length > 0 && (
-                    <div className="flex items-center justify-between px-3 pt-1 pb-2">
-                      <span className="text-sm font-semibold">최근 검색</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearRecentChannels();
-                        }}
-                        className="text-xs text-muted-foreground hover:text-destructive"
-                      >
-                        모두 지우기
-                      </button>
-                    </div>
-                  )}
-                  <ul className="flex gap-3 overflow-x-auto p-1 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    {displayedChannels.map((channel) => (
-                      <li
-                        key={channel.id}
-                        className="relative min-w-[100px] flex-shrink-0 group"
-                      >
-                        {!hasTypedInput && (
+            {isSearchFocused && (
+              <div className="absolute top-[48px] left-0 right-0 z-[100] w-full rounded-2xl border border-border bg-background p-2 shadow-xl">
+                {displayedChannels.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    {hasTypedInput
+                      ? showNoResultsMessage
+                        ? "검색 결과가 없습니다."
+                        : "검색 결과를 확인하는 중..."
+                      : "최근 검색한 채널이 없습니다."}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {!hasTypedInput && displayedChannels.length > 0 && (
+                      <div className="flex items-center justify-between px-3 pt-1 pb-2">
+                        <span className="text-sm font-semibold">최근 검색</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearRecentChannels();
+                          }}
+                          className="text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          모두 지우기
+                        </button>
+                      </div>
+                    )}
+                    <ul className="flex gap-3 overflow-x-auto p-1 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      {displayedChannels.map((channel) => (
+                        <li
+                          key={channel.id}
+                          className="relative min-w-[100px] flex-shrink-0 group"
+                        >
+                          {!hasTypedInput && (
+                            <button
+                              type="button"
+                              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-background hover:text-foreground group-hover:opacity-100"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeRecentChannel(channel.id);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
                           <button
                             type="button"
-                            className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-background hover:text-foreground group-hover:opacity-100"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeRecentChannel(channel.id);
-                            }}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleChannelSelect(channel)}
+                            className="w-full rounded-xl border border-border p-2.5 text-center hover:bg-muted transition-colors"
                           >
-                            <X className="h-3 w-3" />
+                            <Avatar className="mx-auto mb-2 h-10 w-10 border border-border">
+                              <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
+                              <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                                {getChannelInitial(channel.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="truncate text-[13px] font-medium">
+                              {channel.name}
+                            </div>
+                            <div className="mt-0.5 text-[10.5px] text-muted-foreground">
+                              {renderChannelType(channel.type)}
+                            </div>
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => handleChannelSelect(channel)}
-                          className="w-full rounded-xl border border-border p-2.5 text-center hover:bg-muted transition-colors"
-                        >
-                          <Avatar className="mx-auto mb-2 h-10 w-10 border border-border">
-                            <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
-                            <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                              {getChannelInitial(channel.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="truncate text-[13px] font-medium">
-                            {channel.name}
-                          </div>
-                          <div className="mt-0.5 text-[10.5px] text-muted-foreground">
-                            {renderChannelType(channel.type)}
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Navigation Container */}
       <div className="border-t border-border w-full relative hidden md:block">
@@ -875,7 +805,7 @@ export function Header() {
           {/* Main Scrollable Nav - Increased vertical padding for lux room, and bumped right guard to detach neighbor elements */}
           <nav className={cn(
             "flex items-center justify-around sm:justify-center gap-2 sm:gap-6 px-3.5 py-2.5 sm:py-3.5 w-full overflow-x-auto no-scrollbar sm:pr-0",
-            !hasChannel ? "pr-28" : "pr-3.5"
+            !isCompanyUser ? "pr-28" : "pr-3.5"
           )}>
             <button
               onClick={() => router.push("/")}
@@ -919,7 +849,7 @@ export function Header() {
           </nav>
 
           {/* Floating Action Button: Pushed visibly inward to fully detach from edge and made slightly lusher */}
-          {!hasChannel && !isCompanyUser && (
+          {!isCompanyUser && (
             <div className="absolute right-6 md:right-8 top-1/2 -translate-y-1/2 z-10 flex items-center">
               <button
                 onClick={() => router.push("/apply")}
