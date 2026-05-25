@@ -514,7 +514,7 @@ export default function EventDetailPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-background pb-12">
       <Header />
 
-      {/* 1. Hero Section Container with floating back button */}
+      {/* 1. Hero Section Container with floating back and map buttons */}
       <div className="mx-auto max-w-2xl md:max-w-6xl relative mt-2 md:mt-6 mb-4 md:mb-6 px-4 md:px-0">
         {/* Floating Back Button */}
         <button
@@ -524,6 +524,17 @@ export default function EventDetailPage() {
         >
           <ChevronLeft className="w-5 h-5 md:w-8 md:h-8 stroke-[2.5]" />
         </button>
+
+        {/* Floating Map Button (Mobile Only) */}
+        {!isPastEvent && (
+          <button
+            onClick={() => router.push(`/map?eventId=${event.id}`)}
+            className="absolute right-6 top-2 z-40 flex items-center justify-center w-10 h-10 rounded-full border border-border/60 bg-white/90 dark:bg-muted/90 text-foreground shadow-md backdrop-blur-sm hover:scale-105 active:scale-95 transition-all md:hidden"
+            aria-label="위치보기"
+          >
+            <MapPin className="w-5 h-5 stroke-[2.5] text-primary" />
+          </button>
+        )}
 
         {/* Hero Card content */}
         <div className="bg-background border-x border-b border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:rounded-3xl md:border md:border-slate-200/80 overflow-hidden">
@@ -569,22 +580,79 @@ export default function EventDetailPage() {
               </div>
             )}
 
-            <div className="flex items-start justify-between md:items-center gap-4">
-              <div className="flex-1">
-                <div className="flex items-center md:items-start md:flex-col gap-2 mb-1.5 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-xl md:text-2xl font-bold tracking-tight break-keep leading-tight text-foreground">
-                      {event.title}
-                    </h1>
-                    {isPastEvent && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-slate-100 text-slate-500 dark:bg-slate-805 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 select-none">
-                        지나간 행사
-                      </span>
-                    )}
+            {/* Desktop-only Title Section */}
+            <div className="hidden md:block">
+              <div className="flex items-start justify-between md:items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center md:items-start md:flex-col gap-2 mb-1.5 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h1 className="text-xl md:text-2xl font-bold tracking-tight break-keep leading-tight text-foreground">
+                        {event.title}
+                      </h1>
+                      {isPastEvent && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-slate-100 text-slate-500 dark:bg-slate-805 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 select-none">
+                          지나간 행사
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[13px] md:text-base text-muted-foreground font-medium shrink-0 whitespace-nowrap mt-0.5 md:mt-0">
+                      {event.channels.length > 0 ? event.channels[0].name : "오프라인 행사"}
+                    </span>
                   </div>
-                  <span className="text-[13px] md:text-base text-muted-foreground font-medium shrink-0 whitespace-nowrap mt-0.5 md:mt-0">
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile-only Title, Location, and Heart/Share Buttons on Bottom Right */}
+            <div className="block md:hidden">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1">
+                  <h1 className="text-xl font-extrabold tracking-tight break-keep leading-tight text-foreground">
+                    {event.title}
+                  </h1>
+                  <span className="text-[13px] text-muted-foreground font-medium whitespace-nowrap">
                     {event.channels.length > 0 ? event.channels[0].name : "오프라인 행사"}
                   </span>
+                  {isPastEvent && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-slate-100 text-slate-500 dark:bg-slate-805 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 select-none ml-1">
+                      지나간 행사
+                    </span>
+                  )}
+                </div>
+                {/* Clean Address / Location line in the header card */}
+                <div className="flex items-center gap-1 text-[13px] text-muted-foreground">
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span className="truncate">{event.location || "장소 정보 없음"}</span>
+                </div>
+
+                {/* Heart & Share Buttons (Below title on the bottom right) */}
+                <div className="flex justify-end items-center gap-1 mt-2">
+                  <button
+                    onClick={handleBookmark}
+                    className={cn(
+                      "p-2 transition-all active:scale-95 duration-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800",
+                      isBookmarked ? "text-pink-500" : "text-[#6a83a8] dark:text-[#8ba3c7]"
+                    )}
+                    aria-label="관심 저장"
+                  >
+                    <Heart
+                      className={cn(
+                        "w-[26px] h-[26px] transition-all",
+                        isBookmarked ? "fill-pink-500 stroke-pink-500" : "stroke-current"
+                      )}
+                    />
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="p-2 text-[#6a83a8] dark:text-[#8ba3c7] hover:text-foreground transition-all active:scale-95 duration-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                    aria-label="공유"
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-[26px] h-[26px]">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                      <polyline points="16 6 12 2 8 6"></polyline>
+                      <line x1="12" y1="2" x2="12" y2="15"></line>
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
@@ -607,46 +675,45 @@ export default function EventDetailPage() {
               </div>
             )}
 
-            {/* Action Buttons Row (Save, Location, Share) */}
-            <div className="flex justify-around md:justify-start md:gap-3 items-center mt-6 md:mt-8 pt-5 md:pt-0 border-t md:border-t-0 border-border/40">
+            {/* Action Buttons Row for PC/Desktop Only (Save, Location, Share) */}
+            <div className="hidden md:flex justify-start gap-3 items-center mt-8 pt-0 border-t-0 border-border/40">
               <button 
                 onClick={handleBookmark} 
                 className={cn(
-                  "flex flex-col items-center gap-2 transition-colors w-full",
-                  "md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:text-sm md:font-semibold md:shadow-sm",
+                  "flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold shadow-sm transition-colors",
                   isBookmarked 
-                    ? "text-pink-500 md:bg-pink-500 md:text-white md:border-pink-500 md:hover:bg-pink-600" 
-                    : "text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] md:bg-background md:text-[#3a5378] dark:md:text-[#a0b8d6] md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10"
+                    ? "text-pink-500 bg-pink-500 text-white border-pink-500 hover:bg-pink-600" 
+                    : "text-[#3a5378] dark:text-[#a0b8d6] bg-background border-[#4f6b94]/30 dark:border-[#627fa6]/30 hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10"
                 )}
               >
-                <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
-                  <Heart className={cn("w-6 h-6 md:w-4 md:h-4", isBookmarked ? "fill-pink-500 md:fill-white" : "")} />
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <Heart className={cn("w-4 h-4", isBookmarked ? "fill-white" : "")} />
                 </div>
-                <span className="text-[12px] md:text-sm font-medium md:font-semibold">{isBookmarked ? "관심저장" : "저장"}</span>
+                <span className="text-sm font-semibold">{isBookmarked ? "관심저장" : "저장"}</span>
               </button>
 
               {!isPastEvent && (
                 <button 
                   onClick={() => router.push(`/map?eventId=${event.id}`)}
-                  className="flex flex-col items-center gap-2 text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] transition-colors w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:bg-background md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10 md:text-[#3a5378] dark:md:text-[#a0b8d6] md:text-sm md:font-semibold shadow-sm"
+                  className="flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border border-[#4f6b94]/30 dark:border-[#627fa6]/30 bg-background hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10 text-[#3a5378] dark:text-[#a0b8d6] text-sm font-semibold shadow-sm transition-colors"
                 >
-                  <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
-                    <MapPin className="w-6 h-6 md:w-4 md:h-4" />
+                  <div className="w-5 h-5 flex items-center justify-center">
+                    <MapPin className="w-4 h-4" />
                   </div>
-                  <span className="text-[12px] md:text-sm font-medium md:font-semibold">위치보기</span>
+                  <span className="text-sm font-semibold">위치보기</span>
                 </button>
               )}
 
               <button 
                 onClick={handleShare}
-                className="flex flex-col items-center gap-2 text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] transition-colors cursor-pointer w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:bg-background md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10 md:text-[#3a5378] dark:md:text-[#a0b8d6] md:text-sm md:font-semibold shadow-sm"
+                className="flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border border-[#4f6b94]/30 dark:border-[#627fa6]/30 bg-background hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10 text-[#3a5378] dark:text-[#a0b8d6] text-sm font-semibold shadow-sm transition-colors"
               >
-                <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 md:w-4 md:h-4">
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
                   </svg>
                 </div>
-                <span className="text-[12px] md:text-sm font-medium md:font-semibold">공유</span>
+                <span className="text-sm font-semibold">공유</span>
               </button>
             </div>
           </div>
