@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Users } from "lucide-react";
+import { CompanyAffiliation, isAffiliationSupported } from "@/components/company-affiliation";
 
 type Tab = "account" | "advanced";
 
@@ -716,95 +717,104 @@ export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: an
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-sm font-semibold flex items-center gap-1"><Building2 className="w-4 h-4"/> 소속사</Label>
-            {channel.company ? (
-              <div className="flex items-center gap-3 bg-white dark:bg-background px-3 py-1.5 rounded-xl border border-neutral-300 dark:border-neutral-600 h-10 select-none w-fit max-w-full">
-                <Avatar className="h-6 w-6 border shadow-xs bg-background shrink-0">
-                  <AvatarImage src={companyLogo || undefined} className="object-cover" />
-                  <AvatarFallback className="text-[10px] font-bold bg-muted-foreground/10 flex items-center justify-center">
-                    {channel.company.slice(0, 1)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-bold text-foreground truncate">{channel.company}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 bg-white dark:bg-background px-3 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-600 text-muted-foreground text-xs h-10 select-none w-fit">
-                <Building2 className="w-4 h-4 text-muted-foreground/60" />
-                <span>소속사 없음</span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-sm font-semibold flex items-center gap-1"><Users className="w-4 h-4"/> 소속 팀</Label>
-            <Popover open={teamOpen} onOpenChange={setTeamOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={teamOpen}
-                  className="w-full justify-between h-10 border-neutral-300 dark:border-neutral-600 font-normal"
-                >
-                  <span className="truncate">
-                    {teamId !== "none"
-                      ? teams.find((team) => String(team.id) === teamId)?.name || "소속 없음"
-                      : "소속 없음"}
-                  </span>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0" align="start">
-                <Command className="overflow-visible" shouldFilter={false}>
-                  <CommandInput 
-                    placeholder="팀 이름 검색" 
-                    value={teamSearch}
-                    onValueChange={setTeamSearch}
+        {isAffiliationSupported(channel.type) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold flex items-center gap-1"><Building2 className="w-4 h-4"/> 소속사</Label>
+              {channel.company ? (
+                <div className="flex items-center gap-3 bg-white dark:bg-background px-3 py-1.5 rounded-xl border border-neutral-300 dark:border-neutral-600 h-10 select-none w-fit max-w-full">
+                  <Avatar className="h-6 w-6 border shadow-xs bg-background shrink-0">
+                    <AvatarImage src={companyLogo || undefined} className="object-cover" />
+                    <AvatarFallback className="text-[10px] font-bold bg-muted-foreground/10 flex items-center justify-center">
+                      {channel.company.slice(0, 1)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-bold text-foreground truncate">{channel.company}</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 bg-white dark:bg-background px-3 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-600 text-muted-foreground text-xs h-10 select-none w-fit">
+                    <Building2 className="w-4 h-4 text-muted-foreground/60" />
+                    <span>소속사 없음</span>
+                  </div>
+                  <CompanyAffiliation
+                    channelId={channel.id}
+                    channelType={channel.type}
+                    onSuccess={onUpdated}
                   />
-                  {teamSearch.length > 0 && (
-                    <div className="border-t border-neutral-200 dark:border-neutral-700">
-                      <CommandList className="max-h-[160px] overflow-y-auto">
-                        <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
-                        <CommandGroup>
-                          {"소속 없음".includes(teamSearch) && (
-                            <CommandItem
-                              value="none"
-                              onSelect={() => {
-                                setTeamId("none");
-                                setTeamSearch("");
-                                setTeamOpen(false);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", teamId === "none" ? "opacity-100" : "opacity-0")} />
-                              소속 없음
-                            </CommandItem>
-                          )}
-                          {teams.filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase())).map((team) => (
-                            <CommandItem
-                              key={team.id}
-                              value={team.name}
-                              onSelect={() => {
-                                setTeamId(String(team.id));
-                                setTeamSearch("");
-                                setTeamOpen(false);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", teamId === String(team.id) ? "opacity-100" : "opacity-0")} />
-                              {team.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </div>
-                  )}
-                </Command>
-              </PopoverContent>
-            </Popover>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold flex items-center gap-1"><Users className="w-4 h-4"/> 소속 팀</Label>
+              <Popover open={teamOpen} onOpenChange={setTeamOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={teamOpen}
+                    className="w-full justify-between h-10 border-neutral-300 dark:border-neutral-600 font-normal"
+                  >
+                    <span className="truncate">
+                      {teamId !== "none"
+                        ? teams.find((team) => String(team.id) === teamId)?.name || "소속 없음"
+                        : "소속 없음"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command className="overflow-visible" shouldFilter={false}>
+                    <CommandInput 
+                      placeholder="팀 이름 검색" 
+                      value={teamSearch}
+                      onValueChange={setTeamSearch}
+                    />
+                    {teamSearch.length > 0 && (
+                      <div className="border-t border-neutral-200 dark:border-neutral-700">
+                        <CommandList className="max-h-[160px] overflow-y-auto">
+                          <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
+                          <CommandGroup>
+                            {"소속 없음".includes(teamSearch) && (
+                              <CommandItem
+                                value="none"
+                                onSelect={() => {
+                                  setTeamId("none");
+                                  setTeamSearch("");
+                                  setTeamOpen(false);
+                                }}
+                                className="cursor-pointer"
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", teamId === "none" ? "opacity-100" : "opacity-0")} />
+                                소속 없음
+                              </CommandItem>
+                            )}
+                            {teams.filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase())).map((team) => (
+                              <CommandItem
+                                key={team.id}
+                                value={team.name}
+                                onSelect={() => {
+                                  setTeamId(String(team.id));
+                                  setTeamSearch("");
+                                  setTeamOpen(false);
+                                }}
+                                className="cursor-pointer"
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", teamId === String(team.id) ? "opacity-100" : "opacity-0")} />
+                                {team.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </div>
+                    )}
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-2">
           <Label className="text-sm font-semibold flex items-center gap-1"><LinkIcon className="w-4 h-4"/> SNS 링크</Label>

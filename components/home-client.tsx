@@ -235,7 +235,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
                 </div>
                 <div className="space-y-0.5">
                   <h4 className="text-sm md:text-base font-extrabold text-foreground">회사 파트너십 관리 콘솔</h4>
-                  <p className="text-xs text-muted-foreground font-medium">회사 계정으로 로그인하셨습니다. 소속 크리에이터 채널과 가입 신청 목록을 제어하세요.</p>
+                  <p className="text-xs text-muted-foreground font-medium">회사 계정으로 로그인하셨습니다.</p>
                 </div>
               </div>
               <button
@@ -256,7 +256,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
                 </div>
                 <div className="space-y-0.5">
                   <h4 className="text-sm md:text-base font-extrabold text-foreground">주최자 관리 콘솔</h4>
-                  <p className="text-xs text-muted-foreground font-medium">주최자 계정으로 소속 채널과 등록된 행사를 관리하세요.</p>
+                  <p className="text-xs text-muted-foreground font-medium">주최자 계정으로 로그인하셨습니다.</p>
                 </div>
               </div>
               <button

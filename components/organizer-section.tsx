@@ -92,7 +92,7 @@ export function OrganizerSection({ user }: { user: User | null }) {
       try {
         const { data: channelData, error: channelError } = await supabase
           .from("channels")
-          .select("id, name, image_url")
+          .select("*")
           .eq("owner_id", user.id)
           .limit(1)
           .maybeSingle();
