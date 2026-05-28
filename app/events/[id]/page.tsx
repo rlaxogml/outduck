@@ -626,25 +626,32 @@ export default function EventDetailPage() {
 
           {/* Left (Info) on Desktop, Below on Mobile */}
           <div className="w-full md:w-[45%] px-5 md:px-0 pt-0 md:pt-0 pb-6 md:pb-0 flex flex-col justify-center">
-            {/* Overlapping Channel Images / Desktop Row Profiles */}
+            {/* Profile & Name Section (Desktop & Mobile) */}
             {event.channels.length > 0 && (
-              <div className="relative -mt-8 md:mt-0 mb-4 md:mb-6 z-20 flex items-center -space-x-3 md:-space-x-3">
-                {event.channels.map((channel, i) => (
-                  <div 
-                    key={channel.id} 
-                    className="transition-transform hover:scale-105 hover:z-30 cursor-pointer relative" 
-                    style={{ zIndex: 20 - i }}
-                    onClick={() => router.push(`/channels/${channel.id}`)}
-                  >
-                    <div className="w-16 h-16 md:w-14 md:h-14 rounded-full border-4 md:border-2 border-background shadow-md overflow-hidden bg-muted flex items-center justify-center">
-                      {channel.image_url ? (
-                        <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-lg md:text-base font-bold text-muted-foreground">{channel.name.charAt(0)}</span>
-                      )}
+              <div className="relative -mt-8 md:mt-0 mb-3 md:mb-4 z-20 flex items-center gap-3">
+                <div className="flex items-center -space-x-3">
+                  {event.channels.map((channel, i) => (
+                    <div 
+                      key={channel.id} 
+                      className="transition-transform hover:scale-105 hover:z-30 cursor-pointer relative" 
+                      style={{ zIndex: 20 - i }}
+                      onClick={() => router.push(`/channels/${channel.id}`)}
+                    >
+                      <div className="w-14 h-14 md:w-12 md:h-12 rounded-full border-4 md:border-2 border-background shadow-md overflow-hidden bg-muted flex items-center justify-center">
+                        {channel.image_url ? (
+                          <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-lg md:text-base font-bold text-muted-foreground">{channel.name.charAt(0)}</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <div className="flex flex-col pt-1 md:pt-0">
+                  <span className="text-[15px] md:text-base font-semibold text-muted-foreground">
+                    {event.channels.map(c => c.name).join(', ')}
+                  </span>
+                </div>
               </div>
             )}
 
@@ -652,20 +659,15 @@ export default function EventDetailPage() {
             <div className="hidden md:block">
               <div className="flex items-start justify-between md:items-center gap-4">
                 <div className="flex-1">
-                  <div className="flex items-center md:items-start md:flex-col gap-2 mb-1.5 flex-wrap">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h1 className="text-xl md:text-2xl font-bold tracking-tight break-keep leading-tight text-foreground">
-                        {event.title}
-                      </h1>
-                      {isPastEvent && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-slate-100 text-slate-500 dark:bg-slate-805 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 select-none">
-                          지나간 행사
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[13px] md:text-base text-muted-foreground font-medium shrink-0 whitespace-nowrap mt-0.5 md:mt-0">
-                      {event.channels.length > 0 ? event.channels[0].name : "오프라인 행사"}
-                    </span>
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <h1 className="text-xl md:text-2xl font-bold tracking-tight break-keep leading-tight text-foreground">
+                      {event.title}
+                    </h1>
+                    {isPastEvent && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-slate-100 text-slate-500 dark:bg-slate-805 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 select-none">
+                        지나간 행사
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -678,9 +680,6 @@ export default function EventDetailPage() {
                   <h1 className="text-xl font-extrabold tracking-tight break-keep leading-tight text-foreground">
                     {event.title}
                   </h1>
-                  <span className="text-[13px] text-muted-foreground font-medium whitespace-nowrap">
-                    {event.channels.length > 0 ? event.channels[0].name : "오프라인 행사"}
-                  </span>
                   {isPastEvent && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-slate-100 text-slate-500 dark:bg-slate-805 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 select-none ml-1">
                       지나간 행사

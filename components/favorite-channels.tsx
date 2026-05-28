@@ -288,12 +288,12 @@ export function FavoriteChannels({ user }: { user: any }) {
 
   return (
     <div className="bg-white mb-4 border-y border-border">
-      <div
-        className="flex items-center p-3 cursor-pointer border-b border-border"
-        onClick={() => setIsExpanded(!isExpanded)}
+      <Link
+        href="/all-channels"
+        className="flex items-center p-3 cursor-pointer border-b border-border hover:bg-muted/30 transition-colors"
       >
         <span className="font-semibold text-sm">관심 채널 &gt;&gt;</span>
-      </div>
+      </Link>
 
       <div className={`p-4 pt-4 pb-4 flex gap-x-3 md:gap-x-4 gap-y-4 md:gap-y-6 relative ${isExpanded ? "flex-wrap pr-4" : "flex-nowrap overflow-x-auto no-scrollbar pr-0"}`}>
         {channels.length === 0 ? (
@@ -345,6 +345,19 @@ export function FavoriteChannels({ user }: { user: any }) {
                 </span>
               </div>
             )}
+            <Link
+              href="/all-channels"
+              className="flex flex-col items-center gap-2 min-w-[56px] md:min-w-[80px] group"
+            >
+              <div className="w-14 h-14 md:w-20 md:h-20 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center group-hover:bg-muted/50 transition-colors shadow-sm">
+                <span className="text-2xl text-slate-400 dark:text-slate-500 font-light">+</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                <span className="text-[10px] md:text-xs font-medium text-muted-foreground text-center truncate leading-tight">
+                  추가
+                </span>
+              </div>
+            </Link>
           </>
         )}
       </div>

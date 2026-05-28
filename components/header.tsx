@@ -574,7 +574,8 @@ export function Header() {
           </div>
 
           {/* Integrated Search Bar: Explicit fixed width overrides to force CSS Grid 'auto' expansion */}
-          <div className="relative w-full md:w-[400px] lg:w-[550px] xl:w-[650px] max-w-lg md:max-w-2xl mx-3 md:mx-auto md:px-4 hidden md:block">
+          {pathname !== "/all-channels" && (
+            <div className="relative w-full md:w-[400px] lg:w-[550px] xl:w-[650px] max-w-lg md:max-w-2xl mx-3 md:mx-auto md:px-4 hidden md:block">
             <div className="relative flex w-full items-center">
               <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
               <input
@@ -665,6 +666,7 @@ export function Header() {
               </div>
             )}
           </div>
+          )}
 
           <div className="flex-shrink-0 justify-self-end flex items-center gap-2.5 md:gap-3.5">
 
@@ -703,7 +705,7 @@ export function Header() {
       </div>
 
       {/* Mobile Search Bar Row */}
-      {pathname !== "/map" && (
+      {pathname !== "/map" && pathname !== "/all-channels" && (
         <div className="border-b border-border/50 bg-background px-3.5 py-2 block md:hidden">
           <div className="relative w-full max-w-lg mx-auto">
             <div className="relative flex w-full items-center">
