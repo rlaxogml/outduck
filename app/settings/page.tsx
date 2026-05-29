@@ -50,6 +50,11 @@ export default function SettingsPage() {
   const [ownedChannels, setOwnedChannels] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
 
+  // Account Deletion State
+  const [isAccountDeleteOpen, setIsAccountDeleteOpen] = useState(false);
+  const [accountDeleteInput, setAccountDeleteInput] = useState("");
+  const [isAccountDeleting, setIsAccountDeleting] = useState(false);
+
   const fetchOwnedChannelsAndTeams = async (userId: string) => {
     const [{ data: channelsData }, { data: teamsData }] = await Promise.all([
       supabase.from("channels").select("*").eq("owner_id", userId).order("name"),
@@ -158,6 +163,31 @@ export default function SettingsPage() {
       isMounted = false;
     };
   }, [router]);
+
+  const handleAccountDelete = async () => {
+    if (!user) return;
+    setIsAccountDeleting(true);
+
+    try {
+      // 1. Delete associated data
+      const deletes = [
+        supabase.from("channels").delete().eq("owner_id", user.id),
+        supabase.from("companies").delete().eq("user_id", user.id),
+        supabase.from("favorites").delete().eq("user_id", user.id),
+        supabase.from("event_bookmarks").delete().eq("user_id", user.id),
+        supabase.from("notifications").delete().eq("user_id", user.id),
+      ];
+      await Promise.all(deletes);
+
+      // 2. Sign out
+      await supabase.auth.signOut();
+      toast.success("계정이 성공적으로 탈퇴되었습니다.");
+      router.replace("/");
+    } catch (error: any) {
+      toast.error("탈퇴 처리 중 오류가 발생했습니다: " + error.message);
+      setIsAccountDeleting(false);
+    }
+  };
 
   const handleUpdateProfile = async () => {
     if (!user) return;
@@ -488,10 +518,72 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
+
+              {/* Danger Zone */}
+              <div className="border border-red-200 dark:border-red-900/30 rounded-2xl p-6 bg-red-50/30 dark:bg-red-950/10 shadow-sm space-y-6 mt-12">
+                <div>
+                  <h4 className="text-xl font-bold tracking-tight mb-1 flex items-center gap-2 text-red-600 dark:text-red-500">
+                    <AlertTriangle className="h-5 w-5" /> 계정 탈퇴
+                  </h4>
+                  <p className="text-sm text-red-600/80 dark:text-red-400/80">
+                    계정을 탈퇴하면 모든 데이터가 즉시 삭제되며 복구할 수 없습니다.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setAccountDeleteInput("");
+                      setIsAccountDeleteOpen(true);
+                    }}
+                    className="font-bold px-6 h-11"
+                  >
+                    계정 영구 삭제
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </main>
       </div>
+
+      <Dialog open={isAccountDeleteOpen} onOpenChange={setIsAccountDeleteOpen}>
+        <DialogContent className="sm:max-w-[400px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="w-5 h-5" />
+              계정 영구 삭제
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-sm leading-relaxed text-foreground/80">
+              정말로 아웃덕을 탈퇴하시겠습니까?<br/><br/>
+              탈퇴 시 <strong>모든 데이터가 영구 삭제</strong>되며, 절대 복구할 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-2">
+            <Label className="text-xs font-semibold text-muted-foreground block">
+              확인을 위해 아래에 <span className="text-rose-600 font-bold">계정삭제</span> 를 정확히 입력해주세요.
+            </Label>
+            <Input
+              value={accountDeleteInput}
+              onChange={(e) => setAccountDeleteInput(e.target.value)}
+              placeholder="계정삭제"
+              className="h-10 border-neutral-300 dark:border-neutral-600 rounded-xl"
+            />
+          </div>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsAccountDeleteOpen(false)} disabled={isAccountDeleting} className="rounded-xl font-semibold">취소</Button>
+            <Button
+              variant="destructive"
+              onClick={handleAccountDelete}
+              disabled={isAccountDeleting || accountDeleteInput !== "계정삭제"}
+              className="rounded-xl font-semibold"
+            >
+              {isAccountDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              탈퇴하기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

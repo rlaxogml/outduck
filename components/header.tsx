@@ -670,27 +670,87 @@ export function Header() {
 
           <div className="flex-shrink-0 justify-self-end flex items-center gap-2.5 md:gap-3.5">
 
-
             {user ? (
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <Avatar className="h-8 w-8 md:h-11 md:w-11 border border-border cursor-pointer hover:opacity-80 transition-opacity">
-                    <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />
-                    <AvatarFallback>{avatarFallbackText}</AvatarFallback>
-                  </Avatar>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel>{userName}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer font-semibold">
-                    마이페이지
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10">
-                    로그아웃
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2 md:gap-3">
+                {/* Notification Dropdown */}
+                <DropdownMenu open={isNotifDropdownOpen} onOpenChange={handleDropdownOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <button className="relative p-2 rounded-full hover:bg-muted transition-colors">
+                      <Bell className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm border border-background">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80 sm:w-96 p-0 rounded-2xl shadow-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                      <span className="font-bold text-sm">알림</span>
+                      {unreadCount > 0 && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-extrabold">{unreadCount} 새 알림</span>}
+                    </div>
+                    <div className="max-h-[350px] overflow-y-auto no-scrollbar">
+                      {isNotificationsLoading ? (
+                        <div className="flex justify-center items-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+                      ) : notifications.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Bell className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
+                          <p className="text-sm text-muted-foreground">새로운 알림이 없습니다.</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            onClick={() => handleNotificationClick(notif)}
+                            className={cn(
+                              "flex gap-3 px-4 py-3.5 border-b border-border/50 cursor-pointer transition-colors hover:bg-muted/50 last:border-0",
+                              !notif.is_read ? "bg-primary/5" : ""
+                            )}
+                          >
+                            <div className={cn("mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full", getNotificationColorClass(notif.type))}>
+                              {getNotificationIcon(notif.type)}
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <p className={cn("text-[13px] leading-snug break-keep", !notif.is_read ? "font-bold text-foreground" : "font-medium text-muted-foreground")}>
+                                {notif.message}
+                              </p>
+                              <p className="text-[11px] font-medium text-muted-foreground/80">
+                                {getRelativeTime(notif.created_at)}
+                              </p>
+                            </div>
+                            {!notif.is_read && (
+                              <div className="flex shrink-0 items-center justify-center pl-1">
+                                <span className="h-2 w-2 rounded-full bg-primary shadow-sm" />
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Profile Dropdown */}
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Avatar className="h-8 w-8 md:h-11 md:w-11 border border-border cursor-pointer hover:opacity-80 transition-opacity">
+                      <AvatarImage src={avatarUrl} alt={`${userName} 프로필`} />
+                      <AvatarFallback>{avatarFallbackText}</AvatarFallback>
+                    </Avatar>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel>{userName}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer font-semibold">
+                      마이페이지
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10">
+                      로그아웃
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ) : (
               <Button
                 variant="ghost"

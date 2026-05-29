@@ -206,6 +206,25 @@ export default function AdApplyPage() {
   // General loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Handle extension of an existing expired ad
+  const handleExtendAd = (ad: any) => {
+    setAdvertiserName(ad.advertiser_name || ad.title || "");
+    setLinkUrl(ad.link_url || "");
+    setImageUrl(ad.image_url || null);
+    
+    // reset dates to force user to choose new dates
+    setStartYear(currentYear);
+    setStartMonth("");
+    setStartDay("");
+    setEndYear(currentYear);
+    setEndMonth("");
+    setEndDay("");
+    
+    // Switch to apply mode
+    setMode("apply");
+    toast.success("기존 광고 정보가 등록 폼에 불러와졌습니다. 새로운 기간을 설정해주세요!");
+  };
+
   // Price calculations
   const [durationDays, setDurationDays] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -438,7 +457,11 @@ export default function AdApplyPage() {
         )}
 
         {mode === "edit" && user && (
-          <AdManager userId={user.id} onBack={() => setMode("selection")} />
+          <AdManager 
+            userId={user.id} 
+            onBack={() => setMode("selection")} 
+            onExtendAd={handleExtendAd}
+          />
         )}
 
         {mode === "apply" && (

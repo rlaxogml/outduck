@@ -53,7 +53,7 @@ export function CompanyAffiliation({
       // 1. Verify the invite code in companies table
       const { data: companyData, error: companyError } = await supabase
         .from("companies")
-        .select("id, name, invite_code")
+        .select("id, name, invite_code, is_auto_approved")
         .eq("invite_code", code.toUpperCase())
         .maybeSingle();
 
@@ -61,6 +61,12 @@ export function CompanyAffiliation({
 
       if (!companyData) {
         toast.error("유효하지 않은 회사 코드입니다. 다시 확인해 주세요.");
+        setIsValidating(false);
+        return;
+      }
+
+      if (!companyData.is_auto_approved) {
+        toast.error("해당 소속사는 현재 자동 가입을 지원하지 않습니다. (수동 승인 기능 준비 중)");
         setIsValidating(false);
         return;
       }

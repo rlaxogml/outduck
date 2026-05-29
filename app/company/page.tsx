@@ -293,7 +293,7 @@ export default function CompanyPage() {
                   }}
                   className="cursor-pointer font-bold rounded-lg text-sm text-orange-600 dark:text-orange-400 focus:text-orange-600"
                 >
-                  오너 권한 위임
+                  채널 권한 위임
                 </DropdownMenuItem>
               </>
             )}
@@ -1174,15 +1174,26 @@ export default function CompanyPage() {
               <div className="p-2 bg-orange-500/10 text-orange-600 rounded-xl shrink-0">
                 <Key className="w-4 h-4" />
               </div>
-              <div className="space-y-1 flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap min-w-0">
-                  <span className="text-xs md:text-sm font-bold text-foreground shrink-0">소속 가입 코드</span>
-                  {company.invite_code ? (
-                    <>
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-start flex-1 min-w-0 gap-4 md:gap-6 w-full">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-xs md:text-sm font-bold text-foreground shrink-0">소속 가입 코드</span>
+                    {company.invite_code && (
                       <Badge variant="outline" className="text-[9px] font-extrabold h-4.5 border-orange-500/20 text-orange-600 bg-orange-500/5 shrink-0">
                         활성 상태
                       </Badge>
-                      <div className="flex items-center gap-4 bg-background border border-border/60 rounded-xl px-2.5 py-1 shadow-sm shrink-0">
+                    )}
+                  </div>
+                  <p className="text-[10px] md:text-xs text-muted-foreground font-medium flex items-center gap-1">
+                    <Info className="w-3.5 h-3.5 text-muted-foreground/80 shrink-0" />
+                    일반 채널을 회사계정에 편입시키는 코드
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-2 flex-wrap justify-start shrink-0">
+                  {company.invite_code ? (
+                    <>
+                      <div className="flex items-center gap-4 bg-background border border-border/60 rounded-xl px-2.5 py-1.5 shadow-sm shrink-0">
                         <span className="text-[9px] font-extrabold tracking-wider text-muted-foreground uppercase">Code</span>
                         <span className="text-sm font-mono font-black tracking-wider text-orange-600 select-all">
                           {company.invite_code}
@@ -1191,29 +1202,29 @@ export default function CompanyPage() {
                           onClick={handleCopyInviteCode}
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 rounded-lg mr-2 hover:bg-orange-500/10 hover:text-orange-600 transition-all shadow-none border-none shrink-0"
+                          className="h-6 w-6 rounded-lg mr-1 hover:bg-orange-500/10 hover:text-orange-600 transition-all shadow-none border-none shrink-0"
                           title="코드 복사"
                         >
-                          <Copy className="w-3 h-3" />
+                          <Copy className="w-3.5 h-3.5" />
                         </Button>
                       </div>
-                      <div className="flex items-center gap-2 ml-4">
+                      <div className="flex items-center gap-2">
                         <Button
                           onClick={handleDeactivateInviteCode}
                           variant="outline"
-                          className="h-7 rounded-lg text-[10px] font-bold border-rose-300 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:border-rose-500/30 dark:hover:bg-rose-500/10 flex items-center gap-1 px-2.5 shadow-none shrink-0 transition-all"
+                          className="h-9 rounded-lg text-xs font-bold border-rose-300 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:border-rose-500/30 dark:hover:bg-rose-500/10 flex items-center gap-1.5 px-3 shadow-none shrink-0 transition-all"
                           title="코드 비활성화"
                         >
-                          <XCircle className="w-3 h-3" />
+                          <XCircle className="w-3.5 h-3.5" />
                           비활성화
                         </Button>
                         <Button
                           onClick={handleUpdateInviteCode}
                           variant="outline"
-                          className="h-7 rounded-lg text-[10px] font-bold border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/30 flex items-center gap-1 px-2.5 shadow-none shrink-0 transition-all"
+                          className="h-9 rounded-lg text-xs font-bold border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/30 flex items-center gap-1.5 px-3 shadow-none shrink-0 transition-all"
                           title="코드 재발급"
                         >
-                          <RefreshCw className="w-3 h-3" />
+                          <RefreshCw className="w-3.5 h-3.5" />
                           재발급
                         </Button>
                       </div>
@@ -1221,16 +1232,12 @@ export default function CompanyPage() {
                   ) : (
                     <Button
                       onClick={handleUpdateInviteCode}
-                      className="h-7 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[10px] shadow-md flex items-center gap-1 px-2.5"
+                      className="h-9 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs shadow-md flex items-center gap-1.5 px-4"
                     >
-                      <Plus className="w-3 h-3" /> 소속 가입 코드 생성
+                      <Plus className="w-3.5 h-3.5" /> 소속 가입 코드 생성
                     </Button>
                   )}
                 </div>
-                <p className="text-[10px] md:text-xs text-muted-foreground font-medium flex items-center gap-1">
-                  <Info className="w-3.5 h-3.5 text-muted-foreground/80 shrink-0" />
-                  일반 채널을 회사계정에 편입시키는 코드
-                </p>
               </div>
             </div>
 
@@ -1694,6 +1701,12 @@ export default function CompanyPage() {
                       남은 시간: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
                     </div>
                   )}
+                  <div className="mt-3 text-[11px] font-medium text-muted-foreground bg-background/60 p-2.5 rounded-lg border border-border/50 w-full flex items-start sm:items-center justify-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 mt-0.5 sm:mt-0 shrink-0" />
+                    <p className="leading-relaxed break-keep text-left sm:text-center">
+                      위임받을 사용자는 <span className="text-foreground font-bold mx-0.5">상단 프로필 클릭 <span className="text-muted-foreground font-normal text-[10px] mx-0.5">→</span> 마이페이지 <span className="text-muted-foreground font-normal text-[10px] mx-0.5">→</span> 고급설정</span>에서 입력해주세요.
+                    </p>
+                  </div>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed font-medium text-center bg-orange-500/10 p-3 rounded-xl text-orange-700 dark:text-orange-400">
                   🚨 이 코드는 생성 후 <strong>10분간 유효</strong>하며, 한 번만 사용할 수 있습니다. <br />

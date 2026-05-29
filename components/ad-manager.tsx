@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, Image as ImageIcon, Calendar, Edit, ExternalLink, RefreshCw, X, CheckCircle, UploadCloud } from "lucide-react";
+import { Loader2, Image as ImageIcon, Calendar, Edit, ExternalLink, RefreshCw, X, CheckCircle, UploadCloud, Trash2, Clock } from "lucide-react";
 
-export function AdManager({ userId, onBack }: { userId: string; onBack: () => void }) {
+export function AdManager({ userId, onBack, onExtendAd }: { userId: string; onBack: () => void, onExtendAd?: (ad: any) => void }) {
   const [ads, setAds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingAd, setEditingAd] = useState<any>(null);
@@ -51,6 +51,19 @@ export function AdManager({ userId, onBack }: { userId: string; onBack: () => vo
 
   const handleCancelEdit = () => {
     setEditingAd(null);
+  };
+
+  const handleDeleteAd = async (adId: string) => {
+    if (!window.confirm("이 광고 내역을 완전히 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.")) {
+      return;
+    }
+    const { error } = await supabase.from("posters").delete().eq("id", adId);
+    if (error) {
+      toast.error("광고 삭제에 실패했습니다.");
+    } else {
+      toast.success("광고가 삭제되었습니다.");
+      fetchAds();
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,53 +272,70 @@ export function AdManager({ userId, onBack }: { userId: string; onBack: () => vo
         </div>
       ) : (
         <div className="space-y-6">
-          {ads.map((ad) => (
-            <Card key={ad.id} className="rounded-3xl border-border shadow-sm overflow-hidden flex flex-col md:flex-row transition-all hover:shadow-md">
-              <div className="w-full md:w-1/3 aspect-[21/9] md:aspect-auto md:h-full bg-muted shrink-0 border-b md:border-b-0 md:border-r border-border">
-                {ad.image_url ? (
-                  <img src={ad.image_url} alt={ad.title} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-muted">
-                    <ImageIcon className="w-8 h-8 opacity-20" />
-                  </div>
-                )}
-              </div>
-              <div className="p-6 flex flex-col justify-center flex-1">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-bold line-clamp-1">{ad.title}</h3>
-                  <div className="flex gap-2">
-                    {ad.force_hide ? (
-                      <span className="px-2.5 py-1 bg-destructive/10 text-destructive text-xs font-bold rounded-full">노출 차단됨</span>
-                    ) : ad.is_active ? (
-                      <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 text-xs font-bold rounded-full">실시간 노출 중</span>
-                    ) : (
-                      <span className="px-2.5 py-1 bg-blue-500/10 text-blue-600 text-xs font-bold rounded-full">자동 상태 (기간 대기)</span>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2 text-sm text-muted-foreground mb-6">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 shrink-0" />
-                    <span>{ad.start_date} ~ {ad.end_date}</span>
-                  </div>
-                  {ad.link_url && (
-                    <div className="flex items-center gap-2">
-                      <ExternalLink className="w-4 h-4 shrink-0" />
-                      <a href={ad.link_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline line-clamp-1">
-                        {ad.link_url}
-                      </a>
+          {ads.map((ad) => {
+            const isExpired = ad.end_date ? new Date(ad.end_date) < new Date() : false;
+            
+            return (
+              <Card key={ad.id} className={`rounded-3xl border-border shadow-sm overflow-hidden flex flex-col md:flex-row transition-all hover:shadow-md ${isExpired ? 'opacity-70 saturate-50' : ''}`}>
+                <div className="w-full md:w-1/3 aspect-[21/9] md:aspect-auto md:h-full bg-muted shrink-0 border-b md:border-b-0 md:border-r border-border">
+                  {ad.image_url ? (
+                    <img src={ad.image_url} alt={ad.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-muted">
+                      <ImageIcon className="w-8 h-8 opacity-20" />
                     </div>
                   )}
                 </div>
-                
-                <div className="mt-auto flex justify-end">
-                  <Button onClick={() => handleEditClick(ad)} variant="outline" className="rounded-xl flex items-center gap-2 border-border/80 hover:bg-muted">
-                    <Edit className="w-4 h-4" /> 정보 수정
-                  </Button>
+                <div className="p-6 flex flex-col justify-center flex-1">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-lg font-bold line-clamp-1">{ad.title || ad.advertiser_name}</h3>
+                    <div className="flex gap-2">
+                      {ad.force_hide ? (
+                        <span className="px-2.5 py-1 bg-destructive/10 text-destructive text-xs font-bold rounded-full">노출 차단됨</span>
+                      ) : isExpired ? (
+                        <span className="px-2.5 py-1 bg-zinc-500/10 text-zinc-500 text-xs font-bold rounded-full border border-zinc-200 dark:border-zinc-800">기간 만료됨</span>
+                      ) : ad.is_active ? (
+                        <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 text-xs font-bold rounded-full">실시간 노출 중</span>
+                      ) : (
+                        <span className="px-2.5 py-1 bg-blue-500/10 text-blue-600 text-xs font-bold rounded-full">자동 상태 (기간 대기)</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm text-muted-foreground mb-6">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 shrink-0" />
+                      <span>{ad.start_date} ~ {ad.end_date}</span>
+                    </div>
+                    {ad.link_url && (
+                      <div className="flex items-center gap-2">
+                        <ExternalLink className="w-4 h-4 shrink-0" />
+                        <a href={ad.link_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline line-clamp-1">
+                          {ad.link_url}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-auto flex justify-end gap-2">
+                    {isExpired ? (
+                      <>
+                        <Button onClick={() => handleDeleteAd(ad.id)} variant="outline" className="rounded-xl flex items-center gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30">
+                          <Trash2 className="w-4 h-4" /> 내역 삭제
+                        </Button>
+                        <Button onClick={() => onExtendAd && onExtendAd(ad)} className="rounded-xl flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white">
+                          <Clock className="w-4 h-4" /> 기간 연장 신청
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={() => handleEditClick(ad)} variant="outline" className="rounded-xl flex items-center gap-2 border-border/80 hover:bg-muted">
+                        <Edit className="w-4 h-4" /> 정보 수정
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

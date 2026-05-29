@@ -128,7 +128,12 @@ export default function RichTextEditor({
     const q = quillRef.current?.getEditor();
     if (!q) return;
     const range = q.getSelection() || lastSelectionRef.current;
-    q.focus();
+    
+    const inputElement = document.getElementById(inputId);
+    if (document.activeElement !== inputElement) {
+      q.focus();
+    }
+
     if (range) {
       if (range.length > 0) {
         q.formatText(range.index, range.length, 'size', `${sizeVal}px`);

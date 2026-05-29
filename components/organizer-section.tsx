@@ -334,6 +334,24 @@ export function OrganizerSection({ user }: { user: User | null }) {
   const offlineCount = events.filter(e => e.eventType === "offline").length;
   const onlineCount = events.filter(e => e.eventType === "online").length;
 
+  const parsedLinks = (() => {
+    if (!channel || !channel.links) return [];
+    let links = channel.links;
+    if (typeof links === 'string') {
+      try {
+        links = JSON.parse(links);
+      } catch (e) {
+        return [];
+      }
+    }
+    if (Array.isArray(links)) {
+      return links.filter((l: any) => l.name?.trim() && l.url?.trim());
+    } else if (typeof links === 'object') {
+      return Object.entries(links).map(([name, url]) => ({ name, url: url as string })).filter((l: any) => l.name.trim() && l.url.trim());
+    }
+    return [];
+  })();
+
   return (
     <div className="flex flex-col gap-6">
       <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -382,6 +400,26 @@ export function OrganizerSection({ user }: { user: User | null }) {
             </Button>
           </div>
         </div>
+
+        {parsedLinks.length > 0 && (
+          <div className="mt-5 border-t border-border pt-5 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-300">
+            {parsedLinks.map((link: any, idx: number) => (
+              <div key={idx} className="flex items-start sm:items-center gap-1.5 text-sm">
+                <span className="text-muted-foreground select-none">•</span>
+                <span className="font-semibold text-foreground">{link.name} :</span>
+                <a
+                  href={link.url.startsWith("http") ? link.url : `https://${link.url}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {link.url}
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="flex flex-col gap-3 mt-6">

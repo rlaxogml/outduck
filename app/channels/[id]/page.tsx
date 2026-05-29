@@ -9,6 +9,8 @@ import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Star, Calendar, ShoppingBag, Link2, Settings2, ChevronDown, ChevronUp, Plus, Pencil } from "lucide-react";
 import { EventCard } from "@/components/event-card";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ChannelSettingsCard } from "@/app/settings/page";
 
 type ChannelEvent = {
   id: number;
@@ -88,7 +90,9 @@ export default function ChannelProfilePage() {
   }, [channel]);
   const [teamChannel, setTeamChannel] = useState<Channel | null>(null);
   const [memberChannels, setMemberChannels] = useState<Channel[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "offline" | "online">("all");
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -241,20 +245,17 @@ export default function ChannelProfilePage() {
         return { user: null, isSubscribed: false, userCompany: null };
       });
 
-      // 1. Resolve team metadata and member metadata promises first to secure relatedChannelIds
       const [teamData, membersData] = await Promise.all([
         teamDataPromise,
         membersDataPromise,
       ]);
 
-      // 2. Define related channels based on resolved metadata
       const relatedChannelIds = [
         channelId,
         ...(teamData ? [(teamData as Channel).id] : []),
         ...((membersData as Channel[])?.map(m => m.id) || [])
       ];
 
-      // 3. Initiate the massive event queries using relatedChannelIds
       const offlineEventsPromise = supabase
         .from("offline_events")
         .select(`
@@ -288,7 +289,6 @@ export default function ChannelProfilePage() {
         .order("start_at", { ascending: true })
         .then(res => res.data);
 
-      // 4. Resolve events and rest of promises
       const [favCount, { user: currentUser, isSubscribed, userCompany: fetchedCompany }, offlineData, onlineData] = await Promise.all([
         favoriteCountPromise,
         userAndFavPromise,
@@ -369,6 +369,21 @@ export default function ChannelProfilePage() {
     loadChannel();
   }, [channelId]);
 
+  // Lazy load teams only when settings modal is opened
+  useEffect(() => {
+    if (isSettingsOpen && teams.length === 0) {
+      const loadTeams = async () => {
+        const { data } = await supabase
+          .from("channels")
+          .select("id, name")
+          .eq("is_team", true)
+          .order("name");
+        if (data) setTeams(data);
+      };
+      loadTeams();
+    }
+  }, [isSettingsOpen, teams.length]);
+
   if (isLoading) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -434,13 +449,13 @@ export default function ChannelProfilePage() {
 
             {isOwner ? (
               <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 md:gap-2 shrink-0">
-                <Link
-                  href="/settings?tab=advanced"
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
                   className="inline-flex items-center gap-1 justify-center rounded-full h-9 md:h-11 px-3 md:px-5 font-bold text-xs md:text-sm bg-white text-black border border-black/20 transition-all hover:scale-105 active:scale-95 shadow-sm dark:bg-white dark:text-black dark:border-black/20"
                 >
                   <Pencil className="h-3 w-3 md:h-3.5 md:w-3.5" />
                   수정
-                </Link>
+                </button>
                 <Link
                   href="/events/new"
                   className="inline-flex items-center gap-1 justify-center rounded-full h-9 md:h-11 px-3 md:px-5 font-bold text-xs md:text-sm bg-primary/5 text-primary hover:bg-primary/10 border border-primary/60 transition-all hover:scale-105 active:scale-95 shadow-sm"
@@ -858,6 +873,29 @@ export default function ChannelProfilePage() {
           )}
         </section>
       </main>
+
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-0 bg-transparent shadow-none">
+          <DialogTitle className="sr-only">채널 수정 팝업</DialogTitle>
+          <div className="bg-card rounded-2xl overflow-hidden shadow-xl border border-border">
+            <div className="p-6">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold tracking-tight mb-1 flex items-center gap-2">
+                  <Settings2 className="h-5 w-5" /> 채널 수정
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  오너 권한을 가진 채널의 프로필 및 정보를 관리합니다.
+                </p>
+              </div>
+              <ChannelSettingsCard 
+                channel={channel} 
+                teams={teams}
+                onUpdated={() => window.location.reload()} 
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
