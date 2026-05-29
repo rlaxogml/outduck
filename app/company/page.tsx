@@ -106,29 +106,29 @@ const moveStorageImage = async (imageUrl: string): Promise<string> => {
     const bucketName = "channel-images";
     const oldFolder = "channel-requests";
     const newFolder = "channel-profile";
-    
+
     if (!imageUrl || !imageUrl.includes(`/storage/v1/object/public/${bucketName}/${oldFolder}/`)) {
       return imageUrl;
     }
-    
+
     const parts = imageUrl.split(`${oldFolder}/`);
     const fileName = parts[parts.length - 1];
     if (!fileName) return imageUrl;
-    
+
     const oldPath = `${oldFolder}/${fileName}`;
     const newPath = `${newFolder}/${fileName}`;
-    
+
     // Copy the file
     const { error: copyError } = await supabase.storage
       .from(bucketName)
       .copy(oldPath, newPath);
-      
+
     if (copyError) {
       console.error("Storage copy error, trying move fallback:", copyError);
       const { error: moveError } = await supabase.storage
         .from(bucketName)
         .move(oldPath, newPath);
-        
+
       if (moveError) {
         throw new Error(`Failed to copy or move image: ${moveError.message}`);
       }
@@ -137,16 +137,16 @@ const moveStorageImage = async (imageUrl: string): Promise<string> => {
       const { error: removeError } = await supabase.storage
         .from(bucketName)
         .remove([oldPath]);
-        
+
       if (removeError) {
         console.warn("Failed to remove old request image:", removeError);
       }
     }
-    
+
     const { data: { publicUrl } } = supabase.storage
       .from(bucketName)
       .getPublicUrl(newPath);
-      
+
     return publicUrl;
   } catch (err) {
     console.error("Error moving image in storage:", err);
@@ -159,9 +159,9 @@ export default function CompanyPage() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
-  
+
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Events State
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
   const [offlineEvents, setOfflineEvents] = useState<Event[]>([]);
@@ -213,7 +213,7 @@ export default function CompanyPage() {
   const renderChannelItem = (channel: Channel) => {
     return (
       <div key={channel.id} className="flex flex-col items-center gap-2.5 min-w-[64px] md:min-w-[84px] group relative shrink-0 select-none">
-        
+
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <div className="relative w-14 h-14 md:w-16 md:h-16 bg-brand-gradient p-[2.5px] rounded-full shadow-md group-hover:scale-105 transition-all duration-300 ease-out cursor-pointer">
@@ -249,7 +249,7 @@ export default function CompanyPage() {
                 setLinksChanName(channel.name);
                 setLinksTeamId(channel.team_id ? String(channel.team_id) : "none");
                 setLinksImageUrl(channel.image_url || "");
-                
+
                 let initial: (ChannelLink & { id: string })[] = [];
                 let parsedLinks: any = channel.links;
                 if (typeof parsedLinks === 'string') {
@@ -318,7 +318,7 @@ export default function CompanyPage() {
     const interval = setInterval(() => {
       const now = Date.now();
       const diff = Math.floor((codeExpiresAt - now) / 1000);
-      
+
       if (diff <= 0) {
         clearInterval(interval);
         toast.error("10분이 경과하여 코드가 만료되었습니다.");
@@ -387,10 +387,10 @@ export default function CompanyPage() {
         // Fetch associated channels and subsequently events
         console.log("CompanyPage: Fetching channels and events...");
         await fetchChannelsAndEvents(compData.name);
-        
+
         // Fetch pending requests for the company
         await fetchPendingRequests(compData.id);
-        
+
         // Fetch all available Teams for individual member affiliation
         console.log("CompanyPage: Fetching teams...");
         const { data: allTeamsData } = await supabase
@@ -398,11 +398,11 @@ export default function CompanyPage() {
           .select("id, name")
           .eq("is_team", true)
           .order("name");
-        
+
         if (allTeamsData && isMounted) {
           setAllTeams(allTeamsData);
         }
-        
+
       } catch (err: any) {
         console.error("CompanyPage: Initialization Error:", err);
         toast.error("데이터 로드 중 오류가 발생했습니다.");
@@ -491,11 +491,11 @@ export default function CompanyPage() {
         .from("event_channels")
         .select("event_id")
         .in("channel_id", channelIds);
-      
+
       if (evChErr) throw evChErr;
-      
+
       const eventIds = Array.from(new Set(evChData?.map(ec => ec.event_id).filter(Boolean) || []));
-      
+
       if (eventIds.length === 0) {
         setOfflineEvents([]);
         setOnlineEvents([]);
@@ -547,7 +547,7 @@ export default function CompanyPage() {
             startDateValue: event.start_date,
           };
         });
-      
+
       setOfflineEvents(formattedOffline);
 
       // 3. Fetch Online Events
@@ -665,6 +665,24 @@ export default function CompanyPage() {
     toast.success("소속 코드가 클립보드에 복사되었습니다.");
   };
 
+  const handleDeactivateInviteCode = async () => {
+    if (!company) return;
+    try {
+      const { error } = await supabase
+        .from("companies")
+        .update({ invite_code: null })
+        .eq("id", company.id);
+
+      if (error) throw error;
+
+      setCompany(prev => prev ? { ...prev, invite_code: null } : null);
+      toast.success("소속 코드가 비활성화되었습니다.");
+    } catch (err: any) {
+      console.error("Failed to deactivate invite code:", err);
+      toast.error("코드 비활성화 실패: " + err.message);
+    }
+  };
+
   const handleRequestAction = async (request: any, action: "approve" | "reject") => {
     if (!company) return;
     setIsProcessingRequest(request.id);
@@ -679,7 +697,7 @@ export default function CompanyPage() {
 
       const { error: updateError } = await supabase
         .from("channel_requests")
-        .update({ 
+        .update({
           status: newStatus,
           image_url: finalImageUrl
         })
@@ -786,14 +804,14 @@ export default function CompanyPage() {
       if (error) throw error;
 
       toast.success(`'${newChanName}' 채널이 성공적으로 생성되었습니다!`);
-      
+
       setNewChanName("");
       setNewChanImageUrl(null);
       setNewChanIsTeam(false);
       setNewChanTeamId("none");
       setTeamSearchText("");
       setIsCreateOpen(false);
-      
+
       await fetchChannelsAndEvents(company.name);
     } catch (err: any) {
       console.error(err);
@@ -1001,7 +1019,7 @@ export default function CompanyPage() {
       const finalLinks = linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url }));
       const { error } = await supabase
         .from("channels")
-        .update({ 
+        .update({
           name: linksChanName.trim(),
           links: finalLinks.length > 0 ? finalLinks : null,
           team_id: linksTeamId === "none" ? null : Number(linksTeamId),
@@ -1051,33 +1069,33 @@ export default function CompanyPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#09090B] text-foreground pb-24">
-      
+
       {/* ✨ CUSTOM SLIM COMPANY HEADER */}
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-7xl mx-auto flex items-center justify-between h-14 md:h-16 px-4 md:px-6 relative">
-          
+
           {/* LEFT: Empty spacer for visual balance to keep logo absolute center */}
           <div className="w-10 sm:w-24" />
 
           {/* CENTER: Logo Absolute Placement */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="flex items-center gap-1.5 md:gap-2 cursor-pointer pointer-events-auto" onClick={() => router.push("/")}>
-              <Image 
-                src="/logo.png" 
-                alt="Icon" 
-                width={100} 
-                height={100} 
-                className="h-7 w-7 md:h-9 md:w-9 object-contain flex-shrink-0" 
-                priority 
+              <Image
+                src="/logo.png"
+                alt="Icon"
+                width={100}
+                height={100}
+                className="h-7 w-7 md:h-9 md:w-9 object-contain flex-shrink-0"
+                priority
                 unoptimized
               />
-              <Image 
-                src="/logo-text.png" 
-                alt="Logo" 
-                width={180} 
-                height={60} 
-                className="h-7 md:h-9 w-auto object-contain flex-shrink-0" 
-                priority 
+              <Image
+                src="/logo-text.png"
+                alt="Logo"
+                width={180}
+                height={60}
+                className="h-7 md:h-9 w-auto object-contain flex-shrink-0"
+                priority
                 unoptimized
               />
             </div>
@@ -1101,8 +1119,8 @@ export default function CompanyPage() {
                 <DropdownMenuLabel className="font-semibold text-xs text-muted-foreground">계정 정보</DropdownMenuLabel>
                 <div className="px-2 py-1 text-sm font-bold break-all truncate">{userName}</div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={handleLogout} 
+                <DropdownMenuItem
+                  onClick={handleLogout}
                   className="cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10 font-bold rounded-lg"
                 >
                   로그아웃
@@ -1115,20 +1133,20 @@ export default function CompanyPage() {
       </header>
 
       <main className="w-full max-w-7xl mx-auto px-4 pt-6 md:pt-8 space-y-8">
-        
+
         {/* Company Hero Info Block */}
         <div className="relative bg-background border border-border/60 rounded-3xl shadow-sm overflow-hidden flex flex-col">
           {/* Top Profile Section */}
           <div className="relative p-5 md:p-6 flex flex-col sm:flex-row items-center sm:items-start gap-5">
             <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-orange-500/15 to-amber-500/5 opacity-40 pointer-events-none" />
-            
+
             <Avatar className="relative z-10 w-16 h-16 md:w-20 md:h-20 rounded-2xl border-2 border-background shadow-md overflow-hidden flex-shrink-0">
               <AvatarImage src={company.profile_image_url || undefined} className="object-cover" />
               <AvatarFallback className="rounded-2xl bg-orange-100 text-orange-600 font-extrabold text-2xl">
                 {company.name.slice(0, 1)}
               </AvatarFallback>
             </Avatar>
-            
+
             <div className="relative z-10 flex-1 text-center sm:text-left space-y-1">
               <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center justify-center sm:justify-start gap-2">
                 {company.name}
@@ -1137,7 +1155,7 @@ export default function CompanyPage() {
                 통합 파트너 관리 콘솔 • 소속 채널 {channels.length}개
               </p>
             </div>
-            
+
             {/* Ad Application Button */}
             <div className="relative z-10 sm:self-center mt-3 sm:mt-0 shrink-0">
               <Button
@@ -1148,7 +1166,7 @@ export default function CompanyPage() {
               </Button>
             </div>
           </div>
-          
+
           {/* Bottom Invite Code Section */}
           <div className="border-t border-border/60 bg-muted/10 p-4 md:px-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* Left Column: Invite Code */}
@@ -1164,29 +1182,54 @@ export default function CompanyPage() {
                       <Badge variant="outline" className="text-[9px] font-extrabold h-4.5 border-orange-500/20 text-orange-600 bg-orange-500/5 shrink-0">
                         활성 상태
                       </Badge>
-                      <div className="flex items-center gap-1.5 bg-background border border-border/60 rounded-xl px-2.5 py-1 shadow-sm shrink-0">
+                      <div className="flex items-center gap-4 bg-background border border-border/60 rounded-xl px-2.5 py-1 shadow-sm shrink-0">
                         <span className="text-[9px] font-extrabold tracking-wider text-muted-foreground uppercase">Code</span>
                         <span className="text-sm font-mono font-black tracking-wider text-orange-600 select-all">
                           {company.invite_code}
                         </span>
-                        <Button 
+                        <Button
                           onClick={handleCopyInviteCode}
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 rounded-lg hover:bg-orange-500/10 hover:text-orange-600 transition-all shadow-none border-none shrink-0"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 rounded-lg mr-2 hover:bg-orange-500/10 hover:text-orange-600 transition-all shadow-none border-none shrink-0"
                           title="코드 복사"
                         >
                           <Copy className="w-3 h-3" />
                         </Button>
                       </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <Button
+                          onClick={handleDeactivateInviteCode}
+                          variant="outline"
+                          className="h-7 rounded-lg text-[10px] font-bold border-rose-300 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:border-rose-500/30 dark:hover:bg-rose-500/10 flex items-center gap-1 px-2.5 shadow-none shrink-0 transition-all"
+                          title="코드 비활성화"
+                        >
+                          <XCircle className="w-3 h-3" />
+                          비활성화
+                        </Button>
+                        <Button
+                          onClick={handleUpdateInviteCode}
+                          variant="outline"
+                          className="h-7 rounded-lg text-[10px] font-bold border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/30 flex items-center gap-1 px-2.5 shadow-none shrink-0 transition-all"
+                          title="코드 재발급"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          재발급
+                        </Button>
+                      </div>
                     </>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground font-medium">코드가 발급되지 않았습니다.</span>
+                    <Button
+                      onClick={handleUpdateInviteCode}
+                      className="h-7 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[10px] shadow-md flex items-center gap-1 px-2.5"
+                    >
+                      <Plus className="w-3 h-3" /> 소속 가입 코드 생성
+                    </Button>
                   )}
                 </div>
                 <p className="text-[10px] md:text-xs text-muted-foreground font-medium flex items-center gap-1">
                   <Info className="w-3.5 h-3.5 text-muted-foreground/80 shrink-0" />
-                  개인이 주최자 계정 신청에서 입력하는 코드
+                  일반 채널을 회사계정에 편입시키는 코드
                 </p>
               </div>
             </div>
@@ -1208,26 +1251,8 @@ export default function CompanyPage() {
                 className="data-[state=checked]:bg-orange-500"
               />
             </div>
-            
-            {/* Right Column: Code Action Button */}
-            <div className="flex items-center gap-3 self-end md:self-auto w-full md:w-auto justify-end shrink-0">
-              {company.invite_code ? (
-                <Button 
-                  onClick={handleUpdateInviteCode}
-                  variant="outline" 
-                  className="h-10 rounded-xl text-xs font-bold border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/30 flex items-center justify-center gap-1.5 shadow-sm"
-                >
-                  <RefreshCw className="w-3 h-3" /> 코드 재발급
-                </Button>
-              ) : (
-                <Button 
-                  onClick={handleUpdateInviteCode}
-                  className="h-10 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md flex items-center gap-1.5 px-4"
-                >
-                  <Plus className="w-3.5 h-3.5" /> 소속 가입 코드 생성
-                </Button>
-              )}
-            </div>
+
+
           </div>
         </div>
 
@@ -1244,7 +1269,7 @@ export default function CompanyPage() {
             <div className="relative w-full overflow-hidden">
               <div className="p-4 md:p-6 flex gap-x-4 md:gap-x-6 items-start overflow-x-auto no-scrollbar pr-20 md:pr-24 w-full">
                 {/* Add New Channel Circle Action */}
-                <div 
+                <div
                   onClick={() => setIsCreateOpen(true)}
                   className="flex flex-col items-center gap-2.5 min-w-[64px] md:min-w-[84px] cursor-pointer group shrink-0"
                 >
@@ -1290,7 +1315,7 @@ export default function CompanyPage() {
             <div className="flex flex-col w-full">
               <div className="p-4 md:p-6 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-9 gap-x-4 gap-y-6 md:gap-x-6 md:gap-y-8 justify-items-center w-full">
                 {/* Add New Channel Circle Action */}
-                <div 
+                <div
                   onClick={() => setIsCreateOpen(true)}
                   className="flex flex-col items-center gap-2.5 cursor-pointer group"
                 >
@@ -1309,7 +1334,7 @@ export default function CompanyPage() {
               </div>
 
               {/* FULL-WIDTH CLICKABLE "닫기" BAR */}
-              <div 
+              <div
                 onClick={() => setIsChannelsExpanded(false)}
                 className="w-full border-t border-border bg-gradient-to-r from-orange-500/5 via-amber-500/[0.02] to-orange-500/5 hover:from-orange-500/10 hover:via-amber-500/[0.05] hover:to-orange-500/10 py-3.5 flex items-center justify-center gap-2 cursor-pointer transition-all duration-300 group select-none"
               >
@@ -1325,7 +1350,7 @@ export default function CompanyPage() {
         {/* 🔑 소속 신청 승인 관리 콘솔 */}
         <section className={`bg-background border border-border rounded-3xl shadow-sm p-6 flex flex-col justify-between transition-all duration-300 ${isPendingCollapsed ? "min-h-0 py-4.5" : "min-h-[200px]"}`}>
           <div className="flex-1 flex flex-col">
-            <div 
+            <div
               onClick={() => setIsPendingCollapsed(!isPendingCollapsed)}
               className="flex items-center justify-between pb-1 cursor-pointer select-none group"
             >
@@ -1361,8 +1386,8 @@ export default function CompanyPage() {
                     {pendingRequests.map((request) => {
                       const linksCount = request.links ? (Array.isArray(request.links) ? request.links.length : Object.keys(request.links).length) : 0;
                       return (
-                        <div 
-                          key={request.id} 
+                        <div
+                          key={request.id}
                           className="p-3.5 bg-muted/20 border border-border/50 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all duration-200 hover:bg-muted/30"
                         >
                           <div className="flex items-center gap-3 min-w-0">
@@ -1433,12 +1458,12 @@ export default function CompanyPage() {
 
         {/* 📅 RELATED EVENTS GRID */}
         <section className="space-y-5">
-          
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h2 className="text-lg md:text-xl font-black flex items-center gap-2">
               <Calendar className="w-5 h-5 text-orange-600" /> 소속 멤버 일정 및 이벤트
             </h2>
-            
+
             <div className="w-full sm:w-auto min-w-[200px]">
               <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />
             </div>
@@ -1500,7 +1525,7 @@ export default function CompanyPage() {
               소속 기업명(<strong>{company.name}</strong>)으로 자동 귀속되는 새로운 채널을 신설합니다.
             </DialogDescription>
           </DialogHeader>
-          
+
           <form onSubmit={handleCreateChannel} className="space-y-5 pt-2">
             {/* Profile image in Modal */}
             <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-2xl border border-border/50">
@@ -1553,10 +1578,10 @@ export default function CompanyPage() {
 
               <div className="space-y-2">
                 <Label className="font-bold text-xs md:text-sm">소속사</Label>
-                <Input 
-                  value={company.name} 
-                  disabled 
-                  className="h-11 rounded-xl bg-muted/60 text-muted-foreground border-border/50 font-semibold cursor-not-allowed select-none" 
+                <Input
+                  value={company.name}
+                  disabled
+                  className="h-11 rounded-xl bg-muted/60 text-muted-foreground border-border/50 font-semibold cursor-not-allowed select-none"
                 />
               </div>
             </div>
@@ -1601,7 +1626,7 @@ export default function CompanyPage() {
                               allTeams
                                 .filter(t => t.name.toLowerCase().includes(teamSearchText.toLowerCase()))
                                 .map(t => (
-                                  <div 
+                                  <div
                                     key={t.id}
                                     className="px-3 py-2 hover:bg-muted cursor-pointer text-sm font-medium"
                                     onClick={() => {
@@ -1643,7 +1668,7 @@ export default function CompanyPage() {
           setTargetChan(null);
         }
       }}>
-        <DialogContent 
+        <DialogContent
           className="rounded-3xl max-w-[420px] shadow-2xl"
           onInteractOutside={(e) => e.preventDefault()}
         >
@@ -1671,7 +1696,7 @@ export default function CompanyPage() {
                   )}
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed font-medium text-center bg-orange-500/10 p-3 rounded-xl text-orange-700 dark:text-orange-400">
-                  🚨 이 코드는 생성 후 <strong>10분간 유효</strong>하며, 한 번만 사용할 수 있습니다. <br/>
+                  🚨 이 코드는 생성 후 <strong>10분간 유효</strong>하며, 한 번만 사용할 수 있습니다. <br />
                   위임받을 사용자에게 이 코드를 전달해주세요. 창을 닫으면 코드를 다시 볼 수 없습니다.
                 </p>
               </div>
@@ -1680,9 +1705,9 @@ export default function CompanyPage() {
                 <p className="text-sm text-muted-foreground font-medium">
                   아래 버튼을 눌러 8자리 보안 코드를 생성하세요.
                 </p>
-                <Button 
-                  onClick={handleGenerateTransferCode} 
-                  className="w-full rounded-xl font-bold bg-orange-600 hover:bg-orange-700 text-white h-12 shadow-md" 
+                <Button
+                  onClick={handleGenerateTransferCode}
+                  className="w-full rounded-xl font-bold bg-orange-600 hover:bg-orange-700 text-white h-12 shadow-md"
                   disabled={isAssigning}
                 >
                   {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : "위임 코드 생성하기"}
@@ -1737,12 +1762,12 @@ export default function CompanyPage() {
             <div className="space-y-1.5">
               <Label className="text-xs md:text-sm font-bold text-foreground">프로필 이미지 변경</Label>
               <div className="flex items-center gap-3">
-                <Input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleLinkImageUpload} 
-                  disabled={isUploadingLinkImg} 
-                  className="max-w-xs h-10 border-neutral-300 dark:border-neutral-700 rounded-xl cursor-pointer bg-background" 
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLinkImageUpload}
+                  disabled={isUploadingLinkImg}
+                  className="max-w-xs h-10 border-neutral-300 dark:border-neutral-700 rounded-xl cursor-pointer bg-background"
                 />
                 {isUploadingLinkImg && <Loader2 className="w-4 h-4 animate-spin text-orange-500" />}
               </div>
@@ -1815,9 +1840,9 @@ export default function CompanyPage() {
                       }}
                       className="h-10 sm:flex-[2] border-neutral-300 dark:border-neutral-700 rounded-xl bg-background text-xs md:text-sm"
                     />
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => setLinksForm(linksForm.filter(l => l.id !== link.id))}
                       className="h-10 w-10 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive rounded-xl"
                     >
@@ -1841,9 +1866,9 @@ export default function CompanyPage() {
           {/* 4. Action Footer */}
           <div className="flex justify-between items-center pt-4 mt-4 border-t border-border/50">
             {linksTargetChan?.owner_id ? (
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   const expectedConfirm = `${linksTargetChan?.name}/소속사 이적`;
                   const userInput = window.prompt(
@@ -1866,9 +1891,9 @@ export default function CompanyPage() {
                 소속사 이적
               </Button>
             ) : (
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   const expectedConfirm = `${linksTargetChan?.name}/채널 삭제`;
                   const userInput = window.prompt(
