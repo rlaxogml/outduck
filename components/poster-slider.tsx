@@ -43,10 +43,17 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
     cachedPosters = initialPosters;
   }
 
+  const [startIndex, setStartIndex] = useState<number>(() => {
+    const p = initialPosters || cachedPosters;
+    return (p && p.length > 0) ? Math.floor(Math.random() * p.length) : 0;
+  });
+  const [hasSetStart, setHasSetStart] = useState<boolean>(!!(initialPosters || cachedPosters));
+
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: true,
     align: "center",
     containScroll: false,
+    startIndex: startIndex,
   }, [
     Autoplay({
       delay: 4000,
@@ -55,7 +62,7 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
     })
   ]);
 
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(startIndex);
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
 
   useEffect(() => {
@@ -103,6 +110,10 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
 
         cachedPosters = validPosters;
         if (isMounted) {
+          if (!hasSetStart && validPosters.length > 0) {
+            setStartIndex(Math.floor(Math.random() * validPosters.length));
+            setHasSetStart(true);
+          }
           setPosters(validPosters);
         }
       } catch (err) {

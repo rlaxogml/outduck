@@ -636,6 +636,15 @@ export default function AdminPage() {
             .update({ image_url: finalImageUrl })
             .eq("name", request.name);
         }
+
+        // Asynchronously notify applicant without awaiting
+        import("@/app/actions/email").then(({ notifyHostApplicationApproved }) => {
+          notifyHostApplicationApproved({
+            userId: request.user_id,
+            name: request.name,
+            requestType: request.request_type,
+          }).catch(console.error);
+        }).catch(console.error);
       } else {
         toast.success("신청 건을 거절 처리했습니다.");
       }

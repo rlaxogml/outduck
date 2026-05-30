@@ -77,6 +77,16 @@ export function CompanyApplyForm({ user, onBack, onSuccess }: CompanyApplyFormPr
       if (error) throw error;
 
       toast.success("신청이 성공적으로 접수되었습니다.");
+      
+      // Asynchronously notify admins without awaiting
+      import("@/app/actions/email").then(({ notifyAdminsNewApplication }) => {
+        notifyAdminsNewApplication({
+          name: name.trim(),
+          type: "회사/단체",
+          createdAt: new Date().toISOString()
+        }).catch(console.error);
+      }).catch(console.error);
+
       onSuccess();
     } catch (error: any) {
       console.error("Submission error:", error);

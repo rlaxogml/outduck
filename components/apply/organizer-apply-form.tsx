@@ -236,6 +236,15 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
         toast.success("소속 코드가 인증되어 주최자 권한이 즉시 부여되었습니다!");
       } else {
         toast.success("신청이 성공적으로 접수되었습니다. 관리자 승인 후 완료됩니다.");
+        
+        // Asynchronously notify admins without awaiting
+        import("@/app/actions/email").then(({ notifyAdminsNewApplication }) => {
+          notifyAdminsNewApplication({
+            name: name.trim(),
+            type: isYoutuberType ? "youtuber" : type,
+            createdAt: new Date().toISOString()
+          }).catch(console.error);
+        }).catch(console.error);
       }
 
       onSuccess();
