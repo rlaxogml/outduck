@@ -12,7 +12,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: '행사 & 굿즈 - 오프라인 행사, 온라인 굿즈 정보',
+  title: '아웃덕',
   description: '게임, 유튜버 관련 오프라인 행사와 온라인 굿즈 정보를 한눈에 확인하세요.',
   generator: 'v0.app',
   icons: {
