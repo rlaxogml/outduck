@@ -200,7 +200,7 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
 
   return (
     /* Contained within normal 6xl container limits */
-    <div className="w-[calc(100%+16px)] -mx-2 md:w-full md:mx-0 relative overflow-hidden py-2 group">
+    <div className="w-[calc(100%+16px)] -mx-2 md:w-full md:mx-0 relative overflow-hidden pt-0 pb-2 group">
       <div className="overflow-visible" ref={emblaRef}>
         <div className="flex items-center touch-pan-y">
           {posters.map((poster, index) => (

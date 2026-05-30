@@ -250,10 +250,10 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
       <Header />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 pt-1 pb-3 md:py-3">
+      <div className="mx-auto max-w-7xl px-4 pt-0 pb-3 md:pt-0 md:pb-3">
         <main className="pb-8">
           {/* Poster Slider */}
-          <section className="pt-1 pb-4 md:py-4">
+          <section className="pt-2 pb-4 md:pt-3 md:pb-4">
             <PosterSlider initialPosters={initialPosters} />
           </section>
 
