@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   Camera,
@@ -286,14 +287,30 @@ export default function CompanyPage() {
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => {
+                  onSelect={(e) => {
+                    if ((e.target as HTMLElement).closest('.info-icon')) {
+                      e.preventDefault();
+                      return;
+                    }
                     setTargetChan(channel);
                     setTransferCode(null);
                     setIsOwnerOpen(true);
                   }}
-                  className="cursor-pointer font-bold rounded-lg text-sm text-orange-600 dark:text-orange-400 focus:text-orange-600"
+                  className="cursor-pointer font-bold rounded-lg text-sm text-orange-600 dark:text-orange-400 focus:text-orange-600 flex items-center gap-1.5"
                 >
-                  채널 권한 위임
+                  <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="info-icon flex items-center justify-center hover:bg-orange-500/10 p-0.5 rounded-full transition-colors shrink-0">
+                          <Info className="w-4 h-4 stroke-[2.5]" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={5} className="max-w-[220px] text-xs font-medium leading-relaxed z-[100] bg-popover text-popover-foreground border shadow-xl break-keep">
+                        해당 채널을 회사 계정에서 관리하지 않고 회사 소속의 다른 계정 소유주에게 권한을 양도해 관리하게 합니다.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <span>채널 권한 위임</span>
                 </DropdownMenuItem>
               </>
             )}

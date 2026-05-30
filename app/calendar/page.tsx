@@ -39,6 +39,36 @@ type Event = {
   startDateValue: string | null;
   endDateValue: string | null;
   eventType: "offline" | "online";
+  schedules?: any[];
+};
+
+const isEventOnDate = (event: any, targetDate: Date) => {
+  if (!event.startDateValue) return false;
+  
+  const start = new Date(event.startDateValue);
+  start.setHours(0, 0, 0, 0);
+  const end = event.endDateValue ? new Date(event.endDateValue) : start;
+  end.setHours(23, 59, 59, 999);
+
+  const calDate = new Date(targetDate);
+  calDate.setHours(12, 0, 0, 0);
+
+  const isInRange = calDate >= start && calDate <= end;
+  if (!isInRange) return false;
+
+  if (event.schedules && event.schedules.length > 0) {
+    const dayOfWeekMap = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+    const dayOfWeek = dayOfWeekMap[calDate.getDay()];
+    const dateString = `${calDate.getFullYear()}-${String(calDate.getMonth() + 1).padStart(2, "0")}-${String(calDate.getDate()).padStart(2, "0")}`;
+
+    return event.schedules.some((s: any) => {
+      if (s.date && s.date === dateString) return true;
+      if (!s.date && s.day_of_week === dayOfWeek) return true;
+      return false;
+    });
+  }
+  
+  return true;
 };
 
 function CalendarContent() {
@@ -107,6 +137,10 @@ function CalendarContent() {
                   type,
                   image_url
                 )
+              ),
+              event_schedules(
+                date,
+                day_of_week
               )
             ),
             offline_event_locations (
@@ -210,6 +244,7 @@ function CalendarContent() {
 
         const formattedOffline: Event[] = (offlineEventsData || []).map((event, index) => {
           const channels = extractChannels((event.events as any)?.event_channels);
+          const schedules = (event.events as any)?.event_schedules || [];
           return {
             id: event.id,
             baseEventId: event.event_id,
@@ -225,7 +260,8 @@ function CalendarContent() {
             createdAt: event.created_at,
             startDateValue: event.start_date,
             endDateValue: event.end_date,
-            eventType: "offline"
+            eventType: "offline",
+            schedules
           };
         });
 
@@ -329,13 +365,9 @@ function CalendarContent() {
   // 3. Memoize daily filtered event items
   const eventsOnSelectedDate = useMemo(() => {
     return filteredEvents.filter((event: any) => {
-      if (!event.startDateValue) return false;
-      const start = new Date(event.startDateValue);
-      start.setHours(0, 0, 0, 0);
-      const end = event.endDateValue ? new Date(event.endDateValue) : start;
-      end.setHours(23, 59, 59, 999);
-
-      return selectedDateMidnight >= start.getTime() && selectedDateMidnight <= end.getTime();
+      const calDate = new Date(selectedDateMidnight);
+      calDate.setHours(12, 0, 0, 0);
+      return isEventOnDate(event, calDate);
     });
   }, [filteredEvents, selectedDateMidnight]);
 
@@ -486,15 +518,9 @@ function CalendarContent() {
                   setSelectedDate(value);
 
                   const hasEvents = filteredEvents.some((event: any) => {
-                    if (!event.startDateValue) return false;
-                    const start = new Date(event.startDateValue);
-                    start.setHours(0, 0, 0, 0);
-                    const end = event.endDateValue ? new Date(event.endDateValue) : start;
-                    end.setHours(23, 59, 59, 999);
-
                     const calDate = new Date(value);
                     calDate.setHours(12, 0, 0, 0);
-                    return calDate >= start && calDate <= end;
+                    return isEventOnDate(event, calDate);
                   });
 
                   if (hasEvents) {
@@ -515,27 +541,16 @@ function CalendarContent() {
                 tileClassName={({ date, view }) => {
                   if (view === "month") {
                     const hasEvents = filteredEvents.some((event: any) => {
-                      if (!event.startDateValue) return false;
-                      const start = new Date(event.startDateValue);
-                      start.setHours(0, 0, 0, 0);
-                      const end = event.endDateValue ? new Date(event.endDateValue) : start;
-                      end.setHours(23, 59, 59, 999);
-
                       const calDate = new Date(date);
                       calDate.setHours(12, 0, 0, 0);
-                      return calDate >= start && calDate <= end;
+                      return isEventOnDate(event, calDate);
                     });
 
                     const isHighlightDate = filteredEvents.some((event: any) => {
-                      if (event.id !== highlightId || !event.startDateValue) return false;
-                      const start = new Date(event.startDateValue);
-                      start.setHours(0, 0, 0, 0);
-                      const end = event.endDateValue ? new Date(event.endDateValue) : start;
-                      end.setHours(23, 59, 59, 999);
-
+                      if (event.id !== highlightId) return false;
                       const calDate = new Date(date);
                       calDate.setHours(12, 0, 0, 0);
-                      return calDate >= start && calDate <= end;
+                      return isEventOnDate(event, calDate);
                     });
 
                     const today = new Date();
@@ -554,15 +569,9 @@ function CalendarContent() {
                 tileContent={({ date, view }) => {
                   if (view === "month") {
                     const dayEvents = filteredEvents.filter((event: any) => {
-                      if (!event.startDateValue) return false;
-                      const start = new Date(event.startDateValue);
-                      start.setHours(0, 0, 0, 0);
-                      const end = event.endDateValue ? new Date(event.endDateValue) : start;
-                      end.setHours(23, 59, 59, 999);
-
                       const calDate = new Date(date);
                       calDate.setHours(12, 0, 0, 0);
-                      return calDate >= start && calDate <= end;
+                      return isEventOnDate(event, calDate);
                     });
 
                     const channelsWithProfile: any[] = [];
