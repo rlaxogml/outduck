@@ -61,7 +61,8 @@ export default async function Home() {
       )
     `)
     .or(`end_date.gte.${todayStr},end_date.is.null`)
-    .order("start_date", { ascending: true });
+    .order("start_date", { ascending: true })
+    .range(0, 29);
 
   const onlineQuery = supabase
     .from("online_events")
@@ -84,7 +85,8 @@ export default async function Home() {
       )
     `)
     .or(`end_at.gte.${todayStr},end_at.is.null`)
-    .order("start_at", { ascending: true });
+    .order("start_at", { ascending: true })
+    .range(0, 29);
 
   const posterQuery = supabase
     .from("posters")

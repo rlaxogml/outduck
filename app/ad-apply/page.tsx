@@ -226,9 +226,25 @@ export default function AdApplyPage() {
   };
 
   // Price calculations
+  const [dailyPrice, setDailyPrice] = useState(10000);
   const [durationDays, setDurationDays] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
   const [isDateValid, setIsDateValid] = useState(false);
+
+  useEffect(() => {
+    const fetchDailyPrice = async () => {
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('value')
+        .eq('key', 'banner_daily_price')
+        .single();
+      
+      if (data && !error) {
+        setDailyPrice(parseInt(data.value, 10) || 10000);
+      }
+    };
+    fetchDailyPrice();
+  }, []);
 
   // Date range verification & automatic fee calculation
   useEffect(() => {
@@ -259,13 +275,13 @@ export default function AdApplyPage() {
       
       setIsDateValid(true);
       setDurationDays(diffDays);
-      setTotalAmount(diffDays * 10000); // 10,000 KRW per day
+      setTotalAmount(diffDays * dailyPrice); 
     } else {
       setIsDateValid(false);
       setDurationDays(0);
       setTotalAmount(0);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, dailyPrice]);
 
   // Handle immediate upload on file select for preview
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -638,7 +654,7 @@ export default function AdApplyPage() {
                 <div className="space-y-2.5 text-sm font-semibold">
                   <div className="flex justify-between items-center text-muted-foreground">
                     <span>1일 광고 게재 단가</span>
-                    <span className="text-foreground">10,000 원</span>
+                    <span className="text-foreground">{dailyPrice.toLocaleString()} 원</span>
                   </div>
                   <div className="flex justify-between items-center text-muted-foreground">
                     <span>광고 게재 기간</span>

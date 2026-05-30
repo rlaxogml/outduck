@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
@@ -26,9 +27,11 @@ import {
   Heart,
   ImageIcon,
   Plus,
-  LayoutGrid
+  LayoutGrid,
+  DollarSign
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { RevenueDashboard } from "@/components/admin/revenue-dashboard";
 
 type ChannelRequest = {
   id: number;
@@ -105,7 +108,7 @@ export default function AdminPage() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"all" | "requests" | "reports" | "bans" | "channels" | "posters">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "requests" | "reports" | "bans" | "channels" | "posters" | "revenue">("all");
 
   // 주최자 신청 관련 상태
   const [requests, setRequests] = useState<ChannelRequest[]>([]);
@@ -224,7 +227,8 @@ export default function AdminPage() {
         .from("channel_requests")
         .select("*")
         .is("company_id", null)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (error) throw error;
       setRequests(reqData || []);
@@ -244,7 +248,8 @@ export default function AdminPage() {
         .from("comment_reports")
         .select("*")
         .eq("status", reportFilter)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (reportsError) {
         if (reportsError.code === '42703' || reportsError.message?.includes("status")) {
@@ -386,7 +391,8 @@ export default function AdminPage() {
       const { data: bansData, error: bansError } = await supabase
         .from("comment_bans")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (bansError) throw bansError;
 
@@ -851,7 +857,8 @@ export default function AdminPage() {
       const { data, error } = await supabase
         .from("posters")
         .select("*")
-        .order("order", { ascending: true });
+        .order("order", { ascending: true })
+        .limit(100);
 
       if (error) throw error;
       setPosters(data || []);
@@ -988,10 +995,11 @@ export default function AdminPage() {
       {/* Banner Image Preview */}
       <div className="relative rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center w-full aspect-[21/9] mb-3">
         {poster.image_url ? (
-          <img 
+          <Image 
             src={poster.image_url} 
             alt="Banner Preview" 
-            className="w-full h-full object-cover object-center"
+            fill
+            className="object-cover object-center"
           />
         ) : (
           <div className="flex flex-col items-center gap-1 text-muted-foreground/50">
@@ -1169,7 +1177,28 @@ export default function AdminPage() {
             <Building2 className="w-4 h-4" />
             <span>채널 관리</span>
           </button>
+          <button
+            onClick={() => setActiveTab("revenue")}
+            className={`pb-3 px-5 text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 shrink-0 ${
+              activeTab === "revenue"
+                ? "border-emerald-500 text-emerald-500"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <DollarSign className="w-4 h-4" />
+            <span>수익 관리</span>
+          </button>
         </div>
+
+        {activeTab === "revenue" && (
+          <div className="animate-in fade-in duration-300">
+            <div className="flex items-center gap-2 mb-6">
+              <DollarSign className="w-5 h-5 text-emerald-500" />
+              <h2 className="text-xl font-extrabold tracking-tight">수익 관리 및 단가 설정</h2>
+            </div>
+            <RevenueDashboard />
+          </div>
+        )}
 
         {activeTab === "all" && (
           <div className="space-y-12 animate-in fade-in duration-300">
@@ -1208,10 +1237,11 @@ export default function AdminPage() {
                           className="group relative aspect-[21/9] rounded-2xl overflow-hidden border border-border bg-muted/30 shadow-xs transition-all duration-300 hover:shadow-md hover:border-orange-500/30"
                         >
                           {poster.image_url ? (
-                            <img 
+                            <Image 
                               src={poster.image_url} 
                               alt={poster.advertiser_name || "배너"} 
-                              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                              fill
+                              className="object-cover object-center group-hover:scale-105 transition-transform duration-500"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground/60 font-semibold select-none">
@@ -2398,10 +2428,11 @@ CHECK (status IN ('pending', 'resolved', 'dismissed'));`}
                         className="group relative aspect-[21/9] rounded-2xl overflow-hidden border border-border bg-muted/30 shadow-xs transition-all duration-300 hover:shadow-md hover:border-orange-500/30"
                       >
                         {poster.image_url ? (
-                          <img 
+                          <Image 
                             src={poster.image_url} 
                             alt={poster.advertiser_name || "배너"} 
-                            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                            fill
+                            className="object-cover object-center group-hover:scale-105 transition-transform duration-500"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground/60 font-semibold select-none">

@@ -73,7 +73,7 @@ function SuccessContent() {
         const newOrder = maxOrder + 1;
 
         // 2. Insert into the posters table
-        const { error: insertError } = await supabase
+        const { data: insertedPoster, error: insertError } = await supabase
           .from("posters")
           .insert([
             {
@@ -89,11 +89,34 @@ function SuccessContent() {
               payment_status: "paid",
               user_id: userId
             }
-          ]);
+          ])
+          .select("id")
+          .single();
 
         if (insertError) {
           console.error("Poster insertion failed:", insertError);
           throw insertError;
+        }
+
+        // 3. Insert into ad_payments table
+        const { error: paymentInsertError } = await supabase
+          .from("ad_payments")
+          .insert([
+            {
+              order_id: orderId,
+              payment_key: paymentKey,
+              poster_id: insertedPoster?.id,
+              user_id: userId,
+              amount: pending.amount || parseInt(amountStr || "0", 10),
+              type: "payment",
+              description: `배너 광고 ${pending.days}일 결제`
+            }
+          ]);
+
+        if (paymentInsertError) {
+          console.error("Payment insertion failed:", paymentInsertError);
+          // We don't throw here to avoid failing the user's success page if poster was successfully registered,
+          // but in production we might want a transaction.
         }
 
         // Save processing token to session to prevent double submission

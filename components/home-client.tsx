@@ -7,6 +7,7 @@ import { EventTabs } from "@/components/event-tabs";
 import { CategoryFilter } from "@/components/category-filter";
 import { EventCard } from "@/components/event-card";
 import { supabase } from "@/lib/supabase/client";
+import { fetchMoreEvents } from "@/app/actions/events";
 import type { User } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { PosterSlider } from "@/components/poster-slider";
@@ -180,20 +181,50 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
     return result;
   })();
 
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [hasMoreOffline, setHasMoreOffline] = useState(initialOfflineEvents.length === 30);
+  const [hasMoreOnline, setHasMoreOnline] = useState(initialOnlineEvents.length === 30);
+
   // 4. Infinite Scroll Observer to seamlessly load additional events as the user scrolls
   useEffect(() => {
-    if (visibleCount >= filteredEvents.length) return;
+    // Determine if we can fetch more based on current tab
+    const hasMore = activeTab === "offline" ? hasMoreOffline : hasMoreOnline;
+    
+    // visibleCount controls the smooth client-side reveal, we fetch when we get close to the end
+    if (!hasMore && visibleCount >= filteredEvents.length) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          // A minor timeout creates a premium delay to show the loader elegantly
+      async (entries) => {
+        if (entries[0].isIntersecting && !isFetchingMore) {
+          // If we reached the end of the client-side list, fetch more from server
+          if (visibleCount >= filteredEvents.length && hasMore) {
+            setIsFetchingMore(true);
+            const currentLength = activeTab === "offline" ? offlineEvents.length : onlineEvents.length;
+            
+            const { data, error } = await fetchMoreEvents(activeTab, currentLength, 30);
+            
+            if (data && data.length > 0) {
+              if (activeTab === "offline") {
+                setOfflineEvents(prev => [...prev, ...data as any]);
+                if (data.length < 30) setHasMoreOffline(false);
+              } else {
+                setOnlineEvents(prev => [...prev, ...data as any]);
+                if (data.length < 30) setHasMoreOnline(false);
+              }
+            } else {
+              if (activeTab === "offline") setHasMoreOffline(false);
+              else setHasMoreOnline(false);
+            }
+            setIsFetchingMore(false);
+          }
+          
+          // Reveal 10 more items smoothly
           setTimeout(() => {
-            setVisibleCount((prev) => Math.min(prev + 10, filteredEvents.length));
+            setVisibleCount((prev) => prev + 10);
           }, 150);
         }
       },
-      { rootMargin: "250px" } // Load events slightly earlier for a seamless user experience
+      { rootMargin: "250px" } 
     );
 
     const trigger = document.getElementById("infinite-scroll-trigger");
@@ -206,7 +237,7 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
         observer.unobserve(trigger);
       }
     };
-  }, [visibleCount, filteredEvents.length]);
+  }, [visibleCount, filteredEvents.length, activeTab, isFetchingMore, hasMoreOffline, hasMoreOnline, offlineEvents.length, onlineEvents.length]);
 
   return (
     <div className="min-h-screen bg-background">
