@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className="bg-background">
-      <body className="font-sans antialiased pb-[calc(env(safe-area-inset-bottom,0px)+64px)] md:pb-0">
+      <body className="font-sans antialiased flex flex-col min-h-[100dvh] pb-[calc(env(safe-area-inset-bottom,0px)+64px)] md:pb-0">
         <style dangerouslySetInnerHTML={{ __html: `
           html, body, [data-scroll-locked] {
             padding-right: 0px !important;

@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { Users } from "lucide-react";
 import { CompanyAffiliation, isAffiliationSupported } from "@/components/company-affiliation";
 
-type Tab = "account" | "advanced";
+type Tab = "account" | "notifications" | "advanced";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -37,8 +37,8 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Notification state
-  const [notifyNewEvent, setNotifyNewEvent] = useState(false);
-  const [notifyBookmarkNotice, setNotifyBookmarkNotice] = useState(false);
+  const [notifyNewEvent, setNotifyNewEvent] = useState(true);
+  const [notifyBookmarkNotice, setNotifyBookmarkNotice] = useState(true);
   const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
 
   // Advanced state
@@ -49,6 +49,7 @@ export default function SettingsPage() {
   // Channel Management State
   const [ownedChannels, setOwnedChannels] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
+  const [isCompanyAccount, setIsCompanyAccount] = useState(false);
 
   // Account Deletion State
   const [isAccountDeleteOpen, setIsAccountDeleteOpen] = useState(false);
@@ -68,6 +69,8 @@ export default function SettingsPage() {
       .select("name")
       .eq("user_id", userId)
       .maybeSingle();
+
+    setIsCompanyAccount(!!compData?.name);
 
     if (compData?.name) {
       const { data: companyChans } = await supabase
@@ -139,14 +142,14 @@ export default function SettingsPage() {
 
         // Fetch notifications settings
         const { data: notifData } = await supabase
-          .from("notifications")
-          .select("*")
-          .eq("user_id", currentUser.id)
+          .from("profiles")
+          .select("notify_new_event, notify_bookmark_notice")
+          .eq("id", currentUser.id)
           .maybeSingle();
 
         if (isMounted && notifData) {
-          setNotifyNewEvent(notifData.notify_new_event ?? false);
-          setNotifyBookmarkNotice(notifData.notify_bookmark_notice ?? false);
+          setNotifyNewEvent(notifData.notify_new_event ?? true);
+          setNotifyBookmarkNotice(notifData.notify_bookmark_notice ?? true);
         }
       } catch (error) {
         console.error("Error fetching settings data:", error);
@@ -247,19 +250,15 @@ export default function SettingsPage() {
     if (!user) return;
     try {
       const { error } = await supabase
-        .from("notifications")
+        .from("profiles")
         .upsert(
-          { 
-            user_id: user.id, 
-            notify_new_event: checked, 
-            notify_bookmark_notice: notifyBookmarkNotice 
-          },
-          { onConflict: 'user_id' }
+          { id: user.id, notify_new_event: checked, notify_bookmark_notice: notifyBookmarkNotice },
+          { onConflict: "id" }
         );
       if (error) throw error;
       toast.success("새 행사 알림 설정이 업데이트되었습니다.");
-    } catch (error) {
-      toast.error("알림 설정 저장에 실패했습니다.");
+    } catch (error: any) {
+      toast.error("알림 설정 저장에 실패했습니다: " + error.message);
     }
   };
 
@@ -268,19 +267,15 @@ export default function SettingsPage() {
     if (!user) return;
     try {
       const { error } = await supabase
-        .from("notifications")
+        .from("profiles")
         .upsert(
-          { 
-            user_id: user.id, 
-            notify_new_event: notifyNewEvent, 
-            notify_bookmark_notice: checked 
-          },
-          { onConflict: 'user_id' }
+          { id: user.id, notify_new_event: notifyNewEvent, notify_bookmark_notice: checked },
+          { onConflict: "id" }
         );
       if (error) throw error;
       toast.success("공지 알림 설정이 업데이트되었습니다.");
-    } catch (error) {
-      toast.error("알림 설정 저장에 실패했습니다.");
+    } catch (error: any) {
+      toast.error("알림 설정 저장에 실패했습니다: " + error.message);
     }
   };
 
@@ -362,7 +357,17 @@ export default function SettingsPage() {
               계정
             </button>
             
-
+            <button
+              onClick={() => setActiveTab("notifications")}
+              className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === "notifications" 
+                  ? "bg-primary/10 text-primary" 
+                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Bell className="h-5 w-5" />
+              알림
+            </button>
             
             <button
               onClick={() => setActiveTab("advanced")}
@@ -373,7 +378,7 @@ export default function SettingsPage() {
               }`}
             >
               <Settings2 className="h-5 w-5" />
-              고급 설정
+              주최자 설정
             </button>
           </div>
         </aside>
@@ -449,50 +454,108 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {activeTab === "notifications" && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div>
+                <h3 className="text-2xl font-bold tracking-tight mb-1">알림 설정</h3>
+                <p className="text-muted-foreground text-sm">중요한 알림을 받을지 설정합니다.</p>
+              </div>
+
+              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-semibold">새 행사 알림</Label>
+                    <p className="text-sm text-muted-foreground">새로운 행사가 등록될 때 알림을 받습니다.</p>
+                  </div>
+                  <Switch 
+                    checked={notifyNewEvent} 
+                    onCheckedChange={handleToggleNotifyNewEvent} 
+                  />
+                </div>
+                
+                <div className="h-px w-full bg-border" />
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-semibold">찜한 행사 공지 알림</Label>
+                    <p className="text-sm text-muted-foreground">내가 찜한 행사의 새로운 공지사항 알림을 받습니다.</p>
+                  </div>
+                  <Switch 
+                    checked={notifyBookmarkNotice} 
+                    onCheckedChange={handleToggleNotifyBookmarkNotice} 
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
 
 
           {activeTab === "advanced" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
-                <h3 className="text-2xl font-bold tracking-tight mb-1">고급 설정</h3>
+                <h3 className="text-2xl font-bold tracking-tight mb-1">주최자 설정</h3>
                 <p className="text-muted-foreground text-sm">특수 권한 및 관리자 기능을 설정합니다.</p>
               </div>
 
-              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="ownerCode" className="text-base font-semibold flex items-center gap-2">
-                    <KeyRound className="h-4 w-4" />
-                    권한 코드
-                  </Label>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    주최자 또는 관리자 전용 코드를 입력하여 권한을 활성화하세요.
-                  </p>
-                  <div className="flex flex-col gap-2 max-w-md">
-                    <div className="flex gap-3">
-                      <Input 
-                        id="ownerCode" 
-                        type="password"
-                        value={ownerCode} 
-                        onChange={(e) => setOwnerCode(e.target.value)} 
-                        onKeyDown={(e) => setIsCapsLockOn(e.getModifierState("CapsLock"))}
-                        onKeyUp={(e) => setIsCapsLockOn(e.getModifierState("CapsLock"))}
-                        placeholder="코드를 입력하세요"
-                        className="h-11 border-neutral-400 dark:border-neutral-500"
-                      />
+              {(!isCompanyAccount || ownedChannels.length === 0) && (
+                <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-6">
+                  {!isCompanyAccount && (
+                    <div className={cn("space-y-4", ownedChannels.length === 0 ? "pb-4 border-b border-border" : "")}>
+                      <Label className="text-base font-semibold flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        주최자 계정 신청
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        아웃덕에 행사 또는 채널을 등록하고 싶으신 경우, 주최자 계정을 신청해 주세요.
+                      </p>
                       <Button 
-                        onClick={handleVerifyOwnerCode} 
-                        disabled={isVerifyingCode || !ownerCode.trim()}
-                        className="h-11 px-6 font-semibold whitespace-nowrap"
+                        variant="outline"
+                        onClick={() => router.push('/apply')}
+                        className="font-semibold"
                       >
-                        {isVerifyingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : "검증"}
+                        주최자 계정 신청하기
                       </Button>
                     </div>
-                    <p className={`text-xs font-medium animate-in fade-in flex items-center gap-1 ${isCapsLockOn ? 'text-rose-500' : 'text-emerald-500'}`}>
-                      {isCapsLockOn ? "⚠️ Caps Lock이 켜져 있습니다." : "✅ Caps Lock이 꺼져 있습니다."}
-                    </p>
-                  </div>
+                  )}
+
+                  {ownedChannels.length === 0 && (
+                    <div className="space-y-2 pt-2">
+                      <Label htmlFor="ownerCode" className="text-base font-semibold flex items-center gap-2">
+                        <KeyRound className="h-4 w-4" />
+                        권한 코드
+                      </Label>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        부여받은 주최자 또는 관리자 전용 코드를 입력하여 권한을 활성화하세요.
+                      </p>
+                      <div className="flex flex-col gap-2 max-w-md">
+                        <div className="flex gap-3">
+                          <Input 
+                            id="ownerCode" 
+                            type="password"
+                            value={ownerCode} 
+                            onChange={(e) => setOwnerCode(e.target.value)} 
+                            onKeyDown={(e) => setIsCapsLockOn(e.getModifierState("CapsLock"))}
+                            onKeyUp={(e) => setIsCapsLockOn(e.getModifierState("CapsLock"))}
+                            placeholder="코드를 입력하세요"
+                            className="h-11 border-neutral-400 dark:border-neutral-500"
+                          />
+                          <Button 
+                            onClick={handleVerifyOwnerCode} 
+                            disabled={isVerifyingCode || !ownerCode.trim()}
+                            className="h-11 px-6 font-semibold whitespace-nowrap"
+                          >
+                            {isVerifyingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : "검증"}
+                          </Button>
+                        </div>
+                        <p className={`text-xs font-medium animate-in fade-in flex items-center gap-1 ${isCapsLockOn ? 'text-rose-500' : 'text-emerald-500'}`}>
+                          {isCapsLockOn ? "⚠️ Caps Lock이 켜져 있습니다." : "✅ Caps Lock이 꺼져 있습니다."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {/* Channel Management Section */}
               {ownedChannels.length > 0 && (

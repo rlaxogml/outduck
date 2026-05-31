@@ -335,16 +335,6 @@ export function FavoriteChannels({ user }: { user: any }) {
               </Link>
             ))}
 
-            {!isExpanded && hasTooMany && (
-              <div
-                onClick={() => setIsExpanded(true)}
-                className="sticky right-0 flex items-center justify-center min-w-[40px] md:min-w-[50px] cursor-pointer select-none bg-white/95 backdrop-blur-sm z-10 px-1.5 self-stretch border-l border-border/30 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.05)] hover:bg-muted/30 transition-all"
-              >
-                <span className="text-xs md:text-sm font-bold text-primary whitespace-nowrap px-1 hover:underline">
-                  더보기
-                </span>
-              </div>
-            )}
             <Link
               href="/all-channels"
               className="flex flex-col items-center gap-2 min-w-[56px] md:min-w-[80px] group"
@@ -358,6 +348,17 @@ export function FavoriteChannels({ user }: { user: any }) {
                 </span>
               </div>
             </Link>
+
+            {!isExpanded && hasTooMany && (
+              <div
+                onClick={() => setIsExpanded(true)}
+                className="sticky right-0 flex items-center justify-center min-w-[40px] md:min-w-[50px] cursor-pointer select-none bg-white/95 backdrop-blur-sm z-10 px-1.5 self-stretch border-l border-border/30 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.05)] hover:bg-muted/30 transition-all"
+              >
+                <span className="text-xs md:text-sm font-bold text-primary whitespace-nowrap px-1 hover:underline">
+                  더보기
+                </span>
+              </div>
+            )}
           </>
         )}
       </div>
