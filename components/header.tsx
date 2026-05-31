@@ -430,13 +430,53 @@ export function Header() {
   }, []);
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
+    // 앱(WebView) 안에서 실행 중인지 확인
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'GOOGLE_LOGIN' }));
+    } else {
+      // 일반 웹 브라우저
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+    }
   };
+
+  useEffect(() => {
+    // 앱(WebView)에서 보내는 로그인 완료 메시지 수신
+    const handleNativeMessage = async (event: MessageEvent) => {
+      if (event.data?.type === 'GOOGLE_LOGIN_SUCCESS' && event.data.url) {
+        // url에서 access_token, refresh_token 추출
+        const urlStr = event.data.url as string;
+        const hashStr = urlStr.split('#')[1];
+        if (!hashStr) return;
+
+        const params = new URLSearchParams(hashStr);
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+
+        if (access_token && refresh_token) {
+          // Supabase 세션 설정
+          await supabase.auth.setSession({
+            access_token,
+            refresh_token
+          });
+          
+          // 로그인 후 화면 갱신
+          if (window.location.pathname === "/") {
+            window.location.reload();
+          } else {
+            window.location.href = "/";
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleNativeMessage);
+    return () => window.removeEventListener('message', handleNativeMessage);
+  }, []);
 
 
   const handleLogout = () => {
