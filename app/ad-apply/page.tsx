@@ -508,13 +508,13 @@ export default function AdApplyPage() {
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-bold flex items-center gap-2">광고 이미지 업로드</CardTitle>
             <CardDescription className="text-sm font-semibold text-orange-600 dark:text-orange-400 mt-2 leading-relaxed bg-orange-500/10 p-3 rounded-lg border border-orange-500/20">
-              💡 메인 슬라이더 광고 배너 최적화 규격은 <strong className="text-orange-700 dark:text-orange-300">약 21:9 비율</strong>입니다. <br/>
+              💡 메인 슬라이더 광고 배너 최적화 규격은 <strong className="text-orange-700 dark:text-orange-300">약 16:9 비율</strong>입니다. <br/>
               5MB 이내의 PNG, JPG, JPEG 이미지 포맷을 권장합니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {imageUrl ? (
-              <div className="relative group rounded-2xl overflow-hidden border border-border bg-muted flex items-center justify-center w-full aspect-[21/9]">
+              <div className="relative group rounded-2xl overflow-hidden border border-border bg-muted flex items-center justify-center w-full aspect-[16/9]">
                 <img 
                   src={imageUrl} 
                   alt="Uploaded Banner Preview" 
@@ -525,7 +525,7 @@ export default function AdApplyPage() {
                 </div>
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center w-full aspect-[21/9] border-2 border-dashed border-border hover:border-orange-400 hover:bg-orange-500/[0.02] dark:hover:bg-orange-500/[0.01] rounded-2xl cursor-pointer group transition-all duration-300 select-none">
+              <label className="flex flex-col items-center justify-center w-full aspect-[16/9] border-2 border-dashed border-border hover:border-orange-400 hover:bg-orange-500/[0.02] dark:hover:bg-orange-500/[0.01] rounded-2xl cursor-pointer group transition-all duration-300 select-none">
                 <div className="flex flex-col items-center justify-center p-4 text-center space-y-2">
                   {isUploading ? (
                     <>
