@@ -12,7 +12,7 @@ export function Footer() {
   }
 
   return (
-    <footer className="bg-muted/10 border-t border-border mt-auto w-full py-8 px-4 text-center pb-24 md:pb-8">
+    <footer className="hidden md:block bg-muted/10 border-t border-border mt-auto w-full py-8 px-4 text-center pb-24 md:pb-8">
       <div className="max-w-screen-xl mx-auto flex flex-col items-center justify-center gap-4 text-sm text-muted-foreground">
         <div className="flex items-center gap-6 font-medium">
           <Link href="/terms" className="hover:text-primary transition-colors">

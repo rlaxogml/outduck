@@ -249,14 +249,14 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
 
       <Header />
 
+      {/* Poster Slider (Full Width) */}
+      <section className="w-full mb-4 md:mb-6">
+        <PosterSlider initialPosters={initialPosters} />
+      </section>
+
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 pt-0 pb-3 md:pt-0 md:pb-3">
         <main className="pb-8">
-          {/* Poster Slider */}
-          <section className="pt-2 pb-4 md:pt-3 md:pb-4">
-            <PosterSlider initialPosters={initialPosters} />
-          </section>
-
           {/* Company Owner Banner */}
           {isCompanyUser && (
             <div className="mb-6 p-4 md:p-5 bg-gradient-to-r from-orange-500/10 to-amber-500/5 border border-orange-500/20 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-2 fade-in duration-300">
