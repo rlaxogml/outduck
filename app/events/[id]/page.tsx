@@ -656,7 +656,7 @@ export default function EventDetailPage() {
                     </div>
                   ))}
                 </div>
-                <div className="flex flex-col pt-1 md:pt-0">
+                <div className="hidden md:flex flex-col pt-1 md:pt-0">
                   <span className="text-[15px] md:text-base font-semibold text-muted-foreground">
                     {event.channels.map(c => c.name).join(', ')}
                   </span>
@@ -695,6 +695,14 @@ export default function EventDetailPage() {
                     </span>
                   )}
                 </div>
+                
+                {/* Mobile Channel Name */}
+                {event.channels.length > 0 && (
+                  <div className="flex items-center gap-1.5 mt-0.5 mb-1 text-[14px] font-semibold text-muted-foreground">
+                    <span className="truncate">{event.channels.map(c => c.name).join(', ')}</span>
+                  </div>
+                )}
+
                 {/* Clean Address / Location line in the header card */}
                 <div className="flex items-center gap-1 text-[13px] text-muted-foreground">
                   <MapPin className="w-3.5 h-3.5" />

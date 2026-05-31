@@ -36,10 +36,11 @@ export function BottomNav() {
           <button
             key={item.id}
             onClick={() => router.push(item.path)}
-            className="flex flex-col items-center justify-center flex-1 h-full py-1 text-muted-foreground transition-all duration-200 cursor-pointer relative"
+            className={cn(
+              "flex flex-col items-center justify-center flex-1 h-full py-1.5 transition-all duration-200 cursor-pointer relative rounded-2xl mx-1",
+              isActive ? "bg-slate-100 dark:bg-slate-800/60" : "bg-transparent hover:bg-slate-50 dark:hover:bg-slate-900/30"
+            )}
           >
-
-
             <Icon
               className={cn(
                 "h-[22px] w-[22px] transition-all duration-300",

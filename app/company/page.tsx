@@ -213,6 +213,72 @@ export default function CompanyPage() {
   const [isPendingCollapsed, setIsPendingCollapsed] = useState(true);
   const [hasInitializedPendingState, setHasInitializedPendingState] = useState(false);
 
+  // Company Edit States
+  const [isCompanyEditOpen, setIsCompanyEditOpen] = useState(false);
+  const [editCompanyName, setEditCompanyName] = useState("");
+  const [editCompanyImageUrl, setEditCompanyImageUrl] = useState("");
+  const [isCompanyUploading, setIsCompanyUploading] = useState(false);
+  const [isCompanySaving, setIsCompanySaving] = useState(false);
+
+  const handleCompanyImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      if (!e.target.files || e.target.files.length === 0) return;
+      const file = e.target.files[0];
+      setIsCompanyUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `company-profile/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('channel-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('channel-images')
+        .getPublicUrl(filePath);
+
+      setEditCompanyImageUrl(publicUrl);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("이미지 업로드에 실패했습니다.");
+    } finally {
+      setIsCompanyUploading(false);
+    }
+  };
+
+  const handleSaveCompanyProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!company) return;
+    if (!editCompanyName.trim()) {
+      toast.error("회사 이름을 입력해주세요.");
+      return;
+    }
+
+    try {
+      setIsCompanySaving(true);
+      const { error } = await supabase
+        .from("companies")
+        .update({
+          name: editCompanyName.trim(),
+          profile_image_url: editCompanyImageUrl || null,
+        })
+        .eq("id", company.id);
+
+      if (error) throw error;
+
+      setCompany({ ...company, name: editCompanyName.trim(), profile_image_url: editCompanyImageUrl || null });
+      setIsCompanyEditOpen(false);
+      toast.success("회사 프로필이 수정되었습니다.");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("회사 프로필 수정 중 오류가 발생했습니다.");
+    } finally {
+      setIsCompanySaving(false);
+    }
+  };
+
   const renderChannelItem = (channel: Channel) => {
     return (
       <div key={channel.id} className="flex flex-col items-center gap-2.5 min-w-[64px] md:min-w-[84px] group relative shrink-0 select-none">
@@ -1175,7 +1241,7 @@ export default function CompanyPage() {
             </Avatar>
 
             <div className="relative z-10 flex-1 text-center sm:text-left space-y-1">
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center justify-center sm:justify-start gap-2">
+              <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center justify-center sm:justify-start gap-2 w-fit mx-auto sm:mx-0">
                 {company.name}
               </h1>
               <p className="text-muted-foreground text-xs md:text-sm font-medium">
@@ -1183,13 +1249,27 @@ export default function CompanyPage() {
               </p>
             </div>
 
-            {/* Ad Application Button */}
-            <div className="relative z-10 sm:self-center mt-3 sm:mt-0 shrink-0">
+            {/* Action Buttons (Ad Apply & Profile Edit) */}
+            <div className="relative z-10 sm:self-center mt-2 sm:mt-0 w-full sm:w-auto shrink-0 flex items-center justify-center sm:justify-start gap-2">
               <Button
                 onClick={() => router.push("/ad-apply")}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-2xl text-xs md:text-sm shadow-md h-10 px-5 transition-all flex items-center gap-1.5"
+                className="flex-1 sm:flex-initial bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl md:rounded-2xl text-sm shadow-sm md:shadow-md h-11 md:h-10 px-5 transition-all flex items-center justify-center gap-1.5"
               >
                 광고 신청
+              </Button>
+              <Button
+                onClick={() => {
+                  if (company) {
+                    setEditCompanyName(company.name);
+                    setEditCompanyImageUrl(company.profile_image_url || "");
+                    setIsCompanyEditOpen(true);
+                  }
+                }}
+                variant="outline"
+                className="flex-1 sm:flex-initial font-bold rounded-xl md:rounded-2xl text-sm shadow-sm md:shadow-md h-11 md:h-10 px-4 transition-all flex items-center justify-center gap-1.5 border-border bg-background hover:bg-muted text-foreground"
+              >
+                <Settings className="w-4 h-4 mr-0.5" />
+                프로필 수정
               </Button>
             </div>
           </div>
@@ -1989,6 +2069,62 @@ export default function CompanyPage() {
         </DialogContent>
       </Dialog>
 
+      {/* 4. Company Profile Edit Dialog */}
+      <Dialog open={isCompanyEditOpen} onOpenChange={setIsCompanyEditOpen}>
+        <DialogContent className="sm:max-w-[460px] rounded-3xl shadow-2xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl md:text-2xl font-extrabold flex items-center gap-2">
+              <Building2 className="w-5 h-5 md:w-6 md:h-6 text-orange-600" /> 소속사 프로필 수정
+            </DialogTitle>
+            <DialogDescription className="text-xs md:text-sm">
+              소속사의 이름과 프로필 이미지를 수정합니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveCompanyProfile} className="space-y-5 pt-2">
+            <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-2xl border border-border/50">
+              <div className="relative w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-xl bg-muted overflow-hidden border border-border flex items-center justify-center shadow-sm">
+                {editCompanyImageUrl ? (
+                  <img src={editCompanyImageUrl} alt="Company Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <Building2 className="w-5 h-5 text-muted-foreground/40" />
+                )}
+                {isCompanyUploading && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-white" /></div>}
+              </div>
+              <div className="flex-1 flex flex-col gap-1.5">
+                <Label className="text-xs font-bold text-muted-foreground">회사 프로필 이미지</Label>
+                <input type="file" id="comp-modal-img" className="hidden" accept="image/*" onChange={handleCompanyImageUpload} disabled={isCompanyUploading} />
+                <Button type="button" variant="outline" className="h-8 text-[11px] rounded-lg font-bold self-start shadow-sm" asChild disabled={isCompanyUploading}>
+                  <label htmlFor="comp-modal-img" className="cursor-pointer flex items-center gap-1.5">
+                    <Upload className="w-3 h-3" /> {editCompanyImageUrl ? "이미지 변경" : "이미지 선택"}
+                  </label>
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="compName" className="font-bold text-xs md:text-sm">회사 이름 <span className="text-destructive">*</span></Label>
+              <Input
+                id="compName"
+                value={editCompanyName}
+                onChange={e => setEditCompanyName(e.target.value)}
+                placeholder="예: 아웃덕 컴퍼니"
+                className="h-11 rounded-xl"
+                required
+              />
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1 pt-1">
+                <Info className="w-3 h-3" /> 변경된 이름은 모든 소속 채널에 일괄 적용됩니다.
+              </p>
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button type="submit" className="w-full h-12 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-md" disabled={isCompanySaving || isCompanyUploading}>
+                {isCompanySaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "수정 완료"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

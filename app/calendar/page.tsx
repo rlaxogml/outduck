@@ -322,6 +322,13 @@ function CalendarContent() {
       let next = activeFilters.includes(id)
         ? activeFilters.filter(f => f !== id)
         : [...activeFilters.filter(f => f !== "all"), id];
+
+      // 상호 배타적인 필터 처리 (구독행사 vs 찜한행사)
+      if (!activeFilters.includes(id)) {
+        if (id === "subscribed") next = next.filter(f => f !== "bookmarks");
+        if (id === "bookmarks") next = next.filter(f => f !== "subscribed");
+      }
+
       if (next.length === 0) next = ["all"];
       setActiveFilters(next);
     }
