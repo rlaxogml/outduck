@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import Image from "next/image";
-import type { User } from "@supabase/supabase-js";
-import { Calendar, Heart, MapPinned, Star, Search, X, House, PlusCircle, Bell, Megaphone, CheckCircle2, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { User } from "@supabase/supabase-js";
+import { Bell, Calendar, CheckCircle2, Heart, House, Loader2, MapPinned, Megaphone, PlusCircle, Search, Star, X } from "lucide-react";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import {
   DropdownMenu,
@@ -104,7 +104,7 @@ export function Header() {
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays === 1) return "어제";
     if (diffInDays < 7) return `${diffInDays}일 전`;
-    
+
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${month}/${day}`;
@@ -298,7 +298,7 @@ export function Header() {
           .select("id")
           .eq("owner_id", userId)
           .limit(1);
-        
+
         if (!error && data && data.length > 0) {
           setHasChannel(true);
         } else {
@@ -430,53 +430,13 @@ export function Header() {
   }, []);
 
   const handleGoogleLogin = async () => {
-    // 앱(WebView) 안에서 실행 중인지 확인
-    if (window.ReactNativeWebView) {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'GOOGLE_LOGIN' }));
-    } else {
-      // 일반 웹 브라우저
-      await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-    }
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
   };
-
-  useEffect(() => {
-    // 앱(WebView)에서 보내는 로그인 완료 메시지 수신
-    const handleNativeMessage = async (event: MessageEvent) => {
-      if (event.data?.type === 'GOOGLE_LOGIN_SUCCESS' && event.data.url) {
-        // url에서 access_token, refresh_token 추출
-        const urlStr = event.data.url as string;
-        const hashStr = urlStr.split('#')[1];
-        if (!hashStr) return;
-
-        const params = new URLSearchParams(hashStr);
-        const access_token = params.get('access_token');
-        const refresh_token = params.get('refresh_token');
-
-        if (access_token && refresh_token) {
-          // Supabase 세션 설정
-          await supabase.auth.setSession({
-            access_token,
-            refresh_token
-          });
-          
-          // 로그인 후 화면 갱신
-          if (window.location.pathname === "/") {
-            window.location.reload();
-          } else {
-            window.location.href = "/";
-          }
-        }
-      }
-    };
-
-    window.addEventListener('message', handleNativeMessage);
-    return () => window.removeEventListener('message', handleNativeMessage);
-  }, []);
 
 
   const handleLogout = () => {
@@ -585,7 +545,7 @@ export function Header() {
   };
 
   return (
-    <header className="border-b border-border bg-background w-full">
+    <header className="border-b border-border bg-purple-50 dark:bg-purple-900/20 w-full">
       {/* Top bar: Logo and Login (Wrapper spans full width) */}
       <div className="border-b border-border/50">
         <div className="mx-auto max-w-7xl w-full flex items-center justify-between md:grid md:grid-cols-[1fr_auto_1fr] px-3.5 md:px-4 py-2 md:py-3">
@@ -593,22 +553,22 @@ export function Header() {
             className="flex items-center gap-2 md:gap-3 cursor-pointer flex-shrink-0 justify-self-start"
             onClick={() => router.push("/")}
           >
-            <Image 
-              src="/logo.png" 
-              alt="Icon" 
-              width={120} 
-              height={120} 
-              className="h-11 w-11 md:h-14 md:w-14 object-contain flex-shrink-0" 
-              priority 
+            <Image
+              src="/logo.png"
+              alt="Icon"
+              width={120}
+              height={120}
+              className="h-11 w-11 md:h-14 md:w-14 object-contain flex-shrink-0"
+              priority
               unoptimized
             />
-            <Image 
-              src="/logo-text.png" 
-              alt="Logo" 
-              width={250} 
-              height={100} 
-              className="h-12 md:h-15 w-auto object-contain flex-shrink-0" 
-              priority 
+            <Image
+              src="/logo-text.png"
+              alt="Logo"
+              width={250}
+              height={100}
+              className="h-12 md:h-15 w-auto object-contain flex-shrink-0"
+              priority
               unoptimized
             />
           </div>
@@ -616,96 +576,96 @@ export function Header() {
           {/* Integrated Search Bar: Explicit fixed width overrides to force CSS Grid 'auto' expansion */}
           {pathname !== "/all-channels" && (
             <div className="relative w-full md:w-[400px] lg:w-[550px] xl:w-[650px] max-w-lg md:max-w-2xl mx-3 md:mx-auto md:px-4 hidden md:block">
-            <div className="relative flex w-full items-center">
-              <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
-              <input
-                type="text"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                onKeyDown={handleSearchInputKeyDown}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => {
-                  window.setTimeout(() => {
-                    setIsSearchFocused(false);
-                  }, 120);
-                }}
-                placeholder="채널명을 검색해보세요"
-                className="h-11 md:h-12 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm md:text-[15px] outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
-              />
-            </div>
+              <div className="relative flex w-full items-center">
+                <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  onKeyDown={handleSearchInputKeyDown}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => {
+                      setIsSearchFocused(false);
+                    }, 120);
+                  }}
+                  placeholder="채널명을 검색해보세요"
+                  className="h-11 md:h-12 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm md:text-[15px] outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
+                />
+              </div>
 
-            {isSearchFocused && (
-              <div className="absolute top-[52px] left-0 right-0 z-[100] w-full rounded-2xl border border-border bg-background p-2 shadow-xl">
-                {displayedChannels.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    {hasTypedInput
-                      ? showNoResultsMessage
-                        ? "검색 결과가 없습니다."
-                        : "검색 결과를 확인하는 중..."
-                      : "최근 검색한 채널이 없습니다."}
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {!hasTypedInput && displayedChannels.length > 0 && (
-                      <div className="flex items-center justify-between px-3 pt-1 pb-2">
-                        <span className="text-sm font-semibold">최근 검색</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearRecentChannels();
-                          }}
-                          className="text-xs text-muted-foreground hover:text-destructive"
-                        >
-                          모두 지우기
-                        </button>
-                      </div>
-                    )}
-                    <ul className="flex gap-3 overflow-x-auto p-1 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                      {displayedChannels.map((channel) => (
-                        <li
-                          key={channel.id}
-                          className="relative min-w-[100px] flex-shrink-0 group"
-                        >
-                          {!hasTypedInput && (
+              {isSearchFocused && (
+                <div className="absolute top-[52px] left-0 right-0 z-[100] w-full rounded-2xl border border-border bg-background p-2 shadow-xl">
+                  {displayedChannels.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      {hasTypedInput
+                        ? showNoResultsMessage
+                          ? "검색 결과가 없습니다."
+                          : "검색 결과를 확인하는 중..."
+                        : "최근 검색한 채널이 없습니다."}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {!hasTypedInput && displayedChannels.length > 0 && (
+                        <div className="flex items-center justify-between px-3 pt-1 pb-2">
+                          <span className="text-sm font-semibold">최근 검색</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              clearRecentChannels();
+                            }}
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            모두 지우기
+                          </button>
+                        </div>
+                      )}
+                      <ul className="flex gap-3 overflow-x-auto p-1 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                        {displayedChannels.map((channel) => (
+                          <li
+                            key={channel.id}
+                            className="relative min-w-[100px] flex-shrink-0 group"
+                          >
+                            {!hasTypedInput && (
+                              <button
+                                type="button"
+                                className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-background hover:text-foreground group-hover:opacity-100"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeRecentChannel(channel.id);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
                             <button
                               type="button"
-                              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-background hover:text-foreground group-hover:opacity-100"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeRecentChannel(channel.id);
-                              }}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => handleChannelSelect(channel)}
+                              className="w-full rounded-xl border border-border p-2.5 text-center hover:bg-muted transition-colors"
                             >
-                              <X className="h-3 w-3" />
+                              <Avatar className="mx-auto mb-2 h-10 w-10 border border-border">
+                                <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
+                                <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                                  {getChannelInitial(channel.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="truncate text-[13px] font-medium">
+                                {channel.name}
+                              </div>
+                              <div className="mt-0.5 text-[10.5px] text-muted-foreground">
+                                {renderChannelType(channel.type)}
+                              </div>
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => handleChannelSelect(channel)}
-                            className="w-full rounded-xl border border-border p-2.5 text-center hover:bg-muted transition-colors"
-                          >
-                            <Avatar className="mx-auto mb-2 h-10 w-10 border border-border">
-                              <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
-                              <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                                {getChannelInitial(channel.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="truncate text-[13px] font-medium">
-                              {channel.name}
-                            </div>
-                            <div className="mt-0.5 text-[10.5px] text-muted-foreground">
-                              {renderChannelType(channel.type)}
-                            </div>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="flex-shrink-0 justify-self-end flex items-center gap-2.5 md:gap-3.5">
@@ -806,7 +766,7 @@ export function Header() {
 
       {/* Mobile Search Bar Row */}
       {pathname !== "/map" && pathname !== "/all-channels" && (
-        <div className="border-b border-border/50 bg-background px-3.5 py-2 block md:hidden">
+        <div className="border-b border-border/50 bg-transparent px-3.5 py-2 block md:hidden">
           <div className="relative w-full max-w-lg mx-auto">
             <div className="relative flex w-full items-center">
               <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
@@ -902,7 +862,7 @@ export function Header() {
       )}
 
       {/* Navigation Container */}
-      <div className="border-t border-border w-full relative hidden md:block">
+      <div className="border-t border-border bg-background w-full relative hidden md:block">
         <div className="mx-auto max-w-7xl w-full relative flex items-center justify-center">
           {/* Main Scrollable Nav - Increased vertical padding for lux room, and bumped right guard to detach neighbor elements */}
           <nav className={cn(

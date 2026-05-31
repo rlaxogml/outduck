@@ -117,7 +117,7 @@
 
 @layer base {
   html {
-    overflow-y: scroll;
+    /* overflow-y: scroll removed to fix mobile WebView pull-to-refresh */
   }
   * {
     @apply border-border outline-ring/50;
