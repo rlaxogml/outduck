@@ -58,23 +58,9 @@ export function FavoriteChannels({ user }: { user: any }) {
 
     const checkAuthAndProgressiveFetch = async () => {
       try {
-        let currentUser = user;
-        if (!currentUser) {
-          // Verify supabase session directly to bypass initial React prop loading delay
-          const { data: { session } } = await supabase.auth.getSession();
-          currentUser = session?.user ?? null;
-        }
-
-        if (!currentUser) {
-          console.log("FavoriteChannels: No active session. Resetting.");
-          cachedChannels = null;
-          if (isMounted) {
-            setChannels([]);
-            setIsLoading(false);
-          }
-          clearTimeout(safetyTimeout);
-          return;
-        }
+        // 부모 컴포넌트에서 user={user}로 내려오므로 세션 확인 단계를 과감히 삭제하여 Waterfall 방지
+        const currentUser = user;
+        if (!currentUser) return;
 
         if (isMounted && cachedChannels) {
           setChannels(cachedChannels);
@@ -99,7 +85,7 @@ export function FavoriteChannels({ user }: { user: any }) {
 
         if (!isMounted) return;
 
-        // 메타데이터 매핑 및 렌더링 시작 (배지 개수는 일단 로딩)
+        // 메타데이터 매핑 및 렌더링 시작
         const initialChannels: (Channel & { team_id?: number | null; is_team?: boolean; relatedChannelIds?: number[] })[] = (favoritesData || []).map((fav: any) => {
           const ch = fav.channels;
           return {
@@ -115,6 +101,14 @@ export function FavoriteChannels({ user }: { user: any }) {
           };
         }).filter(c => c.id !== undefined);
 
+        // [핵심 최적화] 소속사 멤버/뱃지 계산을 기다리지 않고 즉시 렌더링!
+        cachedChannels = initialChannels;
+        setChannels(initialChannels);
+        setIsLoading(false);
+        clearTimeout(safetyTimeout);
+
+        // --- 화면이 뜬 상태에서 백그라운드로 도는 작업 ---
+        
         // 소속 팀 채널들의 멤버 채널 목록 수집
         const teamIds = initialChannels.filter(c => c.is_team).map(c => c.id);
         let membersList: { id: number; team_id: number }[] = [];
@@ -129,7 +123,7 @@ export function FavoriteChannels({ user }: { user: any }) {
           membersList = (membersData || []) as { id: number; team_id: number }[];
         }
 
-        // 각 채널별 연관 채널 ID 바인딩 (팀은 멤버들 포함, 멤버는 팀 포함)
+        // 각 채널별 연관 채널 ID 바인딩
         initialChannels.forEach(c => {
           if (c.is_team) {
             const memberIds = membersList.filter(m => m.team_id === c.id).map(m => m.id);
@@ -141,12 +135,7 @@ export function FavoriteChannels({ user }: { user: any }) {
           }
         });
 
-        cachedChannels = initialChannels;
-        setChannels(initialChannels);
-        setIsLoading(false);
-        clearTimeout(safetyTimeout);
-
-        // 연관 채널들의 고유 ID 목록 추출하여 통합 조회 목록 정의
+        // 연관 채널들의 고유 ID 목록 추출
         const allQueryChannelIds = Array.from(new Set(
           initialChannels.flatMap(c => c.relatedChannelIds || [])
         ));
