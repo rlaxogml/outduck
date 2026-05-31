@@ -579,7 +579,19 @@ export default function NewEventPage() {
 
         if (baseError) throw baseError;
 
-        // 1. Insert into offline_events linked to base event
+        // 1. Insert into consolidated event_channels
+        const channelRelations = [
+          { event_id: baseEvent.id, channel_id: parseInt(hostId) },
+          ...coHosts.map(ch => ({ event_id: baseEvent.id, channel_id: ch.id }))
+        ];
+
+        const { error: relationError } = await supabase
+          .from("event_channels")
+          .insert(channelRelations);
+
+        if (relationError) throw relationError;
+
+        // 2. Insert into offline_events linked to base event
         const linksObj: Record<string, string> = {};
         eventLinks.forEach(link => {
           if (link.link_name.trim() && link.link_url.trim()) {
@@ -608,18 +620,6 @@ export default function NewEventPage() {
           .single();
 
         if (eventError) throw eventError;
-
-        // 2. Insert into consolidated event_channels
-        const channelRelations = [
-          { event_id: baseEvent.id, channel_id: parseInt(hostId) },
-          ...coHosts.map(ch => ({ event_id: baseEvent.id, channel_id: ch.id }))
-        ];
-
-        const { error: relationError } = await supabase
-          .from("event_channels")
-          .insert(channelRelations);
-
-        if (relationError) throw relationError;
 
         // 3. Insert into offline_event_locations
         const locationRelations = locations.map((loc, idx) => ({
@@ -747,7 +747,19 @@ export default function NewEventPage() {
 
         if (baseError) throw baseError;
 
-        // 1. Insert into online_events
+        // 1. Insert into event_channels
+        const channelRelations = [
+          { event_id: baseEvent.id, channel_id: parseInt(hostId) },
+          ...coHosts.map(ch => ({ event_id: baseEvent.id, channel_id: ch.id }))
+        ];
+
+        const { error: relationError } = await supabase
+          .from("event_channels")
+          .insert(channelRelations);
+
+        if (relationError) throw relationError;
+
+        // 2. Insert into online_events
         const linksObj: Record<string, string> = {};
         eventLinks.forEach(link => {
           if (link.link_name.trim() && link.link_url.trim()) {
@@ -770,18 +782,6 @@ export default function NewEventPage() {
           .single();
 
         if (eventError) throw eventError;
-
-        // 2. Insert into event_channels
-        const channelRelations = [
-          { event_id: baseEvent.id, channel_id: parseInt(hostId) },
-          ...coHosts.map(ch => ({ event_id: baseEvent.id, channel_id: ch.id }))
-        ];
-
-        const { error: relationError } = await supabase
-          .from("event_channels")
-          .insert(channelRelations);
-
-        if (relationError) throw relationError;
 
         // Insert support images into event_images table
         if (supportImages.length > 0) {

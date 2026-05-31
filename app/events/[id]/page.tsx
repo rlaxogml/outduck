@@ -64,6 +64,7 @@ export default function EventDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [userCompData, setUserCompData] = useState<{name: string} | null>(null);
   const [heartAnim, setHeartAnim] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isScheduleExpanded, setIsScheduleExpanded] = useState(false);
@@ -171,8 +172,12 @@ export default function EventDetailPage() {
 
   const isOwner = useMemo(() => {
     if (!user || !event) return false;
-    return event.channels.some(ch => ch.owner_id === user.id);
-  }, [user, event]);
+    return event.channels.some(ch => {
+      if (ch.owner_id === user.id) return true;
+      if (userCompData?.name && ch.company === userCompData.name && !ch.owner_id) return true;
+      return false;
+    });
+  }, [user, event, userCompData]);
 
   const handleShare = () => {
     if (typeof window !== "undefined") {
@@ -253,6 +258,10 @@ export default function EventDetailPage() {
         data: { session },
       } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
+      if (session?.user) {
+        const { data } = await supabase.from("companies").select("name").eq("user_id", session.user.id).maybeSingle();
+        setUserCompData(data);
+      }
     };
 
     syncSession();
@@ -274,7 +283,7 @@ export default function EventDetailPage() {
           .select(`
             id, event_id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type, reservation_starts_at, reservation_ends_at, links,
             events (
-              event_channels ( channels ( id, name, type, image_url, owner_id ) ),
+              event_channels ( channels ( id, name, type, image_url, owner_id, company ) ),
               event_images ( id, image_url, order ),
               event_schedules ( id, day_of_week, date, open_time, close_time, reservation_type )
             ),

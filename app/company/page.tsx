@@ -204,6 +204,8 @@ export default function CompanyPage() {
   const [isDeletingChan, setIsDeletingChan] = useState(false);
   const [linksChanName, setLinksChanName] = useState<string>("");
   const [isTransferringChan, setIsTransferringChan] = useState(false);
+  const [linksTeamSearchText, setLinksTeamSearchText] = useState("");
+  const [isLinksTeamSearchFocused, setIsLinksTeamSearchFocused] = useState(false);
 
   // Pending Requests State
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
@@ -249,6 +251,14 @@ export default function CompanyPage() {
                 setLinksTargetChan(channel);
                 setLinksChanName(channel.name);
                 setLinksTeamId(channel.team_id ? String(channel.team_id) : "none");
+                
+                let tName = "";
+                if (channel.team_id) {
+                  const t = allTeams.find(t => t.id === channel.team_id);
+                  if (t) tName = t.name;
+                }
+                setLinksTeamSearchText(tName);
+
                 setLinksImageUrl(channel.image_url || "");
 
                 let initial: (ChannelLink & { id: string })[] = [];
@@ -319,7 +329,7 @@ export default function CompanyPage() {
         <div className="flex flex-col items-center gap-0.5 min-w-0 w-full px-0.5">
           <span className="text-[10px] md:text-xs font-bold text-center truncate w-full leading-tight group-hover:text-foreground transition-colors">{channel.name}</span>
           <span className="text-[8px] md:text-[9px] text-muted-foreground text-center truncate w-full font-medium leading-tight">
-            {channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "행사" : "게임"}
+            {channel.type === "youtuber" ? (channel.is_team ? "유튜버 (단체)" : "유튜버") : channel.type === "festival" ? "행사" : "게임"}
           </span>
         </div>
       </div>
@@ -800,9 +810,9 @@ export default function CompanyPage() {
       return;
     }
 
-    const isYoutuber = newChanType === "youtuber";
-    const finalIsTeam = isYoutuber ? newChanIsTeam : false;
-    const finalTeamId = (isYoutuber && !newChanIsTeam && newChanTeamId !== "none") ? parseInt(newChanTeamId) : null;
+    const isYoutuberType = newChanType === "youtuber" || newChanType === "youtuber_team";
+    const finalIsTeam = newChanType === "youtuber_team";
+    const finalTeamId = (newChanType === "youtuber" && newChanTeamId !== "none") ? parseInt(newChanTeamId) : null;
 
     setIsSubmitting(true);
     try {
@@ -810,7 +820,7 @@ export default function CompanyPage() {
         .from("channels")
         .insert([{
           name: newChanName.trim(),
-          type: newChanType,
+          type: isYoutuberType ? "youtuber" : newChanType,
           is_team: finalIsTeam,
           team_id: finalTeamId,
           image_url: newChanImageUrl,
@@ -1594,6 +1604,7 @@ export default function CompanyPage() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="youtuber">유튜버 / 버튜버</SelectItem>
+                    <SelectItem value="youtuber_team">유튜버 단체 팀</SelectItem>
                     <SelectItem value="game">게임</SelectItem>
                     <SelectItem value="festival">축제</SelectItem>
                   </SelectContent>
@@ -1610,66 +1621,55 @@ export default function CompanyPage() {
               </div>
             </div>
 
-            {/* ROW 2: 팀/그룹 여부 & 소속 팀 (Only visible for YouTubers) */}
+            {/* ROW 2: 소속 팀 (Only visible for YouTubers) */}
             {newChanType === "youtuber" && (
               <div className="grid grid-cols-2 gap-4 items-end min-h-[68px] animate-in slide-in-from-top-2 fade-in duration-300">
-                <div className="space-y-2 flex flex-col justify-between">
-                  <Label className="font-bold text-xs md:text-sm mb-2">팀/그룹 여부</Label>
-                  <div className="flex items-center gap-2 h-11 px-1">
-                    <Switch
-                      checked={newChanIsTeam}
-                      onCheckedChange={setNewChanIsTeam}
-                    />
-                    <span className="text-[11px] font-bold text-muted-foreground">
-                      {newChanIsTeam ? "그룹형 (Team)" : "개인형"}
-                    </span>
-                  </div>
+                <div className="space-y-2 flex flex-col justify-between hidden">
+                  {/* Placeholder to keep layout consistent */}
                 </div>
 
-                <div className="min-h-[68px] flex flex-col justify-end">
-                  {!newChanIsTeam && (
-                    <div className="space-y-2 animate-in fade-in duration-300">
-                      <Label htmlFor="teamSearch" className="font-bold text-xs md:text-sm">소속 팀 검색</Label>
-                      <div className="relative">
-                        <Input
-                          id="teamSearch"
-                          value={teamSearchText}
-                          onChange={(e) => {
-                            setTeamSearchText(e.target.value);
-                            setNewChanTeamId("none"); // Reset ID when typing
-                          }}
-                          onFocus={() => setIsTeamSearchFocused(true)}
-                          onBlur={() => setTimeout(() => setIsTeamSearchFocused(false), 150)}
-                          placeholder="소속 없음"
-                          className="h-11 rounded-xl bg-muted/20 border-border/60"
-                          autoComplete="off"
-                        />
-                        {isTeamSearchFocused && teamSearchText.trim().length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
-                            {allTeams.filter(t => t.name.toLowerCase().includes(teamSearchText.toLowerCase())).length > 0 ? (
-                              allTeams
-                                .filter(t => t.name.toLowerCase().includes(teamSearchText.toLowerCase()))
-                                .map(t => (
-                                  <div
-                                    key={t.id}
-                                    className="px-3 py-2 hover:bg-muted cursor-pointer text-sm font-medium"
-                                    onClick={() => {
-                                      setNewChanTeamId(t.id.toString());
-                                      setTeamSearchText(t.name);
-                                      setIsTeamSearchFocused(false);
-                                    }}
-                                  >
-                                    {t.name}
-                                  </div>
-                                ))
-                            ) : (
-                              <div className="px-3 py-2 text-sm text-muted-foreground text-center">결과가 없습니다.</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                <div className="min-h-[68px] flex flex-col justify-end col-span-2">
+                  <div className="space-y-2 animate-in fade-in duration-300">
+                    <Label htmlFor="teamSearch" className="font-bold text-xs md:text-sm">소속 팀 검색</Label>
+                    <div className="relative">
+                      <Input
+                        id="teamSearch"
+                        value={teamSearchText}
+                        onChange={(e) => {
+                          setTeamSearchText(e.target.value);
+                          setNewChanTeamId("none"); // Reset ID when typing
+                        }}
+                        onFocus={() => setIsTeamSearchFocused(true)}
+                        onBlur={() => setTimeout(() => setIsTeamSearchFocused(false), 150)}
+                        placeholder="소속 없음"
+                        className="h-11 rounded-xl bg-muted/20 border-border/60"
+                        autoComplete="off"
+                      />
+                      {isTeamSearchFocused && teamSearchText.trim().length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
+                          {allTeams.filter(t => t.name.toLowerCase().includes(teamSearchText.toLowerCase())).length > 0 ? (
+                            allTeams
+                              .filter(t => t.name.toLowerCase().includes(teamSearchText.toLowerCase()))
+                              .map(t => (
+                                <div
+                                  key={t.id}
+                                  className="px-3 py-2 hover:bg-muted cursor-pointer text-sm font-medium"
+                                  onClick={() => {
+                                    setNewChanTeamId(t.id.toString());
+                                    setTeamSearchText(t.name);
+                                    setIsTeamSearchFocused(false);
+                                  }}
+                                >
+                                  {t.name}
+                                </div>
+                              ))
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-muted-foreground text-center">결과가 없습니다.</div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1770,7 +1770,7 @@ export default function CompanyPage() {
             <div>
               <h4 className="text-xl font-black text-foreground">{linksTargetChan?.name}</h4>
               <p className="text-sm text-muted-foreground font-semibold">
-                {linksTargetChan?.type === "youtuber" ? "유튜버 채널" : linksTargetChan?.type === "festival" ? "행사 채널" : "게임 채널"}
+                {linksTargetChan?.type === "youtuber" ? (linksTargetChan?.is_team ? "유튜버 단체 팀 채널" : "유튜버 채널") : linksTargetChan?.type === "festival" ? "행사 채널" : "게임 채널"}
               </p>
             </div>
           </div>
@@ -1804,7 +1804,7 @@ export default function CompanyPage() {
             </div>
 
             {/* 2. Agency & Team Affiliation */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className={`grid grid-cols-1 ${!linksTargetChan?.is_team ? "sm:grid-cols-2" : ""} gap-4`}>
               {/* Agency (Read-only) */}
               <div className="space-y-1.5">
                 <Label className="text-xs md:text-sm font-bold text-foreground flex items-center gap-1">
@@ -1822,24 +1822,50 @@ export default function CompanyPage() {
               </div>
 
               {/* Team Selector */}
-              <div className="space-y-1.5">
-                <Label className="text-xs md:text-sm font-bold text-foreground flex items-center gap-1">
-                  <Users className="w-4 h-4 text-muted-foreground" /> 소속 팀
-                </Label>
-                <Select value={linksTeamId} onValueChange={setLinksTeamId}>
-                  <SelectTrigger className="h-10 border-neutral-300 dark:border-neutral-700 rounded-xl bg-background text-xs md:text-sm font-medium">
-                    <SelectValue placeholder="소속 팀 선택" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="none" className="text-xs md:text-sm font-medium">소속 없음</SelectItem>
-                    {allTeams.map(team => (
-                      <SelectItem key={team.id} value={String(team.id)} className="text-xs md:text-sm font-medium">
-                        {team.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!linksTargetChan?.is_team && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs md:text-sm font-bold text-foreground flex items-center gap-1">
+                    <Users className="w-4 h-4 text-muted-foreground" /> 소속 팀
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      value={linksTeamSearchText}
+                      onChange={(e) => {
+                        setLinksTeamSearchText(e.target.value);
+                        setLinksTeamId("none"); // Reset ID when typing
+                      }}
+                      onFocus={() => setIsLinksTeamSearchFocused(true)}
+                      onBlur={() => setTimeout(() => setIsLinksTeamSearchFocused(false), 150)}
+                      placeholder="소속 없음"
+                      className="h-10 border-neutral-300 dark:border-neutral-700 rounded-xl bg-background text-xs md:text-sm"
+                      autoComplete="off"
+                    />
+                    {isLinksTeamSearchFocused && linksTeamSearchText.trim().length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
+                        {allTeams.filter(t => t.name.toLowerCase().includes(linksTeamSearchText.toLowerCase())).length > 0 ? (
+                          allTeams
+                            .filter(t => t.name.toLowerCase().includes(linksTeamSearchText.toLowerCase()))
+                            .map(t => (
+                              <div
+                                key={t.id}
+                                className="px-3 py-2 hover:bg-muted cursor-pointer text-xs md:text-sm font-medium"
+                                onClick={() => {
+                                  setLinksTeamId(t.id.toString());
+                                  setLinksTeamSearchText(t.name);
+                                  setIsLinksTeamSearchFocused(false);
+                                }}
+                              >
+                                {t.name}
+                              </div>
+                            ))
+                        ) : (
+                          <div className="px-3 py-2 text-xs md:text-sm text-muted-foreground text-center">결과가 없습니다.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 3. SNS Links Management */}
