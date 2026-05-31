@@ -142,20 +142,57 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
   const scrollNext = useCallback(() => emblaApi && emblaApi.scrollNext(), [emblaApi]);
   const scrollTo = useCallback((index: number) => emblaApi && emblaApi.scrollTo(index), [emblaApi]);
 
+  const setTweenNodes = useCallback((emblaApi: EmblaCarouselType) => {
+    const engine = emblaApi.internalEngine();
+    const scrollProgress = emblaApi.scrollProgress();
+    const scrollSnapList = emblaApi.scrollSnapList();
+
+    emblaApi.slideNodes().forEach((slideNode, slideIndex) => {
+      let diffToTarget = scrollSnapList[slideIndex] - scrollProgress;
+
+      if (engine.options.loop) {
+        engine.slideLooper.loopPoints.forEach((loopItem) => {
+          const target = loopItem.target();
+          if (slideIndex === loopItem.index && target !== 0) {
+            const sign = Math.sign(target);
+            if (sign === -1) diffToTarget = scrollSnapList[slideIndex] - (1 + scrollProgress);
+            if (sign === 1) diffToTarget = scrollSnapList[slideIndex] + (1 - scrollProgress);
+          }
+        });
+      }
+
+      const slideDistance = Math.abs(diffToTarget * scrollSnapList.length);
+      const t = numberWithinRange(1 - (slideDistance * 0.65), 0, 1);
+
+      const innerNode = slideNode.querySelector(".poster-inner") as HTMLElement;
+ 
+      if (innerNode) {
+        // Disable scale effect on mobile (screens < 768px) where it's meant to be flush full-width
+        const isMobile = window.innerWidth < 768;
+        const scale = isMobile ? 1 : 0.9 + (t * 0.1);
+        innerNode.style.transform = `scale(${scale})`;
+        innerNode.style.zIndex = t > 0.8 ? "10" : "0";
+      }
+    });
+  }, []);
+
   useEffect(() => {
     if (!emblaApi || posters.length === 0) return;
 
     onSelect(emblaApi);
     setScrollSnaps(emblaApi.scrollSnapList());
     
+    setTweenNodes(emblaApi);
     emblaApi.on("select", onSelect);
+    emblaApi.on("scroll", setTweenNodes);
     emblaApi.on("reInit", onSelect);
-  }, [emblaApi, posters, onSelect]);
+    emblaApi.on("reInit", setTweenNodes);
+  }, [emblaApi, posters, onSelect, setTweenNodes]);
 
   // Safeguards: Avoid rendering flash and hide if empty.
   if (isLoading) {
     return (
-      <div className="w-full aspect-[21/9] md:aspect-[3/1] lg:aspect-[4/1] animate-pulse bg-muted/50" />
+      <div className="w-full md:max-w-[950px] md:mx-auto aspect-[21/9] md:px-4 mb-4 animate-pulse bg-muted/50 md:rounded-3xl" />
     );
   }
 
@@ -164,20 +201,20 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
   }
 
   return (
-    /* Full width container without side padding */
-    <div className="w-full relative overflow-hidden group">
-      <div className="overflow-hidden" ref={emblaRef}>
+    /* Full width on mobile, contained on PC */
+    <div className="w-full relative overflow-hidden pt-0 pb-2 group">
+      <div className="overflow-visible" ref={emblaRef}>
         <div className="flex items-center touch-pan-y">
           {posters.map((poster, index) => (
             <div
               key={poster.id}
-              className="flex-[0_0_100%] min-w-0 relative"
+              className="flex-[0_0_100%] md:flex-[0_0_75%] min-[1152px]:flex-[0_0_950px] min-w-0 px-0 md:px-4 relative"
               style={{ backfaceVisibility: "hidden" }}
             >
               <div
                 onClick={() => poster.link_url && window.open(poster.link_url, "_blank")}
                 className={cn(
-                  "poster-inner relative w-full aspect-[21/9] md:aspect-[3/1] lg:aspect-[4/1] flex flex-col items-center justify-center text-white will-change-transform bg-cover bg-center overflow-hidden",
+                  "poster-inner relative w-full aspect-[21/9] flex flex-col items-center justify-center text-white md:rounded-3xl md:shadow-lg will-change-transform bg-cover bg-center overflow-hidden",
                   poster.link_url ? "cursor-pointer" : "cursor-default",
                   !poster.image_url && fallbackGradients[index % fallbackGradients.length]
                 )}
@@ -194,7 +231,9 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
         </div>
       </div>
 
-
+      {/* Soft localized vignettes within the contained container - Hidden on Mobile to respect clean viewport edges */}
+      <div className="hidden md:block absolute inset-y-0 left-0 w-[40px] md:w-[50px] bg-[linear-gradient(to_right,white_0%,transparent_100%)] z-20 pointer-events-none" />
+      <div className="hidden md:block absolute inset-y-0 right-0 w-[40px] md:w-[50px] bg-[linear-gradient(to_left,white_0%,transparent_100%)] z-20 pointer-events-none" />
 
 
 
@@ -222,7 +261,7 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
       </div>
 
       {/* Pagination Dots */}
-      <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-2 z-30">
+      <div className="flex items-center justify-center gap-2 mt-6">
         {scrollSnaps.map((_, index) => (
           <button
             key={index}

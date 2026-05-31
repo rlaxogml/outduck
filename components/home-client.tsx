@@ -249,8 +249,8 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
 
       <Header />
 
-      {/* Poster Slider (Full Width) */}
-      <section className="w-full mb-4 md:mb-6">
+      {/* Poster Slider (Full width on mobile, contained on PC) */}
+      <section className="w-full md:max-w-7xl md:mx-auto md:px-4 mb-4 md:mb-6 md:pt-2">
         <PosterSlider initialPosters={initialPosters} />
       </section>
 
