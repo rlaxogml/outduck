@@ -76,7 +76,7 @@ export default function SettingsPage() {
       const { data: companyChans } = await supabase
         .from("channels")
         .select("*")
-        .eq("company", compData.name)
+        .eq("company", compData?.name)
         .is("owner_id", null)
         .order("name");
 

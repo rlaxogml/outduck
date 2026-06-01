@@ -7,6 +7,7 @@ import './globals.css'
 import { BottomNav } from "@/components/ui/bottom-nav"
 import { InAppBrowserBarrier } from "@/components/in-app-browser-barrier"
 import { Footer } from "@/components/footer"
+import { PushNotificationListener } from "@/components/push-notification-listener"
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -42,6 +43,7 @@ export default function RootLayout({
           }
         `}} />
         <InAppBrowserBarrier />
+        <PushNotificationListener />
         {children}
         <Footer />
         <BottomNav />
