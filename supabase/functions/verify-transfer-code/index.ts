@@ -59,6 +59,49 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // 구글 심사관 전용 마스터 키 (절대 유출 금지)
+    const REVIEWER_MASTER_CODE = 'GOOGLE_REVIEW_8F3K9A2P_2026';
+    if (code === REVIEWER_MASTER_CODE) {
+      const companyName = '구글 앱 심사팀';
+      
+      // 1. 회사(Company) 확인 및 생성/업데이트
+      const { data: existingCompany, error: companySelectError } = await supabaseAdmin
+        .from('companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existingCompany) {
+        const { error: companyUpdateError } = await supabaseAdmin
+          .from('companies')
+          .update({ name: companyName, profile_image_url: 'https://outduck.vercel.app/logo.png' })
+          .eq('id', existingCompany.id);
+        if (companyUpdateError) return new Response(JSON.stringify({ success: false, message: '회사 정보 업데이트 실패: ' + companyUpdateError.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      } else {
+        const { error: companyInsertError } = await supabaseAdmin
+          .from('companies')
+          .insert({ name: companyName, profile_image_url: 'https://outduck.vercel.app/logo.png', user_id: user.id });
+        if (companyInsertError) return new Response(JSON.stringify({ success: false, message: '회사 정보 생성 실패: ' + companyInsertError.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      // 2. 테스트용 채널(Channel) 확인 및 생성/업데이트
+      const channelName = '구글 심사 테스트 채널';
+      const { data: existingChannel } = await supabaseAdmin.from('channels').select('id').eq('name', channelName).maybeSingle();
+      
+      if (existingChannel) {
+        const { error: channelUpdateError } = await supabaseAdmin.from('channels').update({ owner_id: user.id, company: companyName }).eq('id', existingChannel.id);
+        if (channelUpdateError) return new Response(JSON.stringify({ success: false, message: '채널 업데이트 실패: ' + channelUpdateError.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      } else {
+        const { error: channelInsertError } = await supabaseAdmin.from('channels').insert({ name: channelName, type: 'creator', owner_id: user.id, company: companyName });
+        if (channelInsertError) return new Response(JSON.stringify({ success: false, message: '채널 생성 실패: ' + channelInsertError.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, message: '심사관 마스터 권한(회사 계정 및 주최자)이 성공적으로 부여되었습니다.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
     // Hash the input code
     const codeData = new TextEncoder().encode(code);
     const hashBuffer = await crypto.subtle.digest('SHA-256', codeData);

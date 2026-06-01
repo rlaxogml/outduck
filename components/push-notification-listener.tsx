@@ -52,17 +52,34 @@ export function PushNotificationListener() {
     // 로그인 상태가 변할 때(로그인 완료 시) 스토리지에 저장된 토큰을 DB에 업데이트
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user?.id) {
-        const savedToken = typeof window !== 'undefined' ? localStorage.getItem("expo_push_token") : null;
-        if (savedToken) {
-          updateTokenIfDifferent(session.user.id, savedToken);
-        }
+        checkAndSaveToken(session.user.id);
       }
     });
+
+    const checkAndSaveToken = (userId: string) => {
+      const savedToken = typeof window !== 'undefined' ? localStorage.getItem("expo_push_token") : null;
+      if (savedToken && savedToken !== 'null' && savedToken !== 'undefined') {
+        updateTokenIfDifferent(userId, savedToken);
+      }
+    };
+
+    // 앱의 onLoadEnd 주입이 늦을 수 있으므로 주기적으로 확인 (5초마다 최대 6번)
+    let checks = 0;
+    const interval = setInterval(async () => {
+      checks++;
+      if (checks > 6) clearInterval(interval);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        checkAndSaveToken(session.user.id);
+      }
+    }, 5000);
 
     return () => {
       window.removeEventListener("message", handleMessage);
       document.removeEventListener("message", handleMessage as any);
       authListener.subscription.unsubscribe();
+      clearInterval(interval);
     };
   }, []);
 
