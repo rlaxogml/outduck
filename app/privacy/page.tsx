@@ -103,6 +103,10 @@ export default function PrivacyPage() {
                   <td className="border border-gray-200 px-3 py-2">Google LLC</td>
                   <td className="border border-gray-200 px-3 py-2">OAuth 소셜 로그인</td>
                 </tr>
+                <tr className="bg-gray-50">
+                  <td className="border border-gray-200 px-3 py-2">Google LLC (Firebase)</td>
+                  <td className="border border-gray-200 px-3 py-2">FCM 푸시 알림 전송 인프라 제공</td>
+                </tr>
               </tbody>
             </table>
           </section>
