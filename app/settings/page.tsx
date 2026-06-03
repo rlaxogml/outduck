@@ -451,6 +451,30 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Danger Zone */}
+              <div className="border border-red-200 dark:border-red-900/30 rounded-2xl p-6 bg-red-50/30 dark:bg-red-950/10 shadow-sm space-y-6 mt-12">
+                <div>
+                  <h4 className="text-xl font-bold tracking-tight mb-1 flex items-center gap-2 text-red-600 dark:text-red-500">
+                    <AlertTriangle className="h-5 w-5" /> 계정 탈퇴
+                  </h4>
+                  <p className="text-sm text-red-600/80 dark:text-red-400/80">
+                    계정을 탈퇴하면 모든 데이터가 즉시 삭제되며 복구할 수 없습니다.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setAccountDeleteInput("");
+                      setIsAccountDeleteOpen(true);
+                    }}
+                    className="font-bold px-6 h-11"
+                  >
+                    계정 영구 삭제
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -582,29 +606,7 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {/* Danger Zone */}
-              <div className="border border-red-200 dark:border-red-900/30 rounded-2xl p-6 bg-red-50/30 dark:bg-red-950/10 shadow-sm space-y-6 mt-12">
-                <div>
-                  <h4 className="text-xl font-bold tracking-tight mb-1 flex items-center gap-2 text-red-600 dark:text-red-500">
-                    <AlertTriangle className="h-5 w-5" /> 계정 탈퇴
-                  </h4>
-                  <p className="text-sm text-red-600/80 dark:text-red-400/80">
-                    계정을 탈퇴하면 모든 데이터가 즉시 삭제되며 복구할 수 없습니다.
-                  </p>
-                </div>
-                <div className="pt-2">
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      setAccountDeleteInput("");
-                      setIsAccountDeleteOpen(true);
-                    }}
-                    className="font-bold px-6 h-11"
-                  >
-                    계정 영구 삭제
-                  </Button>
-                </div>
-              </div>
+
             </div>
           )}
         </main>
