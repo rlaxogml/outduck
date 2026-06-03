@@ -33,7 +33,7 @@ export default function PrivacyPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-3">2. 개인정보의 수집 및 이용 목적</h2>
             <ul className="list-disc pl-5 space-y-1 text-sm">
               <li>회원 식별 및 로그인 처리</li>
-              <li>즐겨찾기(채널 스타, 이벤트 북마크) 등 개인화 기능 제공</li>
+              <li>즐겨찾기(채널 팔로우, 이벤트 북마크) 등 개인화 기능 제공</li>
               <li>서비스 이용 통계 분석 및 품질 개선</li>
               <li>이용약관 위반 등 불법·부정 이용 방지</li>
             </ul>
