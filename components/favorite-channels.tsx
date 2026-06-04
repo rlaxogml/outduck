@@ -248,6 +248,8 @@ export function FavoriteChannels({ user }: { user: any }) {
     };
   }, [user, mounted]);
 
+  if (!user) return null;
+
   if (!mounted || isLoading) {
     return (
       <div className="bg-white mb-4 border-y border-border animate-pulse">
@@ -270,8 +272,6 @@ export function FavoriteChannels({ user }: { user: any }) {
       </div>
     );
   }
-
-  if (!user) return null;
 
   const hasTooMany = channels.length > 10;
 
