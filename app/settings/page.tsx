@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { User } from "@supabase/supabase-js";
-import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown } from "lucide-react";
+import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, Menu, X } from "lucide-react";
+import { Header } from "@/components/header";
 import { toast } from "sonner"; // Assuming sonner is available, or use alert
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +28,7 @@ export default function SettingsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("account");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Account state
   const [name, setName] = useState("");
@@ -327,26 +329,56 @@ export default function SettingsPage() {
   const avatarFallbackText = (user?.user_metadata?.name || user?.email || "U").slice(0, 1).toUpperCase();
 
   return (
-    <div className="mx-auto max-w-6xl w-full px-4 py-8 md:py-12">
-      <div className="flex flex-col md:flex-row gap-8 items-start">
-        {/* Sidebar */}
-        <aside className="w-full md:w-64 shrink-0">
-          <div className="sticky top-24 space-y-1">
-            <div className="mb-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.back()}
-                className="h-12 w-12 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground mb-3 -ml-3"
-                title="뒤로 가기"
-              >
-                <ChevronLeft className="size-8 animate-in fade-in duration-300" />
-              </Button>
-              <h2 className="px-4 text-lg font-bold tracking-tight">설정</h2>
-            </div>
-            
+    <div className="min-h-screen bg-slate-50 dark:bg-background pb-12">
+      <Header />
+      <div className="mx-auto max-w-6xl w-full px-4 py-8 md:py-12">
+        {/* Mobile Header / Subheader */}
+        <div className="flex items-center gap-3.5 mb-6 md:hidden px-2">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-1 text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
+            title="설정 메뉴"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <h2 className="text-xl font-bold tracking-tight">설정</h2>
+        </div>
+
+        {/* Mobile Drawer Sidebar */}
+        {/* Backdrop */}
+        <div 
+          className={cn(
+            "fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300",
+            isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          )}
+          onClick={() => setIsSidebarOpen(false)}
+        />
+        
+        {/* Drawer Content */}
+        <div 
+          className={cn(
+            "fixed inset-y-0 left-0 w-72 bg-background border-r border-border p-6 z-50 md:hidden flex flex-col transition-transform duration-300 ease-in-out",
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-xl font-bold tracking-tight">설정 메뉴</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSidebarOpen(false)}
+              className="h-10 w-10 rounded-full hover:bg-muted"
+            >
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
+          
+          <div className="space-y-1">
             <button
-              onClick={() => setActiveTab("account")}
+              onClick={() => {
+                setActiveTab("account");
+                setIsSidebarOpen(false);
+              }}
               className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                 activeTab === "account" 
                   ? "bg-primary/10 text-primary" 
@@ -358,7 +390,10 @@ export default function SettingsPage() {
             </button>
             
             <button
-              onClick={() => setActiveTab("notifications")}
+              onClick={() => {
+                setActiveTab("notifications");
+                setIsSidebarOpen(false);
+              }}
               className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                 activeTab === "notifications" 
                   ? "bg-primary/10 text-primary" 
@@ -370,7 +405,10 @@ export default function SettingsPage() {
             </button>
             
             <button
-              onClick={() => setActiveTab("advanced")}
+              onClick={() => {
+                setActiveTab("advanced");
+                setIsSidebarOpen(false);
+              }}
               className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                 activeTab === "advanced" 
                   ? "bg-primary/10 text-primary" 
@@ -381,27 +419,82 @@ export default function SettingsPage() {
               주최자 설정
             </button>
           </div>
-        </aside>
+        </div>
 
-        {/* Content */}
-        <main className="flex-1 w-full min-w-0">
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          {/* Sidebar */}
+          <aside className="hidden md:block w-full md:w-64 shrink-0">
+            <div className="sticky top-24 space-y-1">
+              <div className="mb-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => router.back()}
+                  className="h-12 w-12 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground mb-3 -ml-3"
+                  title="뒤로 가기"
+                >
+                  <ChevronLeft className="size-8 animate-in fade-in duration-300" />
+                </Button>
+                <h2 className="px-4 text-lg font-bold tracking-tight">설정</h2>
+              </div>
+              
+              <button
+                onClick={() => setActiveTab("account")}
+                className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                  activeTab === "account" 
+                    ? "bg-primary/10 text-primary" 
+                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <UserIcon className="h-5 w-5" />
+                계정
+              </button>
+              
+              <button
+                onClick={() => setActiveTab("notifications")}
+                className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                  activeTab === "notifications" 
+                    ? "bg-primary/10 text-primary" 
+                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Bell className="h-5 w-5" />
+                알림
+              </button>
+              
+              <button
+                onClick={() => setActiveTab("advanced")}
+                className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                  activeTab === "advanced" 
+                    ? "bg-primary/10 text-primary" 
+                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Settings2 className="h-5 w-5" />
+                주최자 설정
+              </button>
+            </div>
+          </aside>
+
+          {/* Content */}
+          <main className="flex-1 w-full min-w-0">
           {activeTab === "account" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
-                <h3 className="text-2xl font-bold tracking-tight mb-1">계정 설정</h3>
-                <p className="text-muted-foreground text-sm">프로필 정보와 활동 내역을 확인합니다.</p>
+                <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-1">계정 설정</h3>
+                <p className="text-muted-foreground text-xs md:text-sm">프로필 정보와 활동 내역을 확인합니다.</p>
               </div>
 
-              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-8">
+              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-4 md:p-6 bg-card shadow-sm space-y-6 md:space-y-8">
                 {/* Profile Image & Name */}
-                <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+                <div className="flex flex-col sm:flex-row gap-4 md:gap-6 items-center sm:items-center">
                   <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                    <Avatar className="h-24 w-24 border-2 border-border/50">
+                    <Avatar className="h-16 w-16 md:h-24 md:w-24 border-2 border-border/50">
                       <AvatarImage src={avatarUrl} className="object-cover" />
-                      <AvatarFallback className="text-2xl">{avatarFallbackText}</AvatarFallback>
+                      <AvatarFallback className="text-xl md:text-2xl">{avatarFallbackText}</AvatarFallback>
                     </Avatar>
                     <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Camera className="h-6 w-6 text-white" />
+                      <Camera className="h-4 w-4 md:h-6 md:w-6 text-white" />
                     </div>
                     <input 
                       type="file" 
@@ -411,14 +504,14 @@ export default function SettingsPage() {
                       onChange={handleImageUpload}
                     />
                   </div>
-                  <div className="space-y-4 flex-1 w-full">
+                  <div className="space-y-4 flex-1 w-full text-center sm:text-left">
                     <div className="space-y-1.5">
-                      <Label htmlFor="name">이름 (닉네임)</Label>
+                      <Label htmlFor="name" className="text-sm md:text-base font-medium">이름 (닉네임)</Label>
                       <Input 
                         id="name" 
                         value={name} 
                         onChange={(e) => setName(e.target.value)} 
-                        className="max-w-md h-11"
+                        className="max-w-md h-10 md:h-11 text-center sm:text-left mx-auto sm:mx-0"
                         placeholder="이름을 입력해주세요"
                       />
                     </div>
@@ -436,16 +529,16 @@ export default function SettingsPage() {
                 <div className="h-px w-full bg-border" />
 
                 {/* Activity Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="rounded-xl bg-muted/50 p-5 flex flex-col justify-center">
-                    <div className="text-sm text-muted-foreground mb-1 font-medium">구독 중인 채널</div>
-                    <div className="text-3xl font-bold text-foreground">
+                <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-4">
+                  <div className="rounded-xl bg-muted/50 p-4 md:p-5 flex flex-col justify-center">
+                    <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">구독 중인 채널</div>
+                    <div className="text-xl md:text-3xl font-bold text-foreground">
                       {favoritesCount.toLocaleString()}
                     </div>
                   </div>
-                  <div className="rounded-xl bg-muted/50 p-5 flex flex-col justify-center">
-                    <div className="text-sm text-muted-foreground mb-1 font-medium">찜한 행사</div>
-                    <div className="text-3xl font-bold text-foreground">
+                  <div className="rounded-xl bg-muted/50 p-4 md:p-5 flex flex-col justify-center">
+                    <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">찜한 행사</div>
+                    <div className="text-xl md:text-3xl font-bold text-foreground">
                       {bookmarksCount.toLocaleString()}
                     </div>
                   </div>
@@ -453,23 +546,23 @@ export default function SettingsPage() {
               </div>
 
               {/* Danger Zone */}
-              <div className="border border-red-200 dark:border-red-900/30 rounded-2xl p-6 bg-red-50/30 dark:bg-red-950/10 shadow-sm space-y-6 mt-12">
+              <div className="border border-red-200 dark:border-red-900/30 rounded-2xl p-4 md:p-6 bg-red-50/30 dark:bg-red-950/10 shadow-sm space-y-4 md:space-y-6 mt-8 md:mt-12">
                 <div>
-                  <h4 className="text-xl font-bold tracking-tight mb-1 flex items-center gap-2 text-red-600 dark:text-red-500">
-                    <AlertTriangle className="h-5 w-5" /> 계정 탈퇴
+                  <h4 className="text-lg md:text-xl font-bold tracking-tight mb-1 flex items-center gap-2 text-red-600 dark:text-red-500 justify-center sm:justify-start">
+                    <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" /> 계정 탈퇴
                   </h4>
-                  <p className="text-sm text-red-600/80 dark:text-red-400/80">
+                  <p className="text-xs md:text-sm text-red-600/80 dark:text-red-400/80 text-center sm:text-left">
                     계정을 탈퇴하면 모든 데이터가 즉시 삭제되며 복구할 수 없습니다.
                   </p>
                 </div>
-                <div className="pt-2">
+                <div className="pt-2 flex justify-center sm:justify-start">
                   <Button
                     variant="destructive"
                     onClick={() => {
                       setAccountDeleteInput("");
                       setIsAccountDeleteOpen(true);
                     }}
-                    className="font-bold px-6 h-11"
+                    className="font-bold w-full sm:w-auto px-6 h-10 md:h-11"
                   >
                     계정 영구 삭제
                   </Button>
@@ -479,17 +572,17 @@ export default function SettingsPage() {
           )}
 
           {activeTab === "notifications" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
-                <h3 className="text-2xl font-bold tracking-tight mb-1">알림 설정</h3>
-                <p className="text-muted-foreground text-sm">중요한 알림을 받을지 설정합니다.</p>
+                <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-1">알림 설정</h3>
+                <p className="text-muted-foreground text-xs md:text-sm">중요한 알림을 받을지 설정합니다.</p>
               </div>
 
-              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-6 bg-card shadow-sm space-y-6">
-                <div className="flex items-center justify-between">
+              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-4 md:p-6 bg-card shadow-sm space-y-4 md:space-y-6">
+                <div className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
-                    <Label className="text-base font-semibold">새 행사 알림</Label>
-                    <p className="text-sm text-muted-foreground">새로운 행사가 등록될 때 알림을 받습니다.</p>
+                    <Label className="text-sm md:text-base font-semibold">새 행사 알림</Label>
+                    <p className="text-xs md:text-sm text-muted-foreground">새로운 행사가 등록될 때 알림을 받습니다.</p>
                   </div>
                   <Switch 
                     checked={notifyNewEvent} 
@@ -499,10 +592,10 @@ export default function SettingsPage() {
                 
                 <div className="h-px w-full bg-border" />
                 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div className="space-y-0.5">
-                    <Label className="text-base font-semibold">찜한 행사 공지 알림</Label>
-                    <p className="text-sm text-muted-foreground">내가 찜한 행사의 새로운 공지사항 알림을 받습니다.</p>
+                    <Label className="text-sm md:text-base font-semibold">찜한 행사 공지 알림</Label>
+                    <p className="text-xs md:text-sm text-muted-foreground">내가 찜한 행사의 새로운 공지사항 알림을 받습니다.</p>
                   </div>
                   <Switch 
                     checked={notifyBookmarkNotice} 
@@ -649,6 +742,7 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

@@ -684,7 +684,7 @@ export function Header() {
                       )}
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-80 sm:w-96 p-0 rounded-2xl shadow-xl overflow-hidden">
+                  <DropdownMenuContent align="end" collisionPadding={16} className="w-[calc(100vw-32px)] sm:w-96 p-0 rounded-2xl shadow-xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
                       <span className="font-bold text-sm">알림</span>
                       {unreadCount > 0 && <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-extrabold">{unreadCount} 새 알림</span>}

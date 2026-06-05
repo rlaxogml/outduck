@@ -37,7 +37,7 @@ type EventDetail = {
   reservation_starts_at: string | null;
   reservation_ends_at: string | null;
   links: { link_name: string; link_url: string }[] | null;
-  channels: { id: number; name: string; image_url: string; type: string; owner_id: string }[];
+  channels: { id: number; name: string; image_url: string; type: string; owner_id: string; company?: string | null }[];
   images: { id: number; image_url: string; order: number }[];
   schedules: ScheduleItem[];
 };
