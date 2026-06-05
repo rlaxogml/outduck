@@ -765,7 +765,7 @@ export function Header() {
       </div>
 
       {/* Mobile Search Bar Row */}
-      {pathname !== "/map" && pathname !== "/all-channels" && (
+      {(pathname === "/" || pathname === "/subscriptions" || pathname === "/bookmarks") && (
         <div className="border-b border-border/50 bg-transparent px-3.5 py-2 block md:hidden">
           <div className="relative w-full max-w-lg mx-auto">
             <div className="relative flex w-full items-center">
