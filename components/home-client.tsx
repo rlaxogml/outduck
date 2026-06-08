@@ -16,6 +16,7 @@ import { FavoriteChannels } from "@/components/favorite-channels";
 import { MiniCalendar } from "@/components/mini-calendar";
 import { GoogleAd } from "@/components/google-ad";
 import { Building2, ArrowRight, UserCircle } from "lucide-react";
+import { trackPerformance } from "@/lib/performance";
 
 type Event = {
   id: number;
@@ -63,7 +64,11 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
     const syncSession = async () => {
       try {
         console.log("HomeClient: Calling supabase.auth.getSession()...");
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await trackPerformance(
+          "메인 페이지 세션 조회 (Client)",
+          "auth",
+          () => supabase.auth.getSession()
+        );
         console.log("HomeClient: getSession resolved.", { hasSession: !!session });
         const currentUser = session?.user ?? null;
         if (isMounted) {
@@ -100,11 +105,15 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
     const checkCompanyUser = async (userId: string) => {
       console.log("HomeClient: Checking if user is a company user:", userId);
       try {
-        const { data } = await supabase
-          .from("companies")
-          .select("id")
-          .eq("user_id", userId)
-          .maybeSingle();
+        const { data } = await trackPerformance(
+          "회사 파트너 계정 확인 (Client)",
+          "client",
+          () => supabase
+            .from("companies")
+            .select("id")
+            .eq("user_id", userId)
+            .maybeSingle()
+        );
 
         console.log("HomeClient: Company check complete. User has company account:", !!data);
         if (data && isMounted) {
@@ -117,12 +126,16 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
 
     const checkHostUser = async (userId: string) => {
       try {
-        const { data } = await supabase
-          .from("channels")
-          .select("id")
-          .eq("owner_id", userId)
-          .limit(1)
-          .maybeSingle();
+        const { data } = await trackPerformance(
+          "주최자 계정 확인 (Client)",
+          "client",
+          () => supabase
+            .from("channels")
+            .select("id")
+            .eq("owner_id", userId)
+            .limit(1)
+            .maybeSingle()
+        );
 
         if (data && isMounted) {
           setIsHostUser(true);

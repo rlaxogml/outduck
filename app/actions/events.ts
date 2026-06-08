@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
+import { trackPerformance } from "@/lib/performance";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,33 +67,37 @@ export async function fetchMoreEvents(
 
   try {
     if (type === "offline") {
-      const { data, error } = await supabase
-        .from("offline_events")
-        .select(`
-          id,
-          title,
-          start_date,
-          end_date,
-          image_url,
-          reservation_type,
-          created_at,
-          events(
-            event_channels(
-              channels(
-                id,
-                name,
-                type,
-                image_url
+      const { data, error } = await trackPerformance(
+        `추가 오프라인 행사 페이징 조회 (${offset} - ${offset + limit - 1}) (ServerAction)`,
+        "server",
+        () => supabase
+          .from("offline_events")
+          .select(`
+            id,
+            title,
+            start_date,
+            end_date,
+            image_url,
+            reservation_type,
+            created_at,
+            events(
+              event_channels(
+                channels(
+                  id,
+                  name,
+                  type,
+                  image_url
+                )
               )
+            ),
+            offline_event_locations(
+              location
             )
-          ),
-          offline_event_locations(
-            location
-          )
-        `)
-        .or(`end_date.gte.${todayStr},end_date.is.null`)
-        .order("start_date", { ascending: true })
-        .range(offset, offset + limit - 1);
+          `)
+          .or(`end_date.gte.${todayStr},end_date.is.null`)
+          .order("start_date", { ascending: true })
+          .range(offset, offset + limit - 1)
+      );
 
       if (error) throw error;
       
@@ -116,29 +121,33 @@ export async function fetchMoreEvents(
 
       return { data: formatted, error: null };
     } else {
-      const { data, error } = await supabase
-        .from("online_events")
-        .select(`
-          id,
-          title,
-          start_at,
-          end_at,
-          image_url,
-          created_at,
-          events(
-            event_channels(
-              channels(
-                id,
-                name,
-                type,
-                image_url
+      const { data, error } = await trackPerformance(
+        `추가 온라인 행사 페이징 조회 (${offset} - ${offset + limit - 1}) (ServerAction)`,
+        "server",
+        () => supabase
+          .from("online_events")
+          .select(`
+            id,
+            title,
+            start_at,
+            end_at,
+            image_url,
+            created_at,
+            events(
+              event_channels(
+                channels(
+                  id,
+                  name,
+                  type,
+                  image_url
+                )
               )
             )
-          )
-        `)
-        .or(`end_at.gte.${todayStr},end_at.is.null`)
-        .order("start_at", { ascending: true })
-        .range(offset, offset + limit - 1);
+          `)
+          .or(`end_at.gte.${todayStr},end_at.is.null`)
+          .order("start_at", { ascending: true })
+          .range(offset, offset + limit - 1)
+      );
 
       if (error) throw error;
       

@@ -6,6 +6,7 @@ import { Header } from "@/components/header";
 import { supabase } from "@/lib/supabase/client";
 import { MapPin, Search, Filter, Gamepad2, Video, Tv, Check, ChevronDown, ChevronUp, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trackPerformance, performanceTracker } from "@/lib/performance";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -73,7 +74,11 @@ function MapContent() {
     const abortController = new AbortController();
 
     const syncSessionAndData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await trackPerformance(
+        "지도시각화 페이지 세션 조회 (Client)",
+        "auth",
+        () => supabase.auth.getSession()
+      );
       const currentUser = session?.user ?? null;
       userIdRef.current = currentUser?.id ?? null;
       setUser(currentUser);
@@ -82,8 +87,16 @@ function MapContent() {
         setInteractionFilter("subscribed");
         try {
           const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
-            supabase.from("event_bookmarks").select("event_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
-            supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id).abortSignal(abortController.signal),
+            trackPerformance(
+              "지도시각화 북마크 조회 (Client)",
+              "client",
+              () => supabase.from("event_bookmarks").select("event_id").eq("user_id", currentUser.id).abortSignal(abortController.signal)
+            ),
+            trackPerformance(
+              "지도시각화 구독 채널 조회 (Client)",
+              "client",
+              () => supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id).abortSignal(abortController.signal)
+            ),
           ]);
 
           if (bookmarksData) {
@@ -162,31 +175,35 @@ function MapContent() {
       try {
         setLoading(true);
         const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
-        const { data, error } = await supabase
-          .from("offline_events")
-          .select(`
-            id,
-            event_id,
-            title,
-            start_date,
-            end_date,
-            image_url,
-            events(
-              event_channels(
-                channels(
-                  id,
-                  name,
-                  type,
-                  image_url
+        const { data, error } = await trackPerformance(
+          "지도 오프라인 행사 정보 조회 (Client)",
+          "client",
+          () => supabase
+            .from("offline_events")
+            .select(`
+              id,
+              event_id,
+              title,
+              start_date,
+              end_date,
+              image_url,
+              events(
+                event_channels(
+                  channels(
+                    id,
+                    name,
+                    type,
+                    image_url
+                  )
                 )
+              ),
+              offline_event_locations!inner(
+                location
               )
-            ),
-            offline_event_locations!inner(
-              location
-            )
-          `)
-          .or(`end_date.gte.${todayStr},end_date.is.null`)
-          .abortSignal(abortController.signal);
+            `)
+            .or(`end_date.gte.${todayStr},end_date.is.null`)
+            .abortSignal(abortController.signal)
+        );
 
         if (error) throw error;
 
@@ -219,84 +236,90 @@ function MapContent() {
             };
           });
 
-          const eventsWithMarkerImages = await Promise.all(
-            formatted.map(async (ev: any) => {
-              const canvasDataUrl = await new Promise<string>((resolve) => {
-                const img = new Image();
-                img.crossOrigin = "anonymous";
-                if (ev.channelImage) {
-                  img.src = `/api/proxy-image?url=${encodeURIComponent(ev.channelImage)}`;
-                } else {
-                  img.src = "https://via.placeholder.com/150";
-                }
+          const eventsWithMarkerImages = await trackPerformance(
+            "지도 마커 이미지(캔버스) 생성 작업 (Client)",
+            "client",
+            async () => {
+              return await Promise.all(
+                formatted.map(async (ev: any) => {
+                  const canvasDataUrl = await new Promise<string>((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = "anonymous";
+                    if (ev.channelImage) {
+                      img.src = `/api/proxy-image?url=${encodeURIComponent(ev.channelImage)}`;
+                    } else {
+                      img.src = "https://via.placeholder.com/150";
+                    }
 
-                const fallbackSvg = `
-                  <svg xmlns="http://www.w3.org/2000/svg" width="68" height="76" viewBox="0 0 68 76">
-                    <polygon points="34,76 24,56 44,56" fill="#FBBF24" stroke="#D97706" stroke-width="2.5" />
-                    <circle cx="34" cy="34" r="30" fill="#FBBF24" stroke="#D97706" stroke-width="3" />
-                    <circle cx="34" cy="34" r="26" fill="#FEF3C7" />
-                    <text x="34" y="41" font-family="sans-serif" font-size="22" font-weight="bold" fill="#B45309" text-anchor="middle">
-                      ${ev.channelName.slice(0, 1)}
-                    </text>
-                  </svg>
-                `;
+                    const fallbackSvg = `
+                      <svg xmlns="http://www.w3.org/2000/svg" width="68" height="76" viewBox="0 0 68 76">
+                        <polygon points="34,76 24,56 44,56" fill="#FBBF24" stroke="#D97706" stroke-width="2.5" />
+                        <circle cx="34" cy="34" r="30" fill="#FBBF24" stroke="#D97706" stroke-width="3" />
+                        <circle cx="34" cy="34" r="26" fill="#FEF3C7" />
+                        <text x="34" y="41" font-family="sans-serif" font-size="22" font-weight="bold" fill="#B45309" text-anchor="middle">
+                          ${ev.channelName.slice(0, 1)}
+                        </text>
+                      </svg>
+                    `;
 
-                img.onload = () => {
-                  const canvas = document.createElement("canvas");
-                  canvas.width = 88;
-                  canvas.height = 98;
-                  const ctx = canvas.getContext("2d");
-                  if (!ctx) {
-                    resolve("data:image/svg+xml;charset=UTF-8," + encodeURIComponent(fallbackSvg));
-                    return;
-                  }
+                    img.onload = () => {
+                      const canvas = document.createElement("canvas");
+                      canvas.width = 88;
+                      canvas.height = 98;
+                      const ctx = canvas.getContext("2d");
+                      if (!ctx) {
+                        resolve("data:image/svg+xml;charset=UTF-8," + encodeURIComponent(fallbackSvg));
+                        return;
+                      }
 
-                  // 1. Draw bottom arrow
-                  ctx.beginPath();
-                  ctx.moveTo(44, 98);
-                  ctx.lineTo(32, 76);
-                  ctx.lineTo(56, 76);
-                  ctx.closePath();
-                  ctx.fillStyle = "#FBBF24";
-                  ctx.strokeStyle = "#D97706";
-                  ctx.lineWidth = 2.5;
-                  ctx.fill();
-                  ctx.stroke();
+                      // 1. Draw bottom arrow
+                      ctx.beginPath();
+                      ctx.moveTo(44, 98);
+                      ctx.lineTo(32, 76);
+                      ctx.lineTo(56, 76);
+                      ctx.closePath();
+                      ctx.fillStyle = "#FBBF24";
+                      ctx.strokeStyle = "#D97706";
+                      ctx.lineWidth = 2.5;
+                      ctx.fill();
+                      ctx.stroke();
 
-                  // 2. Draw yellow circle border
-                  ctx.beginPath();
-                  ctx.arc(44, 44, 40, 0, Math.PI * 2);
-                  ctx.closePath();
-                  ctx.fillStyle = "#FBBF24";
-                  ctx.strokeStyle = "#D97706";
-                  ctx.lineWidth = 3.5;
-                  ctx.fill();
-                  ctx.stroke();
+                      // 2. Draw yellow circle border
+                      ctx.beginPath();
+                      ctx.arc(44, 44, 40, 0, Math.PI * 2);
+                      ctx.closePath();
+                      ctx.fillStyle = "#FBBF24";
+                      ctx.strokeStyle = "#D97706";
+                      ctx.lineWidth = 3.5;
+                      ctx.fill();
+                      ctx.stroke();
 
-                  // 3. Clip and draw image
-                  ctx.save();
-                  ctx.beginPath();
-                  ctx.arc(44, 44, 36, 0, Math.PI * 2);
-                  ctx.closePath();
-                  ctx.clip();
-                  ctx.drawImage(img, 8, 8, 72, 72);
-                  ctx.restore();
+                      // 3. Clip and draw image
+                      ctx.save();
+                      ctx.beginPath();
+                      ctx.arc(44, 44, 36, 0, Math.PI * 2);
+                      ctx.closePath();
+                      ctx.clip();
+                      ctx.drawImage(img, 8, 8, 72, 72);
+                      ctx.restore();
 
-                  try {
-                    const dataUrl = canvas.toDataURL();
-                    resolve(dataUrl);
-                  } catch {
-                    resolve("data:image/svg+xml;charset=UTF-8," + encodeURIComponent(fallbackSvg));
-                  }
-                };
+                      try {
+                        const dataUrl = canvas.toDataURL();
+                        resolve(dataUrl);
+                      } catch {
+                        resolve("data:image/svg+xml;charset=UTF-8," + encodeURIComponent(fallbackSvg));
+                      }
+                    };
 
-                img.onerror = () => {
-                  resolve("data:image/svg+xml;charset=UTF-8," + encodeURIComponent(fallbackSvg));
-                };
-              });
+                    img.onerror = () => {
+                      resolve("data:image/svg+xml;charset=UTF-8," + encodeURIComponent(fallbackSvg));
+                    };
+                  });
 
-              return { ...ev, canvasDataUrl };
-            })
+                  return { ...ev, canvasDataUrl };
+                })
+              );
+            }
           );
 
           setEvents(eventsWithMarkerImages);
@@ -377,6 +400,7 @@ function MapContent() {
     if (!isScriptLoaded && !hasKakao) return;
     if (loading) return;
 
+    const mapInitStartTime = performance.now();
     const interval = setInterval(() => {
       const kakao = window.kakao;
       if (kakao?.maps && typeof kakao.maps.load === "function") {
@@ -395,6 +419,7 @@ function MapContent() {
           let userAdjustedMapView = false;
           let successCount = 0;
 
+          const isFirstMapCreation = !mapRef.current;
           if (!mapRef.current) {
             container.innerHTML = "";
             mapRef.current = new kakao.maps.Map(container, {
@@ -481,6 +506,8 @@ function MapContent() {
 
             const targetCoords: any[] = [];
             const targetOverlays: any[] = [];
+
+            const addressPromises: Promise<void>[] = [];
 
             filteredEvents.forEach((event) => {
               const createMarkerAndPopup = (result: any, status: any, activeLocation: string) => {
@@ -636,30 +663,66 @@ function MapContent() {
 
               currentLocs.forEach((singleLocation: string) => {
                 if (!singleLocation || !singleLocation.trim()) return;
-                geocoder.addressSearch(singleLocation.trim(), (result: any, status: any) => {
-                  if (!isMounted) return;
-                  if (status === kakao.maps.services.Status.OK) {
-                    createMarkerAndPopup(result, status, singleLocation.trim());
-                  } else {
-                    places.keywordSearch(singleLocation.trim(), (data: any, placeStatus: any) => {
-                      if (!isMounted) return;
-                      if (placeStatus === kakao.maps.services.Status.OK) {
-                        createMarkerAndPopup(data, placeStatus, singleLocation.trim());
+
+                const promise = new Promise<void>((resolve) => {
+                  try {
+                    geocoder.addressSearch(singleLocation.trim(), (result: any, status: any) => {
+                      if (!isMounted) {
+                        resolve();
+                        return;
+                      }
+                      try {
+                        if (status === kakao.maps.services.Status.OK) {
+                          createMarkerAndPopup(result, status, singleLocation.trim());
+                          resolve();
+                        } else {
+                          // Try keyword search if address search fails
+                          places.keywordSearch(singleLocation.trim(), (data: any, placeStatus: any) => {
+                            if (!isMounted) {
+                              resolve();
+                              return;
+                            }
+                            try {
+                              if (placeStatus === kakao.maps.services.Status.OK) {
+                                createMarkerAndPopup(data, placeStatus, singleLocation.trim());
+                              }
+                            } catch (err) {
+                              console.error("[Map Error] Error in keywordSearch callback:", err);
+                            } finally {
+                              resolve();
+                            }
+                          });
+                        }
+                      } catch (err) {
+                        console.error("[Map Error] Error in addressSearch callback:", err);
+                        resolve();
                       }
                     });
+                  } catch (err) {
+                    console.error("[Map Error] Failed to invoke addressSearch:", err);
+                    resolve();
                   }
                 });
+                addressPromises.push(promise);
               });
             });
 
-            setTimeout(() => {
+            const timeoutPromise = new Promise<void>((resolve) => {
+              setTimeout(resolve, 1000);
+            });
+
+            Promise.race([Promise.all(addressPromises), timeoutPromise]).then(() => {
               if (!isMounted) return;
-              
+
               // 1. Sync the Kakao Map canvas to the DOM size first
               map.relayout();
-              
-              // 2. Allow a brief 50ms delay for the rendering engine to register the new dimensions,
-              // then perform the bounding and centering calculations on the updated canvas bounds.
+
+              // 2. Determine safety delay based on whether it is the first map creation.
+              // Kakao map needs a small initialization window (e.g. 350ms) to load tiles and handle bounds correctly.
+              const safetyDelay = isFirstMapCreation ? 350 : 50;
+
+              // 3. Allow safety delay for the rendering engine,
+              // then perform the bounding and centering calculations.
               setTimeout(() => {
                 if (!isMounted) return;
 
@@ -683,7 +746,7 @@ function MapContent() {
                         map.setCenter(targetCoords[0]);
                       }
                     }, 50);
-                    
+
                     // Ensure startup popup matches level 3 styling on first load
                     const cNode = targetOverlays[0].getContent();
                     if (cNode && cNode.querySelector) {
@@ -706,8 +769,18 @@ function MapContent() {
                   map.setBounds(bounds);
                 }
                 setIsMapReady(true);
-              }, 50);
-            }, 1100);
+                const duration = performance.now() - mapInitStartTime;
+                console.log(`%c[Perf Client] CLIENT - 카카오 지도 및 마커 초기화 완료: ${duration.toFixed(1)}ms`, "color: #10b981; font-weight: bold;");
+                performanceTracker.addLog({
+                  id: `map-init-${Date.now()}`,
+                  label: "카카오 지도 및 마커 초기화 완료 (Client)",
+                  duration,
+                  type: 'client'
+                });
+              }, safetyDelay);
+            }).catch((err) => {
+              console.error("[Map Error] Promise.all rejected:", err);
+            });
           };
 
           if (targetEvent) {

@@ -6,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, CalendarDays, MapPin } from "lucide-react";
 import Link from "next/link";
+import { trackPerformance } from "@/lib/performance";
 
 interface WeeklyEvent {
   id: number;
@@ -98,8 +99,16 @@ export function MiniCalendar({ user }: { user: User | null }) {
         if (user) {
           console.log("MiniCalendar: Fetching bookmarks and subscriptions for user:", user.id);
           const [{ data: bData }, { data: fData }] = await Promise.all([
-            supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id),
-            supabase.from("favorites").select("channel_id").eq("user_id", user.id),
+            trackPerformance(
+              "미니 캘린더 북마크 조회 (Client)",
+              "client",
+              () => supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id)
+            ),
+            trackPerformance(
+              "미니 캘린더 구독 채널 조회 (Client)",
+              "client",
+              () => supabase.from("favorites").select("channel_id").eq("user_id", user.id)
+            ),
           ]);
           if (ignore) return;
           if (bData) {
@@ -126,15 +135,23 @@ export function MiniCalendar({ user }: { user: User | null }) {
           .gte("end_date", weekStart);
 
         const [offRes, onRes] = await Promise.all([
-          offlineQuery,
-          supabase
-            .from("online_events")
-            .select(`
-              id, event_id, title, start_at, end_at,
-              events(event_channels(channels(id, name, image_url)))
-            `)
-            .lte("start_at", weekEnd)
-            .or(`end_at.gte.${weekStart},end_at.is.null`)
+          trackPerformance(
+            "미니 캘린더 오프라인 일정 조회 (Client)",
+            "client",
+            () => offlineQuery
+          ),
+          trackPerformance(
+            "미니 캘린더 온라인 일정 조회 (Client)",
+            "client",
+            () => supabase
+              .from("online_events")
+              .select(`
+                id, event_id, title, start_at, end_at,
+                events(event_channels(channels(id, name, image_url)))
+              `)
+              .lte("start_at", weekEnd)
+              .or(`end_at.gte.${weekStart},end_at.is.null`)
+          )
         ]);
 
         if (ignore) return;

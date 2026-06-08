@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { cn } from "@/lib/utils";
+import { trackPerformance } from "@/lib/performance";
 import { CompanyApplyForm } from "@/components/apply/company-apply-form";
 import { OrganizerApplyForm } from "@/components/apply/organizer-apply-form";
 
@@ -28,7 +29,11 @@ export default function ApplyPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await trackPerformance(
+        "신청 페이지 세션 조회 (Client)",
+        "auth",
+        () => supabase.auth.getSession()
+      );
       if (!session) {
         toast.error("로그인이 필요합니다.");
         router.push("/");
@@ -37,11 +42,15 @@ export default function ApplyPage() {
       setUser(session.user);
       
       try {
-        const { data, error } = await supabase
-          .from("channels")
-          .select("id")
-          .eq("owner_id", session.user.id)
-          .limit(1);
+        const { data, error } = await trackPerformance(
+          "사용자 채널 소유 여부 확인 (Client)",
+          "client",
+          () => supabase
+            .from("channels")
+            .select("id")
+            .eq("owner_id", session.user.id)
+            .limit(1)
+        );
         
         if (!error && data && data.length > 0) {
           setHasChannel(true);

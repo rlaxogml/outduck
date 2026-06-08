@@ -8,6 +8,7 @@ import Calendar from "react-calendar";
 import type { User } from "@supabase/supabase-js";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trackPerformance } from "@/lib/performance";
 
 const categoryLabelMap: Record<string, string> = {
   game: "게임",
@@ -93,7 +94,11 @@ function CalendarContent() {
 
   useEffect(() => {
     const syncSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await trackPerformance(
+        "캘린더 페이지 세션 조회 (Client)",
+        "auth",
+        () => supabase.auth.getSession()
+      );
       setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
     };
     syncSession();
@@ -117,6 +122,11 @@ function CalendarContent() {
     const fetchEventsAndUserData = async () => {
       try {
         setLoading(true);
+
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const startDateLimit = new Date(year, month - 1, 20).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+        const endDateLimit = new Date(year, month + 1, 10).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 
         const offlineQuery = supabase
           .from("offline_events")
@@ -147,7 +157,9 @@ function CalendarContent() {
               location
             )
           `)
-          .not("start_date", "is", null);
+          .not("start_date", "is", null)
+          .lte("start_date", endDateLimit)
+          .or(`end_date.gte.${startDateLimit},end_date.is.null`);
 
         const onlineQuery = supabase
           .from("online_events")
@@ -170,11 +182,13 @@ function CalendarContent() {
               )
             )
           `)
-          .not("start_at", "is", null);
+          .not("start_at", "is", null)
+          .lte("start_at", endDateLimit)
+          .or(`end_at.gte.${startDateLimit},end_at.is.null`);
 
         const [{ data: offlineEventsData }, { data: onlineEventsData }] = await Promise.all([
-          offlineQuery,
-          onlineQuery
+          trackPerformance("캘린더 오프라인 행사 조회 (Client)", "client", () => offlineQuery),
+          trackPerformance("캘린더 온라인 행사 조회 (Client)", "client", () => onlineQuery)
         ]);
 
         if (ignore) return;
@@ -184,8 +198,16 @@ function CalendarContent() {
 
         if (user) {
           const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
-            supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id),
-            supabase.from("favorites").select("channel_id").eq("user_id", user.id),
+            trackPerformance(
+              "캘린더 북마크 조회 (Client)",
+              "client",
+              () => supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id)
+            ),
+            trackPerformance(
+              "캘린더 구독 채널 조회 (Client)",
+              "client",
+              () => supabase.from("favorites").select("channel_id").eq("user_id", user.id)
+            ),
           ]);
 
           if (ignore) return;
@@ -312,7 +334,7 @@ function CalendarContent() {
     return () => {
       ignore = true;
     };
-  }, [user, highlightId]);
+  }, [user, highlightId, currentMonth]);
 
   const toggleFilter = (id: string) => {
     setFocusEventId(null); // Clear special event focus when any filter is interacted with

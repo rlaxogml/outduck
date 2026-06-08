@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import Link from "next/link";
+import { trackPerformance } from "@/lib/performance";
 
 type Channel = {
   id: number;
@@ -72,11 +73,15 @@ export function FavoriteChannels({ user }: { user: any }) {
         console.log("FavoriteChannels: Fetching initial channel metadata for user:", currentUser.id);
         
         // 1단계: 초고속 단일 조회 (소속 관계 매핑을 위해 team_id, is_team 추가 조회)
-        const { data: favoritesData, error: favError } = await supabase
-          .from("favorites")
-          .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
-          .eq("user_id", currentUser.id)
-          .order("created_at", { ascending: false });
+        const { data: favoritesData, error: favError } = await trackPerformance(
+          "관심 채널 목록 조회 (Client)",
+          "client",
+          () => supabase
+            .from("favorites")
+            .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
+            .eq("user_id", currentUser.id)
+            .order("created_at", { ascending: false })
+        );
 
         if (favError) {
           console.error("FavoriteChannels: Error fetching favorites:", favError);
@@ -114,11 +119,15 @@ export function FavoriteChannels({ user }: { user: any }) {
         let membersList: { id: number; team_id: number }[] = [];
 
         if (teamIds.length > 0) {
-          const { data: membersData } = await supabase
-            .from("channels")
-            .select("id, team_id")
-            .in("team_id", teamIds)
-            .eq("is_team", false);
+          const { data: membersData } = await trackPerformance(
+            "팀 채널 소속 멤버 조회 (Client)",
+            "client",
+            () => supabase
+              .from("channels")
+              .select("id, team_id")
+              .in("team_id", teamIds)
+              .eq("is_team", false)
+          );
           
           membersList = (membersData || []) as { id: number; team_id: number }[];
         }
@@ -145,21 +154,29 @@ export function FavoriteChannels({ user }: { user: any }) {
           const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
           
           const [{ data: eventsData }, { data: bookmarksData }] = await Promise.all([
-            supabase
-              .from("event_channels")
-              .select(`
-                channel_id,
-                events!inner (
-                  id,
-                  offline_events(id, end_date),
-                  online_events(id, end_at)
-                )
-              `)
-              .in("channel_id", allQueryChannelIds),
-            supabase
-              .from("event_bookmarks")
-              .select("event_id")
-              .eq("user_id", currentUser.id),
+            trackPerformance(
+              "관심 채널 활성 행사 개수 조회 (Client)",
+              "client",
+              () => supabase
+                .from("event_channels")
+                .select(`
+                  channel_id,
+                  events!inner (
+                    id,
+                    offline_events(id, end_date),
+                    online_events(id, end_at)
+                  )
+                `)
+                .in("channel_id", allQueryChannelIds)
+            ),
+            trackPerformance(
+              "관심 채널 북마크 매핑 조회 (Client)",
+              "client",
+              () => supabase
+                .from("event_bookmarks")
+                .select("event_id")
+                .eq("user_id", currentUser.id)
+            ),
           ]);
 
           if (!isMounted) return;

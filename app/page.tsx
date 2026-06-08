@@ -1,5 +1,6 @@
 import { HomeClient } from "@/components/home-client";
 import { createClient } from "@supabase/supabase-js";
+import { RegisterServerTimings } from "@/components/register-server-timings";
 
 export const revalidate = 60; // ISR cache revalidation every 60 seconds
 
@@ -93,11 +94,36 @@ export default async function Home() {
     .select("*")
     .order("order", { ascending: true });
 
-  const [{ data: offlineData }, { data: onlineData }, { data: posterData }] = await Promise.all([
-    offlineQuery,
-    onlineQuery,
-    posterQuery,
+  const measureServerQuery = async <T,>(label: string, promise: Promise<T>) => {
+    const s = performance.now();
+    try {
+      const res = await promise;
+      const duration = performance.now() - s;
+      const color = duration > 500 ? '\x1b[31m' : duration > 150 ? '\x1b[33m' : '\x1b[32m';
+      console.log(`${color}[Perf Server] SERVER - ${label}: ${duration.toFixed(1)}ms\x1b[0m`);
+      return { res, duration, label };
+    } catch (err) {
+      const duration = performance.now() - s;
+      console.log(`\x1b[31m[Perf Server Failed] SERVER - ${label}: failed after ${duration.toFixed(1)}ms\x1b[0m`);
+      throw err;
+    }
+  };
+
+  const [offlineRes, onlineRes, posterRes] = await Promise.all([
+    measureServerQuery("홈 오프라인 행사 조회 (Server)", offlineQuery),
+    measureServerQuery("홈 온라인 행사 조회 (Server)", onlineQuery),
+    measureServerQuery("홈 포스터 광고 조회 (Server)", posterQuery),
   ]);
+
+  const offlineData = offlineRes.res.data;
+  const onlineData = onlineRes.res.data;
+  const posterData = posterRes.res.data;
+
+  const serverTimings = [
+    { label: offlineRes.label, duration: offlineRes.duration },
+    { label: onlineRes.label, duration: onlineRes.duration },
+    { label: posterRes.label, duration: posterRes.duration },
+  ];
 
   const formatEventDate = (start: string | null, end: string | null) => {
     if (!start) return "상시";
@@ -210,10 +236,13 @@ export default async function Home() {
   }
 
   return (
-    <HomeClient 
-      initialOfflineEvents={offlineEvents} 
-      initialOnlineEvents={onlineEvents} 
-      initialPosters={posters}
-    />
+    <>
+      <RegisterServerTimings timings={serverTimings} />
+      <HomeClient 
+        initialOfflineEvents={offlineEvents} 
+        initialOnlineEvents={onlineEvents} 
+        initialPosters={posters}
+      />
+    </>
   );
 }
