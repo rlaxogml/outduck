@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 // Supported channel types for company affiliation.
 // Easily extensible in the future (e.g. adding 'game', 'festival', etc.)
-export const SUPPORTED_AFFILIATION_TYPES = ["youtuber"];
+export const SUPPORTED_AFFILIATION_TYPES = ["youtuber", "vtuber"];
 
 export function isAffiliationSupported(type: string | null): boolean {
   if (!type) return false;

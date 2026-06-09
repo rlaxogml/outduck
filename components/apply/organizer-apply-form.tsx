@@ -16,6 +16,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Upload,
   Loader2,
@@ -25,7 +27,8 @@ import {
   ChevronDown,
   Plus,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  CircleHelp
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { useImageUpload } from "@/hooks/use-image-upload";
@@ -112,6 +115,7 @@ const moveStorageImage = async (imageUrl: string): Promise<string> => {
 export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFormProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState<string>("");
+  const [isTeamChecked, setIsTeamChecked] = useState(false);
   const [teamId, setTeamId] = useState<string>("none");
   const [linksForm, setLinksForm] = useState<ChannelLink[]>([{ id: "default", name: "", url: "" }]);
   
@@ -139,6 +143,13 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
     prefix: "request-",
     successMessage: "프로필 이미지가 업로드되었습니다.",
   });
+
+  const handleTypeChange = (newType: string) => {
+    setType(newType);
+    if (newType !== "youtuber" && newType !== "vtuber") {
+      setIsTeamChecked(false);
+    }
+  };
 
   // Fetch teams & companies for auto-complete on mount
   useEffect(() => {
@@ -200,7 +211,7 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
 
     setIsSubmitting(true);
     try {
-      const isYoutuberType = type === "youtuber" || type === "youtuber_team";
+      const isYoutuberOrVtuber = type === "youtuber" || type === "vtuber";
       // Auto-approved only if company exists and has is_auto_approved turned on
       const isAutoApproved = !!selectedCompany && selectedCompany.is_auto_approved === true;
       const finalStatus = isAutoApproved ? "approved" : "pending";
@@ -213,9 +224,9 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
       const insertData = {
         user_id: user.id,
         name: name.trim(),
-        type: isYoutuberType ? "youtuber" : type,
-        is_team: type === "youtuber_team",
-        team_id: type === "youtuber" && teamId !== "none" ? parseInt(teamId) : null,
+        type: type,
+        is_team: isYoutuberOrVtuber ? isTeamChecked : false,
+        team_id: isYoutuberOrVtuber && !isTeamChecked && teamId !== "none" ? parseInt(teamId) : null,
         company: selectedCompany ? selectedCompany.name : null,
         company_id: selectedCompany ? selectedCompany.id : null,
         links: linksForm.filter(l => l.name.trim() || l.url.trim()).length > 0 
@@ -243,7 +254,8 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: name.trim(),
-            type: isYoutuberType ? "youtuber" : type,
+            type: type,
+            is_team: isYoutuberOrVtuber ? isTeamChecked : false,
             createdAt: new Date().toISOString(),
           }),
         }).catch(console.error);
@@ -330,22 +342,47 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="type" className="text-base font-semibold">유형 선택 <span className="text-destructive">*</span></Label>
-                <Select value={type} onValueChange={setType}>
+                <Select value={type} onValueChange={handleTypeChange}>
                   <SelectTrigger className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20">
                     <SelectValue placeholder="활동 유형" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="game">게임</SelectItem>
                     <SelectItem value="youtuber">유튜버</SelectItem>
-                    <SelectItem value="youtuber_team">유튜버 팀</SelectItem>
+                    <SelectItem value="vtuber">버튜버</SelectItem>
                     <SelectItem value="festival">축제</SelectItem>
                   </SelectContent>
                 </Select>
+
+                {(type === "youtuber" || type === "vtuber") && (
+                  <div className="flex items-center gap-2 pt-2 animate-in fade-in duration-200 select-none">
+                    <Checkbox
+                      id="isTeam"
+                      checked={isTeamChecked}
+                      onCheckedChange={(checked) => setIsTeamChecked(!!checked)}
+                    />
+                    <Label htmlFor="isTeam" className="text-sm font-semibold flex items-center gap-1.5 cursor-pointer">
+                      팀 채널
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center p-0.5">
+                              <CircleHelp className="w-4 h-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-slate-900 text-slate-100 border border-slate-800 rounded-lg p-2 max-w-xs shadow-xl z-50 text-xs">
+                            체크 시 다른 채널들을 소속팀으로 연결해 등록할 수 있습니다
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </Label>
+                  </div>
+                )}
               </div>
 
-              {(type === "youtuber" || type === "youtuber_team") && (
+              {(type === "youtuber" || type === "vtuber") && (
                 <>
-                  {type === "youtuber" && (
+                  {!isTeamChecked && (
                     <div className="space-y-2 animate-in fade-in duration-300">
                       <Label className="text-base font-semibold">소속 팀</Label>
                       <Popover open={openTeamPopover} onOpenChange={setOpenTeamPopover}>
@@ -374,7 +411,6 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
                           onOpenAutoFocus={(e) => e.preventDefault()}
                         >
                           <div className="flex flex-col max-h-[280px] overflow-y-auto custom-scrollbar bg-card">
-                            {/* Show interactive search prompt when empty */}
                             {!teamSearch.trim() && (
                               <div className="py-8 flex flex-col items-center justify-center gap-2 text-muted-foreground/60 animate-in fade-in duration-200">
                                 <Search className="w-8 h-8 opacity-30" />
@@ -382,7 +418,6 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
                               </div>
                             )}
                             
-                            {/* Only show matching teams if user has typed something */}
                             {teamSearch.trim() !== "" && teams
                               .filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase()))
                               .map((t) => (
@@ -405,7 +440,6 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
                                 </button>
                               ))
                             }
-                            {/* Empty state for filtering */}
                             {teamSearch.trim() !== "" && teams.filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase())).length === 0 && !("소속 없음".includes(teamSearch)) && (
                               <div className="py-6 text-center text-sm text-muted-foreground font-medium">검색 결과가 없습니다.</div>
                             )}

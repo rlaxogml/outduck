@@ -20,6 +20,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils";
 import { Users } from "lucide-react";
 import { CompanyAffiliation, isAffiliationSupported } from "@/components/company-affiliation";
+import { sendCustomerInquiry } from "@/app/actions/email";
+import { Textarea } from "@/components/ui/textarea";
 
 type Tab = "account" | "notifications" | "advanced";
 
@@ -57,6 +59,13 @@ export default function SettingsPage() {
   const [isAccountDeleteOpen, setIsAccountDeleteOpen] = useState(false);
   const [accountDeleteInput, setAccountDeleteInput] = useState("");
   const [isAccountDeleting, setIsAccountDeleting] = useState(false);
+
+  // Customer Inquiry State
+  const [inquiryType, setInquiryType] = useState("문의");
+  const [inquiryTitle, setInquiryTitle] = useState("");
+  const [inquiryContent, setInquiryContent] = useState("");
+  const [inquiryEmail, setInquiryEmail] = useState("");
+  const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false);
 
   const fetchOwnedChannelsAndTeams = async (userId: string) => {
     const [{ data: channelsData }, { data: teamsData }] = await Promise.all([
@@ -122,6 +131,7 @@ export default function SettingsPage() {
           setUser(currentUser);
           setName(currentUser.user_metadata?.name || "");
           setAvatarUrl(currentUser.user_metadata?.avatar_url || "");
+          setInquiryEmail(currentUser.email || "");
           fetchOwnedChannelsAndTeams(currentUser.id);
         }
 
@@ -315,6 +325,46 @@ export default function SettingsPage() {
       alert(errorMessage);
     } finally {
       setIsVerifyingCode(false);
+    }
+  };
+
+  const handleSubmitInquiry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inquiryTitle.trim()) {
+      toast.error("문의 제목을 입력해주세요.");
+      return;
+    }
+    if (!inquiryContent.trim()) {
+      toast.error("문의 내용을 입력해주세요.");
+      return;
+    }
+    if (!inquiryEmail.trim()) {
+      toast.error("답변받으실 이메일 주소를 입력해주세요.");
+      return;
+    }
+
+    setIsSubmittingInquiry(true);
+    try {
+      const res = await sendCustomerInquiry({
+        userId: user ? user.id : null,
+        type: inquiryType,
+        title: inquiryTitle.trim(),
+        content: inquiryContent.trim(),
+        email: inquiryEmail.trim()
+      });
+
+      if (res.success) {
+        toast.success("문의가 정상적으로 발송되었습니다.");
+        setInquiryTitle("");
+        setInquiryContent("");
+      } else {
+        toast.error("문의 접수에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("오류가 발생했습니다: " + err.message);
+    } finally {
+      setIsSubmittingInquiry(false);
     }
   };
 
@@ -603,6 +653,88 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+
+              {/* 고객 문의 / 피드백 */}
+              <div className="mt-8 md:mt-12">
+                <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-1">고객 문의 & 피드백</h3>
+                <p className="text-muted-foreground text-xs md:text-sm">서비스 개선을 위한 의견이나 불편 사항을 보내주세요.</p>
+              </div>
+
+              <form onSubmit={handleSubmitInquiry} className="border border-slate-300 dark:border-slate-700 rounded-2xl p-4 md:p-6 bg-card shadow-sm space-y-4 md:space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="inquiryType" className="text-sm font-semibold">문의 유형</Label>
+                    <Select value={inquiryType} onValueChange={setInquiryType}>
+                      <SelectTrigger className="h-10 md:h-11 rounded-xl bg-background border-border/85">
+                        <SelectValue placeholder="유형 선택" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="문의">일반 문의</SelectItem>
+                        <SelectItem value="피드백">피드백</SelectItem>
+                        <SelectItem value="기능 제안">기능 제안</SelectItem>
+                        <SelectItem value="버그 제보">버그 제보</SelectItem>
+                        <SelectItem value="광고/제휴">광고 및 제휴</SelectItem>
+                        <SelectItem value="기타">기타</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="inquiryEmail" className="text-sm font-semibold">답변받을 이메일</Label>
+                    <Input
+                      id="inquiryEmail"
+                      type="email"
+                      value={inquiryEmail}
+                      onChange={(e) => setInquiryEmail(e.target.value)}
+                      placeholder="example@email.com"
+                      className="h-10 md:h-11 rounded-xl border-border/85 bg-background"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="inquiryTitle" className="text-sm font-semibold">제목</Label>
+                  <Input
+                    id="inquiryTitle"
+                    type="text"
+                    value={inquiryTitle}
+                    onChange={(e) => setInquiryTitle(e.target.value)}
+                    placeholder="제목을 입력해주세요"
+                    className="h-10 md:h-11 rounded-xl border-border/85 bg-background"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="inquiryContent" className="text-sm font-semibold">내용</Label>
+                  <Textarea
+                    id="inquiryContent"
+                    value={inquiryContent}
+                    onChange={(e) => setInquiryContent(e.target.value)}
+                    placeholder="상세 내용을 입력해주세요"
+                    className="min-h-[140px] rounded-xl border-border/85 bg-background"
+                    required
+                  />
+                </div>
+
+                <div className="pt-2">
+                  <Button
+                    type="submit"
+                    disabled={isSubmittingInquiry}
+                    className="w-full sm:w-auto h-10 md:h-11 px-8 font-bold rounded-xl shadow-sm"
+                  >
+                    {isSubmittingInquiry ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        보내는 중...
+                      </>
+                    ) : (
+                      "보내기"
+                    )}
+                  </Button>
+                </div>
+              </form>
             </div>
           )}
 
@@ -749,6 +881,7 @@ export default function SettingsPage() {
 
 export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: any; teams: any[]; onUpdated: () => void }) {
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [type, setType] = useState<string>(channel.type || "youtuber");
   const [teamId, setTeamId] = useState<string>(channel.team_id ? String(channel.team_id) : "none");
   const [linksForm, setLinksForm] = useState<any[]>([]);
   const [imageUrl, setImageUrl] = useState(channel.image_url || "");
@@ -827,10 +960,12 @@ export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: an
       }
 
       const finalLinks = linksForm.filter(l => l.name.trim() || l.url.trim()).map(({ name, url }) => ({ name, url }));
+      const isYoutuberOrVtuber = type === "youtuber" || type === "vtuber";
       const { error } = await supabase
         .from("channels")
         .update({
-          team_id: teamId === "none" ? null : Number(teamId),
+          type: type,
+          team_id: isYoutuberOrVtuber && !channel.is_team ? (teamId === "none" ? null : Number(teamId)) : null,
           links: finalLinks.length > 0 ? finalLinks : null,
           image_url: imageUrl || null
         })
@@ -955,7 +1090,7 @@ export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: an
         </Avatar>
         <div>
           <h4 className="text-lg font-bold">{channel.name}</h4>
-          <p className="text-sm text-muted-foreground">{channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "행사" : "게임"} 채널</p>
+          <p className="text-sm text-muted-foreground">{type === "youtuber" ? (channel.is_team ? "유튜버 팀" : "유튜버") : type === "vtuber" ? (channel.is_team ? "버튜버 팀" : "버튜버") : type === "festival" ? "행사" : "게임"} 채널</p>
         </div>
       </div>
 
@@ -968,8 +1103,23 @@ export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: an
           </div>
         </div>
 
-        {isAffiliationSupported(channel.type) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label className="text-sm font-semibold">활동 유형</Label>
+          <Select value={type} onValueChange={setType}>
+            <SelectTrigger className="max-w-xs h-10 border-neutral-300 dark:border-neutral-600 rounded-xl bg-background">
+              <SelectValue placeholder="유형 선택" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="game">게임</SelectItem>
+              <SelectItem value="youtuber">유튜버</SelectItem>
+              <SelectItem value="vtuber">버튜버</SelectItem>
+              <SelectItem value="festival">축제</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {isAffiliationSupported(type) && (
+          <div className={cn("grid gap-4", !channel.is_team ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
             <div className="space-y-1.5">
               <Label className="text-sm font-semibold flex items-center gap-1"><Building2 className="w-4 h-4"/> 소속사</Label>
               {channel.company ? (
@@ -990,80 +1140,82 @@ export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: an
                   </div>
                   <CompanyAffiliation
                     channelId={channel.id}
-                    channelType={channel.type}
+                    channelType={type}
                     onSuccess={onUpdated}
                   />
                 </div>
               )}
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm font-semibold flex items-center gap-1"><Users className="w-4 h-4"/> 소속 팀</Label>
-              <Popover open={teamOpen} onOpenChange={setTeamOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={teamOpen}
-                    className="w-full justify-between h-10 border-neutral-300 dark:border-neutral-600 font-normal"
-                  >
-                    <span className="truncate">
-                      {teamId !== "none"
-                        ? teams.find((team) => String(team.id) === teamId)?.name || "소속 없음"
-                        : "소속 없음"}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                  <Command className="overflow-visible" shouldFilter={false}>
-                    <CommandInput 
-                      placeholder="팀 이름 검색" 
-                      value={teamSearch}
-                      onValueChange={setTeamSearch}
-                    />
-                    {teamSearch.length > 0 && (
-                      <div className="border-t border-neutral-200 dark:border-neutral-700">
-                        <CommandList className="max-h-[160px] overflow-y-auto">
-                          <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
-                          <CommandGroup>
-                            {"소속 없음".includes(teamSearch) && (
-                              <CommandItem
-                                value="none"
-                                onSelect={() => {
-                                  setTeamId("none");
-                                  setTeamSearch("");
-                                  setTeamOpen(false);
-                                }}
-                                className="cursor-pointer"
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", teamId === "none" ? "opacity-100" : "opacity-0")} />
-                                소속 없음
-                              </CommandItem>
-                            )}
-                            {teams.filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase())).map((team) => (
-                              <CommandItem
-                                key={team.id}
-                                value={team.name}
-                                onSelect={() => {
-                                  setTeamId(String(team.id));
-                                  setTeamSearch("");
-                                  setTeamOpen(false);
-                                }}
-                                className="cursor-pointer"
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", teamId === String(team.id) ? "opacity-100" : "opacity-0")} />
-                                {team.name}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </div>
-                    )}
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
+            {!channel.is_team && (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-semibold flex items-center gap-1"><Users className="w-4 h-4"/> 소속 팀</Label>
+                <Popover open={teamOpen} onOpenChange={setTeamOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={teamOpen}
+                      className="w-full justify-between h-10 border-neutral-300 dark:border-neutral-600 font-normal"
+                    >
+                      <span className="truncate">
+                        {teamId !== "none"
+                          ? teams.find((team) => String(team.id) === teamId)?.name || "소속 없음"
+                          : "소속 없음"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0" align="start">
+                    <Command className="overflow-visible" shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="팀 이름 검색" 
+                        value={teamSearch}
+                        onValueChange={setTeamSearch}
+                      />
+                      {teamSearch.length > 0 && (
+                        <div className="border-t border-neutral-200 dark:border-neutral-700">
+                          <CommandList className="max-h-[160px] overflow-y-auto">
+                            <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
+                            <CommandGroup>
+                              {"소속 없음".includes(teamSearch) && (
+                                <CommandItem
+                                  value="none"
+                                  onSelect={() => {
+                                    setTeamId("none");
+                                    setTeamSearch("");
+                                    setTeamOpen(false);
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", teamId === "none" ? "opacity-100" : "opacity-0")} />
+                                  소속 없음
+                                </CommandItem>
+                              )}
+                              {teams.filter(t => t.name.toLowerCase().includes(teamSearch.toLowerCase())).map((team) => (
+                                <CommandItem
+                                  key={team.id}
+                                  value={team.name}
+                                  onSelect={() => {
+                                    setTeamId(String(team.id));
+                                    setTeamSearch("");
+                                    setTeamOpen(false);
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", teamId === String(team.id) ? "opacity-100" : "opacity-0")} />
+                                  {team.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </div>
+                      )}
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
           </div>
         )}
 

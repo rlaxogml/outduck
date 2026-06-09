@@ -38,6 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   let channelType = '기타';
   if (channel.type === 'game') channelType = '게임';
   else if (channel.type === 'youtuber') channelType = '유튜버';
+  else if (channel.type === 'vtuber') channelType = '버튜버';
   else if (channel.type === 'festival') channelType = '축제';
 
   const title = `${channel.name} | Outduck`;

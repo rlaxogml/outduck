@@ -27,7 +27,7 @@ type ChannelEvent = {
   eventType: "offline" | "online";
 };
 
-type ChannelType = "game" | "youtuber" | "festival";
+type ChannelType = "game" | "youtuber" | "vtuber" | "festival";
 
 type Channel = {
   id: number;
@@ -44,6 +44,7 @@ type Channel = {
 const channelTypeLabel: Record<ChannelType, string> = {
   game: "게임",
   youtuber: "유튜버",
+  vtuber: "버튜버",
   festival: "축제",
 };
 

@@ -160,15 +160,13 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
     if (activeCategory === "always") {
       result = result.filter(e => e.isAlways);
     } else if (activeCategory !== "all") {
-      if (activeCategory === "youtuber") {
-        result = result.filter(e => e.category === "유튜버" || e.category === "버튜버");
-      } else {
-        const catMap: Record<string, string> = {
-          game: "게임",
-          festival: "축제",
-        };
-        result = result.filter(e => e.category === catMap[activeCategory]);
-      }
+      const catMap: Record<string, string> = {
+        game: "게임",
+        youtuber: "유튜버",
+        vtuber: "버튜버",
+        festival: "축제",
+      };
+      result = result.filter(e => e.category === catMap[activeCategory]);
     }
 
     // 2. Schedule Filter (Exclude "Always" from "Upcoming" unless specifically in "Always" category)

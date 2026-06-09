@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Camera,
@@ -46,7 +47,8 @@ import {
   User,
   Info,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  CircleHelp
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { EventTabs } from "@/components/event-tabs";
@@ -203,6 +205,7 @@ export default function CompanyPage() {
   const [showDeleteChanDialog, setShowDeleteChanDialog] = useState(false);
   const [isDeletingChan, setIsDeletingChan] = useState(false);
   const [linksChanName, setLinksChanName] = useState<string>("");
+  const [linksChanType, setLinksChanType] = useState<string>("youtuber");
   const [isTransferringChan, setIsTransferringChan] = useState(false);
   const [linksTeamSearchText, setLinksTeamSearchText] = useState("");
   const [isLinksTeamSearchFocused, setIsLinksTeamSearchFocused] = useState(false);
@@ -316,6 +319,7 @@ export default function CompanyPage() {
               onClick={() => {
                 setLinksTargetChan(channel);
                 setLinksChanName(channel.name);
+                setLinksChanType(channel.type || "youtuber");
                 setLinksTeamId(channel.team_id ? String(channel.team_id) : "none");
                 
                 let tName = "";
@@ -395,7 +399,7 @@ export default function CompanyPage() {
         <div className="flex flex-col items-center gap-0.5 min-w-0 w-full px-0.5">
           <span className="text-[10px] md:text-xs font-bold text-center truncate w-full leading-tight group-hover:text-foreground transition-colors">{channel.name}</span>
           <span className="text-[8px] md:text-[9px] text-muted-foreground text-center truncate w-full font-medium leading-tight">
-            {channel.type === "youtuber" ? (channel.is_team ? "유튜버 (팀)" : "유튜버") : channel.type === "festival" ? "행사" : "게임"}
+            {channel.type === "youtuber" ? (channel.is_team ? "유튜버 (팀)" : "유튜버") : channel.type === "vtuber" ? (channel.is_team ? "버튜버 (팀)" : "버튜버") : channel.type === "festival" ? "행사" : "게임"}
           </span>
         </div>
       </div>
@@ -581,6 +585,7 @@ export default function CompanyPage() {
     const t = type.trim().toLowerCase();
     if (t === "game") return "게임";
     if (t === "youtuber") return "유튜버";
+    if (t === "vtuber") return "버튜버";
     if (t === "festival") return "축제";
     return "기타";
   };
@@ -886,9 +891,9 @@ export default function CompanyPage() {
       return;
     }
 
-    const isYoutuberType = newChanType === "youtuber" || newChanType === "youtuber_team";
-    const finalIsTeam = newChanType === "youtuber_team";
-    const finalTeamId = (newChanType === "youtuber" && newChanTeamId !== "none") ? parseInt(newChanTeamId) : null;
+    const isYoutuberOrVtuber = newChanType === "youtuber" || newChanType === "vtuber";
+    const finalIsTeam = isYoutuberOrVtuber ? newChanIsTeam : false;
+    const finalTeamId = (isYoutuberOrVtuber && !newChanIsTeam && newChanTeamId !== "none") ? parseInt(newChanTeamId) : null;
 
     setIsSubmitting(true);
     try {
@@ -896,7 +901,7 @@ export default function CompanyPage() {
         .from("channels")
         .insert([{
           name: newChanName.trim(),
-          type: isYoutuberType ? "youtuber" : newChanType,
+          type: newChanType,
           is_team: finalIsTeam,
           team_id: finalTeamId,
           image_url: newChanImageUrl,
@@ -1127,6 +1132,7 @@ export default function CompanyPage() {
         .from("channels")
         .update({
           name: linksChanName.trim(),
+          type: linksChanType,
           links: finalLinks.length > 0 ? finalLinks : null,
           team_id: linksTeamId === "none" ? null : Number(linksTeamId),
           image_url: linksImageUrl || null
@@ -1534,7 +1540,7 @@ export default function CompanyPage() {
                               </div>
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 <Badge className="text-[9px] font-bold h-4.5 px-1.5 bg-muted border-border/50 text-muted-foreground hover:bg-muted">
-                                  {request.type === "youtuber" ? "유튜버" : request.type === "festival" ? "축제" : "게임"}
+                                  {request.type === "youtuber" ? "유튜버" : request.type === "vtuber" ? "버튜버" : request.type === "festival" ? "축제" : "게임"}
                                 </Badge>
                                 {request.is_team && (
                                   <Badge className="text-[9px] font-bold h-4.5 px-1.5 bg-orange-500/5 border-orange-500/10 text-orange-600 hover:bg-orange-500/5">
@@ -1692,17 +1698,50 @@ export default function CompanyPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="font-bold text-xs md:text-sm">활동 유형</Label>
-                <Select value={newChanType} onValueChange={setNewChanType}>
+                <Select
+                  value={newChanType}
+                  onValueChange={(val) => {
+                    setNewChanType(val);
+                    if (val !== "youtuber" && val !== "vtuber") {
+                      setNewChanIsTeam(false);
+                    }
+                  }}
+                >
                   <SelectTrigger className="h-11 rounded-xl">
                     <SelectValue placeholder="유형 선택" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
-                    <SelectItem value="youtuber">유튜버 / 버튜버</SelectItem>
-                    <SelectItem value="youtuber_team">유튜버 팀</SelectItem>
                     <SelectItem value="game">게임</SelectItem>
+                    <SelectItem value="youtuber">유튜버</SelectItem>
+                    <SelectItem value="vtuber">버튜버</SelectItem>
                     <SelectItem value="festival">축제</SelectItem>
                   </SelectContent>
                 </Select>
+
+                {(newChanType === "youtuber" || newChanType === "vtuber") && (
+                  <div className="flex items-center gap-2 pt-1 animate-in fade-in duration-200 select-none">
+                    <Checkbox
+                      id="newChanIsTeam"
+                      checked={newChanIsTeam}
+                      onCheckedChange={(checked) => setNewChanIsTeam(!!checked)}
+                    />
+                    <Label htmlFor="newChanIsTeam" className="text-xs font-bold md:text-sm flex items-center gap-1.5 cursor-pointer">
+                      팀 채널
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center p-0.5">
+                              <CircleHelp className="w-4 h-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-slate-900 text-slate-100 border border-slate-800 rounded-lg p-2 max-w-xs shadow-xl z-50 text-xs">
+                            체크 시 다른 채널들을 소속팀으로 연결해 등록할 수 있습니다
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </Label>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1715,8 +1754,8 @@ export default function CompanyPage() {
               </div>
             </div>
 
-            {/* ROW 2: 소속 팀 (Only visible for YouTubers) */}
-            {newChanType === "youtuber" && (
+            {/* ROW 2: 소속 팀 (Only visible for YouTubers/Vtubers who are not teams) */}
+            {(newChanType === "youtuber" || newChanType === "vtuber") && !newChanIsTeam && (
               <div className="grid grid-cols-2 gap-4 items-end min-h-[68px] animate-in slide-in-from-top-2 fade-in duration-300">
                 <div className="space-y-2 flex flex-col justify-between hidden">
                   {/* Placeholder to keep layout consistent */}
@@ -1864,7 +1903,13 @@ export default function CompanyPage() {
             <div>
               <h4 className="text-xl font-black text-foreground">{linksTargetChan?.name}</h4>
               <p className="text-sm text-muted-foreground font-semibold">
-                {linksTargetChan?.type === "youtuber" ? (linksTargetChan?.is_team ? "유튜버 팀 채널" : "유튜버 채널") : linksTargetChan?.type === "festival" ? "행사 채널" : "게임 채널"}
+                {linksChanType === "youtuber"
+                  ? (linksTargetChan?.is_team ? "유튜버 팀 채널" : "유튜버 채널")
+                  : linksChanType === "vtuber"
+                  ? (linksTargetChan?.is_team ? "버튜버 팀 채널" : "버튜버 채널")
+                  : linksChanType === "festival"
+                  ? "행사 채널"
+                  : "게임 채널"}
               </p>
             </div>
           </div>
@@ -1881,6 +1926,21 @@ export default function CompanyPage() {
                 className="h-10 border-neutral-300 dark:border-neutral-700 rounded-xl bg-background"
                 required
               />
+            </div>
+            {/* Channel Type Edit */}
+            <div className="space-y-1.5">
+              <Label className="text-xs md:text-sm font-bold text-foreground">활동 유형</Label>
+              <Select value={linksChanType} onValueChange={setLinksChanType}>
+                <SelectTrigger className="h-10 border-neutral-300 dark:border-neutral-700 rounded-xl bg-background">
+                  <SelectValue placeholder="유형 선택" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="game">게임</SelectItem>
+                  <SelectItem value="youtuber">유튜버</SelectItem>
+                  <SelectItem value="vtuber">버튜버</SelectItem>
+                  <SelectItem value="festival">축제</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {/* 1. Profile Image Change */}
             <div className="space-y-1.5">

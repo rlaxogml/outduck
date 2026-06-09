@@ -142,3 +142,90 @@ export async function notifyHostApplicationApproved(data: { userId: string; name
     console.error("Error sending applicant approval email:", error);
   }
 }
+
+export async function sendCustomerInquiry(data: {
+  userId: string | null;
+  type: string;
+  title: string;
+  content: string;
+  email: string;
+}) {
+  try {
+    const supabase = getSupabaseAdmin();
+
+    // 1. Try to insert into the feedback table (optional persistence)
+    try {
+      const { error: dbError } = await supabase
+        .from("feedback")
+        .insert({
+          user_id: data.userId,
+          type: data.type,
+          title: data.title,
+          content: data.content,
+          email: data.email,
+        });
+      
+      if (dbError) {
+        console.warn("DB insert into feedback failed (the migration might not be run yet):", dbError.message);
+      } else {
+        console.log("Feedback successfully saved to DB.");
+      }
+    } catch (dbErr) {
+      console.warn("Catch block: DB insert into feedback failed:", dbErr);
+    }
+
+    // 2. Find all admin users and get their email addresses
+    const { data: adminProfiles, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("is_admin", true);
+
+    const adminEmails: string[] = [];
+    if (!profileError && adminProfiles && adminProfiles.length > 0) {
+      const adminIds = adminProfiles.map((p) => p.id);
+      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        for (const id of adminIds) {
+          const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(id);
+          if (!userError && user?.email) {
+            adminEmails.push(user.email);
+          }
+        }
+      }
+    }
+
+    // Default fallback to process.env.GMAIL_USER if no admins found
+    const toEmail = adminEmails.length > 0 ? adminEmails.join(", ") : process.env.GMAIL_USER!;
+
+    // 3. Send email to admin(s)
+    const transporter = getTransporter();
+    
+    const mailOptions = {
+      from: `"Outduck 고객문의" <${process.env.GMAIL_USER}>`,
+      to: toEmail,
+      replyTo: data.email,
+      subject: `[고객문의] [${data.type}] ${data.title}`,
+      html: `
+        <h2>새로운 고객문의 / 피드백 접수</h2>
+        <p>Outduck 서비스에서 새로운 고객 문의가 접수되었습니다.</p>
+        <hr/>
+        <ul>
+          <li><strong>문의 유형:</strong> ${data.type}</li>
+          <li><strong>제목:</strong> ${data.title}</li>
+          <li><strong>작성자 이메일:</strong> <a href="mailto:${data.email}">${data.email}</a></li>
+          <li><strong>회원 ID:</strong> ${data.userId || "비로그인 상태"}</li>
+        </ul>
+        <h3>문의 내용</h3>
+        <p style="white-space: pre-wrap; background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">${data.content}</p>
+        <hr/>
+        <p style="font-size: 12px; color: #6c757d;">본 메일은 Outduck 고객문의 발송 시스템에서 자동 전송된 메일입니다.</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log("Customer inquiry email sent successfully.");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in sendCustomerInquiry:", error);
+    return { success: false, error: error.message || "Failed to send inquiry" };
+  }
+}

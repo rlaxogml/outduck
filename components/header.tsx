@@ -20,7 +20,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
-type ChannelType = "game" | "youtuber" | "festival";
+type ChannelType = "game" | "youtuber" | "vtuber" | "festival";
 
 type ChannelSearchItem = {
   id: number;
@@ -34,6 +34,7 @@ const RECENT_CHANNELS_STORAGE_KEY = "recent-searched-channels";
 const channelTypeLabel: Record<ChannelType, string> = {
   game: "게임",
   youtuber: "유튜버",
+  vtuber: "버튜버",
   festival: "축제",
 };
 
