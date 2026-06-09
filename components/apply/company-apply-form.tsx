@@ -78,13 +78,15 @@ export function CompanyApplyForm({ user, onBack, onSuccess }: CompanyApplyFormPr
 
       toast.success("신청이 성공적으로 접수되었습니다.");
       
-      // Asynchronously notify admins without awaiting
-      import("@/app/actions/email").then(({ notifyAdminsNewApplication }) => {
-        notifyAdminsNewApplication({
+      // Asynchronously notify admins via API route
+      fetch("/api/notify-application", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name: name.trim(),
           type: "회사/단체",
-          createdAt: new Date().toISOString()
-        }).catch(console.error);
+          createdAt: new Date().toISOString(),
+        }),
       }).catch(console.error);
 
       onSuccess();

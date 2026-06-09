@@ -237,13 +237,15 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
       } else {
         toast.success("신청이 성공적으로 접수되었습니다. 관리자 승인 후 완료됩니다.");
         
-        // Asynchronously notify admins without awaiting
-        import("@/app/actions/email").then(({ notifyAdminsNewApplication }) => {
-          notifyAdminsNewApplication({
+        // Asynchronously notify admins via API route
+        fetch("/api/notify-application", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             name: name.trim(),
             type: isYoutuberType ? "youtuber" : type,
-            createdAt: new Date().toISOString()
-          }).catch(console.error);
+            createdAt: new Date().toISOString(),
+          }),
         }).catch(console.error);
       }
 

@@ -64,7 +64,7 @@ const isEventOnDate = (event: any, targetDate: Date) => {
 
     return event.schedules.some((s: any) => {
       if (s.date && s.date === dateString) return true;
-      if (!s.date && s.day_of_week === dayOfWeek) return true;
+      if (!s.date && s.day_of_week?.toLowerCase() === dayOfWeek) return true;
       return false;
     });
   }
@@ -617,7 +617,8 @@ function CalendarContent() {
                     const channelsWithProfile: any[] = [];
                     const seenChannelIds = new Set();
                     dayEvents.forEach((event: any) => {
-                      const filteredChannels = activeFilters.includes("subscribed")
+                      // focusEventId가 있을 때는 구독 필터 무시 — 모든 채널 표시
+                      const filteredChannels = (!focusEventId && activeFilters.includes("subscribed"))
                         ? event.channels.filter((ch: any) => userSubscribedChannelIds.includes(ch.id))
                         : event.channels;
 
@@ -714,7 +715,8 @@ function CalendarContent() {
                           {/* 1. 프로필 이미지 + 이름 */}
                           <div className="flex items-center gap-2.5 md:gap-4 w-full md:w-[220px] flex-shrink-0">
                             <div className="flex -space-x-2.5 md:-space-x-4 flex-shrink-0">
-                              {(activeFilters.includes("subscribed")
+                              {/* focusEventId가 있을 때는 구독 필터 무시 */}
+                              {((!focusEventId && activeFilters.includes("subscribed"))
                                 ? event.channels.filter((ch: any) => userSubscribedChannelIds.includes(ch.id))
                                 : event.channels
                               ).slice(0, 3).map((ch: any, idx: number) => (
@@ -731,7 +733,7 @@ function CalendarContent() {
                             </div>
                             <div className="min-w-0">
                               <span className="text-sm md:text-lg font-bold text-foreground truncate block">
-                                {(activeFilters.includes("subscribed")
+                                {((!focusEventId && activeFilters.includes("subscribed"))
                                   ? event.channels.filter((ch: any) => userSubscribedChannelIds.includes(ch.id))
                                   : event.channels
                                 ).map((c: any) => c.name).join(", ") || "일반"}
