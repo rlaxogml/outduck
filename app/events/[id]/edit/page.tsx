@@ -414,7 +414,7 @@ export default function EditEventPage() {
             if (eventHost) {
               if (eventHost.owner_id === session.user.id) {
                 hasPermission = true;
-              } else if (compData?.name && eventHost.company === compData.name && !eventHost.owner_id) {
+              } else if (compData?.name && eventHost.company === compData.name) {
                 hasPermission = true;
               }
             }

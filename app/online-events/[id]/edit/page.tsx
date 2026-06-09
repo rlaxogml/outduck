@@ -162,7 +162,7 @@ export default function EditOnlineEventPage() {
               let isEventOwner = mappedChannels.some((ch: any) => ch.owner_id === session.user.id);
               if (!isEventOwner && compData?.name) {
                 isEventOwner = mappedChannels.some((ch: any) => 
-                  ch.company === compData.name && !ch.owner_id
+                  ch.company === compData.name
                 );
               }
 

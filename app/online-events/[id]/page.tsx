@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { Heart, Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLink, Link2, Info, User as UserIcon } from "lucide-react";
+import { Heart, Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLink, Link2, Info, User as UserIcon, Edit, Trash2, Eye, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import ReactDOM from "react-dom";
@@ -57,7 +57,7 @@ type OnlineEventDetail = {
   end_at: string | null;
   image_url: string | null;
   links: { link_name: string; link_url: string }[] | null;
-  channels: { id: number; name: string; image_url: string; type: string; owner_id: string }[];
+  channels: { id: number; name: string; image_url: string; type: string; owner_id: string; company?: string | null }[];
 };
 
 export default function OnlineEventDetailPage() {
@@ -75,6 +75,7 @@ export default function OnlineEventDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [userCompData, setUserCompData] = useState<{name: string} | null>(null);
   const [heartAnim, setHeartAnim] = useState(false);
 
   const isPastEvent = useMemo(() => {
@@ -335,8 +336,12 @@ export default function OnlineEventDetailPage() {
 
   const isOwner = useMemo(() => {
     if (!user || !event) return false;
-    return event.channels.some(ch => ch.owner_id === user.id);
-  }, [user, event]);
+    return event.channels.some(ch => {
+      if (ch.owner_id === user.id) return true;
+      if (userCompData?.name && ch.company === userCompData.name) return true;
+      return false;
+    });
+  }, [user, event, userCompData]);
 
   const pinnedNotices = useMemo(() => {
     return notices;
@@ -425,7 +430,29 @@ export default function OnlineEventDetailPage() {
       .eq('event_id', event.event_id)
       .order('created_at', { ascending: false });
     
-    if (data) setNotices(data);
+    if (data && data.length > 0) {
+      const noticeIds = data.map(n => n.id);
+      const { data: commentsData } = await supabase
+        .from('comments')
+        .select('id, notice_id')
+        .in('notice_id', noticeIds);
+
+      const countsMap: Record<number, number> = {};
+      commentsData?.forEach(c => {
+        if (c.notice_id) {
+          countsMap[c.notice_id] = (countsMap[c.notice_id] || 0) + 1;
+        }
+      });
+
+      const noticesWithComments = data.map(n => ({
+        ...n,
+        commentsCount: countsMap[n.id] || 0
+      }));
+
+      setNotices(noticesWithComments);
+    } else {
+      setNotices(data || []);
+    }
     setIsNoticesLoaded(true);
     setIsNoticesLoading(false);
   };
@@ -451,6 +478,17 @@ export default function OnlineEventDetailPage() {
       }
     }
     return paths;
+  };
+
+  const extractImageUrls = (htmlContent: string): string[] => {
+    if (!htmlContent) return [];
+    const regex = /<img[^>]+src=["']([^"']+)["']/g;
+    const urls: string[] = [];
+    let match;
+    while ((match = regex.exec(htmlContent)) !== null) {
+      urls.push(match[1]);
+    }
+    return urls;
   };
 
   const handleSaveNotice = async () => {
@@ -605,11 +643,21 @@ export default function OnlineEventDetailPage() {
     const syncSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
+      if (session?.user) {
+        const { data } = await supabase.from("companies").select("name").eq("user_id", session.user.id).maybeSingle();
+        setUserCompData(data);
+      }
     };
     syncSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        const { data } = await supabase.from("companies").select("name").eq("user_id", session.user.id).maybeSingle();
+        setUserCompData(data);
+      } else {
+        setUserCompData(null);
+      }
     });
 
     return () => {
@@ -625,7 +673,7 @@ export default function OnlineEventDetailPage() {
         .select(`
           id, event_id, title, description, start_at, end_at, image_url, links,
           events (
-            event_channels ( channels ( id, name, type, image_url, owner_id ) )
+            event_channels ( channels ( id, name, type, image_url, owner_id, company ) )
           )
         `)
         .eq("id", eventId)
@@ -1440,66 +1488,77 @@ export default function OnlineEventDetailPage() {
                     );
                   })()
                 ) : (
-                  <div className="md:border md:border-border/60 md:rounded-2xl md:overflow-hidden bg-transparent md:bg-background md:shadow-sm min-h-[500px] flex flex-col animate-in fade-in duration-300 -mx-5 md:mx-0 border-t border-b border-border/60 md:border-t-0 md:border-b-0">
-                    <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3.5 border-b border-border bg-muted/30 text-sm font-extrabold text-muted-foreground select-none">
-                      <div className="col-span-9">제목</div>
-                      <div className="col-span-2 text-center">작성일</div>
-                      <div className="col-span-1 text-center">조회수</div>
-                    </div>
-
-                    {pinnedNotices.length === 0 && regularNotices.length === 0 ? (
-                      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm font-semibold bg-muted/5">
+                  <div className="flex flex-col bg-background md:border border-border/60 md:rounded-2xl md:shadow-sm overflow-hidden divide-y divide-border/60 -mx-5 md:mx-0 border-t border-b border-border/60 md:border-t-0 md:border-b-0 min-h-[500px]">
+                    {pinnedNotices.length === 0 ? (
+                      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm font-semibold bg-muted/5 py-32">
                         등록된 공지·안내가 없습니다.
                       </div>
                     ) : (
-                      <div className="divide-y divide-border/60 flex-1">
-                        {pinnedNotices.map(notice => {
-                          const views = getNoticeViews(notice.id);
-                          const dateStr = new Date(notice.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replaceAll(" ", "");
+                      pinnedNotices.map(notice => {
+                        const views = getNoticeViews(notice.id);
+                        const dateStr = new Date(notice.created_at).toLocaleDateString('ko-KR', { 
+                          month: '2-digit', 
+                          day: '2-digit' 
+                        }).replaceAll(" ", "");
 
-                          return (
-                            <div key={`pinned-${notice.id}`} className="bg-rose-50/15 dark:bg-rose-950/5">
-                              <button
-                                onClick={() => handleViewNotice(notice.id)}
-                                className="w-full px-5 md:px-6 py-3.5 hover:bg-muted/15 transition-colors text-left text-[14px]"
-                              >
-                                {/* Mobile View Layout */}
-                                <div className="flex flex-col gap-1.5 md:hidden">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold select-none">
-                                      📌 공지
-                                    </span>
-                                    <span className="text-foreground hover:underline line-clamp-1 flex-1 font-bold text-[14px]">{notice.title}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold pl-1">
-                                    <span>{notice.channels?.name || "공식 채널"}</span>
-                                    <span>{dateStr}</span>
-                                    <span>조회 {views}</span>
-                                  </div>
+                        const imageUrls = extractImageUrls(notice.content);
+                        const hasImage = imageUrls.length > 0;
+                        const thumbnail = hasImage ? imageUrls[0] : null;
+
+                        return (
+                          <div key={notice.id} className="bg-background hover:bg-muted/10 transition-colors">
+                            <button
+                              onClick={() => handleViewNotice(notice.id)}
+                              className="w-full h-[76px] md:h-[92px] px-5 md:px-8 text-left flex items-center justify-between gap-4"
+                            >
+                              {/* Left content: Title & Metadata */}
+                              <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10.5px] px-1.5 py-0.5 rounded font-extrabold select-none">
+                                    공지
+                                  </span>
+                                  <span className="text-foreground font-semibold text-[15px] md:text-[16px] leading-snug hover:text-primary transition-colors hover:underline truncate">
+                                    {notice.title}
+                                  </span>
                                 </div>
-
-                                {/* Desktop View Layout */}
-                                <div className="hidden md:grid md:grid-cols-12 gap-4 items-center font-bold">
-                                  <div className="col-span-9 flex items-center gap-2">
-                                    <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold select-none">
-                                      📌 공지
-                                    </span>
-                                    <span className="text-foreground hover:underline line-clamp-1 flex-1 font-bold text-[14px]">{notice.title}</span>
-                                  </div>
-                                  
-                                  <div className="col-span-2 text-center text-sm text-muted-foreground font-semibold">
-                                    {dateStr}
-                                  </div>
-
-                                  <div className="col-span-1 text-center text-sm text-muted-foreground font-semibold">
+                                
+                                {/* Meta stats */}
+                                <div className="flex items-center gap-1.5 md:gap-2.5 text-xs text-muted-foreground font-semibold min-w-0">
+                                  <span className="text-slate-700 dark:text-slate-300 font-bold truncate shrink">{notice.channels?.name || "공식 채널"}</span>
+                                  <span className="text-muted-foreground/30 shrink-0">•</span>
+                                  <span className="shrink-0">{dateStr}</span>
+                                  <span className="text-muted-foreground/30 shrink-0">•</span>
+                                  <span className="flex items-center gap-1 shrink-0">
+                                    <Eye className="w-3.5 h-3.5 stroke-[2.2]" />
                                     {views}
-                                  </div>
+                                  </span>
+                                  <span className="text-muted-foreground/30 shrink-0">•</span>
+                                  <span className="flex items-center gap-1 shrink-0">
+                                    <MessageSquare className="w-3.5 h-3.5 stroke-[2.2]" />
+                                    {notice.commentsCount || 0}
+                                  </span>
                                 </div>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
+                              </div>
+
+                              {/* Right content: Thumbnail */}
+                              {hasImage && thumbnail && (
+                                <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-xl overflow-hidden border border-border/40 shrink-0 shadow-sm">
+                                  <img 
+                                    src={thumbnail} 
+                                    alt="공지 이미지" 
+                                    className="w-full h-full object-cover" 
+                                  />
+                                  {imageUrls.length > 1 && (
+                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-extrabold text-[11px] md:text-[13px] select-none tracking-wider">
+                                      {imageUrls.length}+
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 )

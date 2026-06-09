@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Eye, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import RichTextEditor from "./rich-text-editor";
@@ -40,6 +40,17 @@ const extractNoticeImagePaths = (htmlContent: string): string[] => {
     }
   }
   return paths;
+};
+
+const extractImageUrls = (htmlContent: string): string[] => {
+  if (!htmlContent) return [];
+  const regex = /<img[^>]+src=["']([^"']+)["']/g;
+  const urls: string[] = [];
+  let match;
+  while ((match = regex.exec(htmlContent)) !== null) {
+    urls.push(match[1]);
+  }
+  return urls;
 };
 
 export default function EventNoticesBoard({
@@ -87,7 +98,30 @@ export default function EventNoticesBoard({
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      if (data) setNotices(data);
+      
+      if (data && data.length > 0) {
+        const noticeIds = data.map(n => n.id);
+        const { data: commentsData } = await supabase
+          .from('comments')
+          .select('id, notice_id')
+          .in('notice_id', noticeIds);
+
+        const countsMap: Record<number, number> = {};
+        commentsData?.forEach(c => {
+          if (c.notice_id) {
+            countsMap[c.notice_id] = (countsMap[c.notice_id] || 0) + 1;
+          }
+        });
+
+        const noticesWithComments = data.map(n => ({
+          ...n,
+          commentsCount: countsMap[n.id] || 0
+        }));
+
+        setNotices(noticesWithComments);
+      } else {
+        setNotices(data || []);
+      }
     } catch (e) {
       console.error(e);
       toast.error('공지사항을 불러오는 중 오류가 발생했습니다.');
@@ -429,128 +463,82 @@ export default function EventNoticesBoard({
                     <CommentsSection noticeId={notice.id} isOrganizer={isOwner} user={user} />
                   </div>
                 </div>
-
-                {/* Bottom Back to List button */}
-                <div className="border-t border-border/60 mt-8 pt-6 flex justify-center">
-                  <button
-                    onClick={() => setSelectedNoticeId(null)}
-                    className="px-6 py-2.5 border border-border bg-background hover:bg-muted text-foreground font-bold text-sm rounded-xl transition-all shadow-sm flex items-center gap-2"
-                  >
-                    목록으로 돌아가기
-                  </button>
-                </div>
               </div>
             );
           })()
         ) : (
-          // --- Notice List Table View ---
-          <div className="md:border md:border-border/60 md:rounded-2xl md:overflow-hidden bg-transparent md:bg-background md:shadow-sm min-h-[500px] md:min-h-[700px] flex flex-col animate-in fade-in duration-300 -mx-5 md:mx-0 border-t border-b border-border/60 md:border-t-0 md:border-b-0">
-            {/* Table Headers (Hidden on Mobile) */}
-            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3.5 border-b border-border bg-muted/30 text-sm font-extrabold text-muted-foreground select-none">
-              <div className="col-span-9">제목</div>
-              <div className="col-span-2 text-center">작성일</div>
-              <div className="col-span-1 text-center">조회수</div>
-            </div>
-
-            {/* Notice List */}
-            {pinnedNotices.length === 0 && regularNotices.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm font-semibold bg-muted/5">
+          // --- Notice List View ---
+          <div className="flex flex-col bg-background md:border border-border/60 md:rounded-2xl md:shadow-sm overflow-hidden divide-y divide-border/60 -mx-5 md:mx-0 border-t border-b border-border/60 md:border-t-0 md:border-b-0 min-h-[500px]">
+            {pinnedNotices.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm font-semibold bg-muted/5 py-32">
                 등록된 공지·안내가 없습니다.
               </div>
             ) : (
-              <div className="divide-y divide-border/60 flex-1">
-                {/* Pinned Notices */}
-                {pinnedNotices.map(notice => {
-                  const views = getNoticeViews(notice.id);
-                  const dateStr = new Date(notice.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replaceAll(" ", "");
+              pinnedNotices.map(notice => {
+                const views = getNoticeViews(notice.id);
+                const dateStr = new Date(notice.created_at).toLocaleDateString('ko-KR', { 
+                  month: '2-digit', 
+                  day: '2-digit' 
+                }).replaceAll(" ", "");
 
-                  return (
-                    <div key={`pinned-${notice.id}`} className="bg-rose-50/15 dark:bg-rose-950/5">
-                      <button
-                        onClick={() => handleViewNotice(notice.id)}
-                        className="w-full px-5 md:px-6 py-3.5 hover:bg-muted/15 transition-colors text-left text-[14px]"
-                      >
-                        {/* Mobile View Layout */}
-                        <div className="flex flex-col gap-1.5 md:hidden">
-                          <div className="flex items-center gap-1.5">
-                            <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold select-none">
-                              📌 공지
-                            </span>
-                            <span className="text-foreground hover:underline line-clamp-1 flex-1 font-bold text-[14px]">{notice.title}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold pl-1">
-                            <span>{notice.channels?.name || "공식 채널"}</span>
-                            <span>{dateStr}</span>
-                            <span>조회 {views}</span>
-                          </div>
+                const imageUrls = extractImageUrls(notice.content);
+                const hasImage = imageUrls.length > 0;
+                const thumbnail = hasImage ? imageUrls[0] : null;
+
+                return (
+                  <div key={notice.id} className="bg-background hover:bg-muted/10 transition-colors">
+                    <button
+                      onClick={() => handleViewNotice(notice.id)}
+                      className="w-full h-[76px] md:h-[92px] px-5 md:px-8 text-left flex items-center justify-between gap-4"
+                    >
+                      {/* Left content: Title & Metadata */}
+                      <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10.5px] px-1.5 py-0.5 rounded font-extrabold select-none">
+                            공지
+                          </span>
+                          <span className="text-foreground font-semibold text-[15px] md:text-[16px] leading-snug hover:text-primary transition-colors hover:underline truncate">
+                            {notice.title}
+                          </span>
                         </div>
-
-                        {/* Desktop View Layout */}
-                        <div className="hidden md:grid md:grid-cols-12 gap-4 items-center font-bold">
-                          <div className="col-span-9 flex items-center gap-2">
-                            <span className="shrink-0 inline-flex items-center justify-center bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold select-none">
-                              📌 공지
-                            </span>
-                            <span className="text-foreground hover:underline line-clamp-1 flex-1 font-bold text-[14px]">{notice.title}</span>
-                          </div>
-                          
-                          <div className="col-span-2 text-center text-sm text-muted-foreground font-semibold">
-                            {dateStr}
-                          </div>
-
-                          <div className="col-span-1 text-center text-sm text-muted-foreground font-semibold">
+                        
+                        {/* Meta stats */}
+                        <div className="flex items-center gap-1.5 md:gap-2.5 text-xs text-muted-foreground font-semibold min-w-0">
+                          <span className="text-slate-700 dark:text-slate-300 font-bold truncate shrink">{notice.channels?.name || "공식 채널"}</span>
+                          <span className="text-muted-foreground/30 shrink-0">•</span>
+                          <span className="shrink-0">{dateStr}</span>
+                          <span className="text-muted-foreground/30 shrink-0">•</span>
+                          <span className="flex items-center gap-1 shrink-0">
+                            <Eye className="w-3.5 h-3.5 stroke-[2.2]" />
                             {views}
-                          </div>
+                          </span>
+                          <span className="text-muted-foreground/30 shrink-0">•</span>
+                          <span className="flex items-center gap-1 shrink-0">
+                            <MessageSquare className="w-3.5 h-3.5 stroke-[2.2]" />
+                            {notice.commentsCount || 0}
+                          </span>
                         </div>
-                      </button>
-                    </div>
-                  );
-                })}
+                      </div>
 
-                {/* Regular Notices */}
-                {regularNotices.map(notice => {
-                  const views = getNoticeViews(notice.id);
-                  const dateStr = new Date(notice.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replaceAll(" ", "");
-
-                  return (
-                    <div key={`regular-${notice.id}`} className="bg-background">
-                      <button
-                        onClick={() => handleViewNotice(notice.id)}
-                        className="w-full px-5 md:px-6 py-3.5 hover:bg-muted/30 transition-colors text-left text-[14px]"
-                      >
-                        {/* Mobile View Layout */}
-                        <div className="flex flex-col gap-1.5 md:hidden">
-                          <div className="flex items-center gap-1.5">
-                            <span className="shrink-0 text-muted-foreground/60 select-none text-[10px]">●</span>
-                            <span className="text-foreground hover:underline line-clamp-1 flex-1 font-semibold text-[14px]">{notice.title}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold pl-1.5">
-                            <span>{notice.channels?.name || "공식 채널"}</span>
-                            <span>{dateStr}</span>
-                            <span>조회 {views}</span>
-                          </div>
+                      {/* Right content: Thumbnail */}
+                      {hasImage && thumbnail && (
+                        <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-xl overflow-hidden border border-border/40 shrink-0 shadow-sm">
+                          <img 
+                            src={thumbnail} 
+                            alt="공지 이미지" 
+                            className="w-full h-full object-cover" 
+                          />
+                          {imageUrls.length > 1 && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-extrabold text-[11px] md:text-[13px] select-none tracking-wider">
+                              {imageUrls.length}+
+                            </div>
+                          )}
                         </div>
-
-                        {/* Desktop View Layout */}
-                        <div className="hidden md:grid md:grid-cols-12 gap-4 items-center font-medium">
-                          <div className="col-span-9 flex items-center gap-2">
-                            <span className="shrink-0 text-muted-foreground/60 select-none text-[10px]">●</span>
-                            <span className="text-foreground hover:underline line-clamp-1 flex-1 font-semibold text-[14px]">{notice.title}</span>
-                          </div>
-                          
-                          <div className="col-span-2 text-center text-sm text-muted-foreground">
-                            {dateStr}
-                          </div>
-
-                          <div className="col-span-1 text-center text-sm text-muted-foreground">
-                            {views}
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                      )}
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         )

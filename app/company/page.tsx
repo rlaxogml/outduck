@@ -395,7 +395,7 @@ export default function CompanyPage() {
         <div className="flex flex-col items-center gap-0.5 min-w-0 w-full px-0.5">
           <span className="text-[10px] md:text-xs font-bold text-center truncate w-full leading-tight group-hover:text-foreground transition-colors">{channel.name}</span>
           <span className="text-[8px] md:text-[9px] text-muted-foreground text-center truncate w-full font-medium leading-tight">
-            {channel.type === "youtuber" ? (channel.is_team ? "유튜버 (단체)" : "유튜버") : channel.type === "festival" ? "행사" : "게임"}
+            {channel.type === "youtuber" ? (channel.is_team ? "유튜버 (팀)" : "유튜버") : channel.type === "festival" ? "행사" : "게임"}
           </span>
         </div>
       </div>
@@ -485,16 +485,7 @@ export default function CompanyPage() {
         await fetchPendingRequests(compData.id);
 
         // Fetch all available Teams for individual member affiliation
-        console.log("CompanyPage: Fetching teams...");
-        const { data: allTeamsData } = await supabase
-          .from("channels")
-          .select("id, name")
-          .eq("is_team", true)
-          .order("name");
-
-        if (allTeamsData && isMounted) {
-          setAllTeams(allTeamsData);
-        }
+        await fetchTeams(isMounted);
 
       } catch (err: any) {
         console.error("CompanyPage: Initialization Error:", err);
@@ -537,6 +528,24 @@ export default function CompanyPage() {
       }
     } catch (error) {
       console.error("Error fetching channels and events:", error);
+    }
+  };
+
+  const fetchTeams = async (isMounted?: boolean) => {
+    try {
+      const { data: allTeamsData } = await supabase
+        .from("channels")
+        .select("id, name")
+        .eq("is_team", true)
+        .order("name");
+
+      if (allTeamsData) {
+        if (isMounted === undefined || isMounted) {
+          setAllTeams(allTeamsData);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch teams:", err);
     }
   };
 
@@ -830,6 +839,7 @@ export default function CompanyPage() {
 
       await fetchPendingRequests(company.id);
       await fetchChannelsAndEvents(company.name);
+      await fetchTeams();
     } catch (error: any) {
       console.error("Failed to process request:", error);
       toast.error("오류 발생: " + error.message);
@@ -906,6 +916,7 @@ export default function CompanyPage() {
       setIsCreateOpen(false);
 
       await fetchChannelsAndEvents(company.name);
+      await fetchTeams();
     } catch (err: any) {
       console.error(err);
       toast.error("채널 생성 실패: " + err.message);
@@ -1005,6 +1016,7 @@ export default function CompanyPage() {
       setIsLinksOpen(false);
       if (company) {
         await fetchChannelsAndEvents(company.name);
+        await fetchTeams();
       }
     } catch (e: any) {
       toast.error("이적 처리 실패: " + e.message);
@@ -1071,6 +1083,7 @@ export default function CompanyPage() {
       setIsLinksOpen(false);
       if (company) {
         await fetchChannelsAndEvents(company.name);
+        await fetchTeams();
       }
     } catch (e: any) {
       toast.error("삭제 실패: " + e.message);
@@ -1126,6 +1139,7 @@ export default function CompanyPage() {
       setIsLinksOpen(false);
       if (company) {
         await fetchChannelsAndEvents(company.name);
+        await fetchTeams();
       }
     } catch (err: any) {
       toast.error("정보 저장 실패: " + err.message);
@@ -1684,7 +1698,7 @@ export default function CompanyPage() {
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
                     <SelectItem value="youtuber">유튜버 / 버튜버</SelectItem>
-                    <SelectItem value="youtuber_team">유튜버 단체 팀</SelectItem>
+                    <SelectItem value="youtuber_team">유튜버 팀</SelectItem>
                     <SelectItem value="game">게임</SelectItem>
                     <SelectItem value="festival">축제</SelectItem>
                   </SelectContent>
@@ -1725,7 +1739,7 @@ export default function CompanyPage() {
                         className="h-11 rounded-xl bg-muted/20 border-border/60"
                         autoComplete="off"
                       />
-                      {isTeamSearchFocused && teamSearchText.trim().length > 0 && (
+                      {isTeamSearchFocused && (
                         <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
                           {allTeams.filter(t => t.name.toLowerCase().includes(teamSearchText.toLowerCase())).length > 0 ? (
                             allTeams
@@ -1850,7 +1864,7 @@ export default function CompanyPage() {
             <div>
               <h4 className="text-xl font-black text-foreground">{linksTargetChan?.name}</h4>
               <p className="text-sm text-muted-foreground font-semibold">
-                {linksTargetChan?.type === "youtuber" ? (linksTargetChan?.is_team ? "유튜버 단체 팀 채널" : "유튜버 채널") : linksTargetChan?.type === "festival" ? "행사 채널" : "게임 채널"}
+                {linksTargetChan?.type === "youtuber" ? (linksTargetChan?.is_team ? "유튜버 팀 채널" : "유튜버 채널") : linksTargetChan?.type === "festival" ? "행사 채널" : "게임 채널"}
               </p>
             </div>
           </div>
@@ -1920,7 +1934,7 @@ export default function CompanyPage() {
                       className="h-10 border-neutral-300 dark:border-neutral-700 rounded-xl bg-background text-xs md:text-sm"
                       autoComplete="off"
                     />
-                    {isLinksTeamSearchFocused && linksTeamSearchText.trim().length > 0 && (
+                    {isLinksTeamSearchFocused && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto">
                         {allTeams.filter(t => t.name.toLowerCase().includes(linksTeamSearchText.toLowerCase())).length > 0 ? (
                           allTeams

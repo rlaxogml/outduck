@@ -317,8 +317,19 @@ function CalendarContent() {
           if (highlightId) {
             const highlightEvent = combined.find(e => e.id === highlightId);
             if (highlightEvent && highlightEvent.startDateValue) {
-              setSelectedDate(new Date(highlightEvent.startDateValue));
-              setCurrentMonth(new Date(highlightEvent.startDateValue));
+              const targetDate = new Date(highlightEvent.startDateValue);
+              setSelectedDate((prev) => {
+                if (prev.getTime() !== targetDate.getTime()) {
+                  return targetDate;
+                }
+                return prev;
+              });
+              setCurrentMonth((prev) => {
+                if (prev.getFullYear() !== targetDate.getFullYear() || prev.getMonth() !== targetDate.getMonth()) {
+                  return targetDate;
+                }
+                return prev;
+              });
             }
           }
         }

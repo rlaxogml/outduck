@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { Heart, MapPin, Calendar, Clock, Info, User as UserIcon, X, ChevronDown, ChevronLeft, Link2 } from "lucide-react";
+import { Heart, MapPin, Calendar, Clock, Info, User as UserIcon, X, ChevronDown, ChevronLeft, Link2, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import EventNoticesBoard from "@/components/events/event-notices-board";
@@ -174,7 +174,7 @@ export default function EventDetailPage() {
     if (!user || !event) return false;
     return event.channels.some(ch => {
       if (ch.owner_id === user.id) return true;
-      if (userCompData?.name && ch.company === userCompData.name && !ch.owner_id) return true;
+      if (userCompData?.name && ch.company === userCompData.name) return true;
       return false;
     });
   }, [user, event, userCompData]);

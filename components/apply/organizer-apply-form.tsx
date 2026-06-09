@@ -335,7 +335,7 @@ export function OrganizerApplyForm({ user, onBack, onSuccess }: OrganizerApplyFo
                   <SelectContent className="rounded-xl">
                     <SelectItem value="game">게임</SelectItem>
                     <SelectItem value="youtuber">유튜버</SelectItem>
-                    <SelectItem value="youtuber_team">유튜버 단체 팀</SelectItem>
+                    <SelectItem value="youtuber_team">유튜버 팀</SelectItem>
                     <SelectItem value="festival">축제</SelectItem>
                   </SelectContent>
                 </Select>
