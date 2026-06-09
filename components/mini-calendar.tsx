@@ -18,6 +18,7 @@ interface WeeklyEvent {
   dateStr: string;
   location?: string;
   channels: { id: number; name: string; image_url: string }[];
+  schedules?: any[];
 }
 
 let cachedAllEvents: WeeklyEvent[] | null = null;
@@ -129,7 +130,10 @@ export function MiniCalendar({ user }: { user: User | null }) {
           .select(`
             id, event_id, title, start_date, end_date,
             offline_event_locations(location),
-            events(event_channels(channels(id, name, image_url)))
+            events(
+              event_channels(channels(id, name, image_url)),
+              event_schedules(date, day_of_week, reservation_type)
+            )
           `)
           .lte("start_date", weekEnd)
           .gte("end_date", weekStart);
@@ -187,7 +191,8 @@ export function MiniCalendar({ user }: { user: User | null }) {
           eventType: "offline" as const,
           dateStr: formatOfflineEventDate(e.start_date, e.end_date),
           location: e.offline_event_locations?.[0]?.location || "장소 정보 없음",
-          channels: e.events?.event_channels?.map((c: any) => c.channels).filter(Boolean) || []
+          channels: e.events?.event_channels?.map((c: any) => c.channels).filter(Boolean) || [],
+          schedules: e.events?.event_schedules || []
         }));
 
         const formattedOnline: WeeklyEvent[] = allRawOnline.map((e: any) => {
@@ -252,7 +257,26 @@ export function MiniCalendar({ user }: { user: User | null }) {
     return filteredEvents.filter(e => {
       const start = e.startDateValue;
       const end = e.endDateValue || start;
-      return dateStr >= start && dateStr <= end;
+      const isInRange = dateStr >= start && dateStr <= end;
+      if (!isInRange) return false;
+
+      if (e.schedules && e.schedules.length > 0) {
+        const targetDate = new Date(dateStr);
+        const dayOfWeekMap = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+        const dayOfWeek = dayOfWeekMap[targetDate.getDay()];
+
+        return e.schedules.some((s: any) => {
+          if (s.date && s.date === dateStr) {
+            return s.reservation_type !== "휴무";
+          }
+          if (!s.date && s.day_of_week?.toLowerCase() === dayOfWeek) {
+            return s.reservation_type !== "휴무";
+          }
+          return false;
+        });
+      }
+
+      return true;
     });
   };
 

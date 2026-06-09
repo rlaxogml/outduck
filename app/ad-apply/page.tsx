@@ -283,6 +283,78 @@ export default function AdApplyPage() {
     }
   }, [startDate, endDate, dailyPrice]);
 
+  const [isValidatingSlots, setIsValidatingSlots] = useState(false);
+  const [fullyBookedDates, setFullyBookedDates] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    
+    const checkSlots = async () => {
+      if (!startDate || !endDate || !isDateValid) {
+        setFullyBookedDates([]);
+        return;
+      }
+      
+      setIsValidatingSlots(true);
+      try {
+        const { data, error } = await supabase
+          .from("posters")
+          .select("start_date, end_date")
+          .eq("payment_status", "paid")
+          .is("force_hide", false)
+          .lte("start_date", endDate)
+          .gte("end_date", startDate);
+          
+        if (error) throw error;
+        
+        if (!active) return;
+        
+        const overlappingAds = data || [];
+        const maxSlots = 8;
+        const booked: string[] = [];
+        
+        let tempDate = new Date(startDate);
+        const lastDate = new Date(endDate);
+        
+        tempDate.setHours(0, 0, 0, 0);
+        lastDate.setHours(0, 0, 0, 0);
+        
+        while (tempDate <= lastDate) {
+          const dateStr = tempDate.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+          
+          const adsCount = overlappingAds.filter(ad => {
+            if (!ad.start_date || !ad.end_date) return false;
+            const adStart = ad.start_date.split("T")[0];
+            const adEnd = ad.end_date.split("T")[0];
+            return adStart <= dateStr && adEnd >= dateStr;
+          }).length;
+          
+          if (adsCount >= maxSlots) {
+            booked.push(dateStr);
+          }
+          
+          tempDate.setDate(tempDate.getDate() + 1);
+        }
+        
+        if (active) {
+          setFullyBookedDates(booked);
+        }
+      } catch (err) {
+        console.error("Error checking slots:", err);
+      } finally {
+        if (active) {
+          setIsValidatingSlots(false);
+        }
+      }
+    };
+    
+    checkSlots();
+    
+    return () => {
+      active = false;
+    };
+  }, [startDate, endDate, isDateValid]);
+
   // Handle immediate upload on file select for preview
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -356,6 +428,10 @@ export default function AdApplyPage() {
       toast.error("올바른 광고 기간을 설정해주세요.");
       return;
     }
+    if (fullyBookedDates.length > 0) {
+      toast.error("예약이 마감된 날짜가 포함되어 있습니다.");
+      return;
+    }
 
     setIsSubmitting(true);
     
@@ -388,6 +464,13 @@ export default function AdApplyPage() {
       };
       
       localStorage.setItem(`pending_ad_${orderId}`, JSON.stringify(pendingData));
+
+      // 0원 무료 광고 신청 처리
+      if (totalAmount === 0) {
+        toast.success("무료 광고 신청 처리 중입니다...");
+        router.push(`/ad-apply/success?orderId=${orderId}&amount=0&paymentKey=FREE_${orderId}`);
+        return;
+      }
 
       // Trigger Toss Payments Checkout using USER's test client key
       const clientKey = "test_ck_0RnYX2w5322DlmbX11LN3NeyqApQ";
@@ -637,6 +720,25 @@ export default function AdApplyPage() {
                       onDayChange={setEndDay}
                     />
                   </div>
+
+                  {/* Slot availability check states */}
+                  {isValidatingSlots && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground animate-pulse mt-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                      <span>광고 슬롯 확인 중...</span>
+                    </div>
+                  )}
+
+                  {!isValidatingSlots && fullyBookedDates.length > 0 && (
+                    <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold rounded-xl space-y-1 mt-2 animate-in fade-in duration-200">
+                      <div className="flex items-start gap-1.5">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold">{fullyBookedDates.join(", ")}</span>는 광고 예약이 다 차있어 신청이 불가합니다.
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -674,7 +776,16 @@ export default function AdApplyPage() {
               <CardFooter className="pt-2">
                 <Button 
                   onClick={handlePayment}
-                  disabled={isSubmitting || isUploading || !advertiserName.trim() || !contact.trim() || !imageUrl || !isDateValid}
+                  disabled={
+                    isSubmitting || 
+                    isUploading || 
+                    isValidatingSlots || 
+                    fullyBookedDates.length > 0 || 
+                    !advertiserName.trim() || 
+                    !contact.trim() || 
+                    !imageUrl || 
+                    !isDateValid
+                  }
                   className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-black dark:hover:bg-white/90 font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 group text-sm disabled:opacity-50"
                 >
                   {isSubmitting ? (

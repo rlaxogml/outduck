@@ -63,8 +63,12 @@ const isEventOnDate = (event: any, targetDate: Date) => {
     const dateString = `${calDate.getFullYear()}-${String(calDate.getMonth() + 1).padStart(2, "0")}-${String(calDate.getDate()).padStart(2, "0")}`;
 
     return event.schedules.some((s: any) => {
-      if (s.date && s.date === dateString) return true;
-      if (!s.date && s.day_of_week?.toLowerCase() === dayOfWeek) return true;
+      if (s.date && s.date === dateString) {
+        return s.reservation_type !== "휴무";
+      }
+      if (!s.date && s.day_of_week?.toLowerCase() === dayOfWeek) {
+        return s.reservation_type !== "휴무";
+      }
       return false;
     });
   }
@@ -150,7 +154,8 @@ function CalendarContent() {
               ),
               event_schedules(
                 date,
-                day_of_week
+                day_of_week,
+                reservation_type
               )
             ),
             offline_event_locations (
