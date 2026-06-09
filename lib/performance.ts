@@ -26,13 +26,10 @@ class PerformanceTracker {
 
 export const performanceTracker = new PerformanceTracker();
 
-/**
- * Passes through the execution of the asynchronous function without profiling logs.
- */
 export async function trackPerformance<T>(
   label: string,
   type: PerformanceLog['type'],
-  fn: () => Promise<T>
+  fn: () => PromiseLike<T>
 ): Promise<T> {
   return await fn();
 }

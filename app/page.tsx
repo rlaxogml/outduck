@@ -94,7 +94,7 @@ export default async function Home() {
     .select("*")
     .order("order", { ascending: true });
 
-  const measureServerQuery = async <T,>(label: string, promise: Promise<T>) => {
+  const measureServerQuery = async <T,>(label: string, promise: PromiseLike<T>) => {
     const s = performance.now();
     try {
       const res = await promise;
