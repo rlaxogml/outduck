@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
-import { Star, Calendar, ShoppingBag, Link2, Settings2, ChevronDown, ChevronUp, Plus, Pencil } from "lucide-react";
+import { Star, Calendar, ShoppingBag, Link2, Settings2, ChevronDown, ChevronUp, Plus, Pencil, Loader2 } from "lucide-react";
 import { EventCard } from "@/components/event-card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ChannelSettingsCard } from "@/app/settings/page";
@@ -387,8 +387,9 @@ export default function ChannelProfilePage() {
 
   if (isLoading) {
     return (
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
-        <div className="text-sm text-muted-foreground">채널 정보를 불러오는 중...</div>
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 flex flex-col items-center justify-center min-h-[300px]">
+        <Loader2 className="w-10 h-10 animate-spin text-primary opacity-80" />
+        <span className="sr-only">채널 정보를 불러오는 중...</span>
       </main>
     );
   }

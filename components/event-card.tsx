@@ -242,7 +242,7 @@ export function EventCard({
         </div>
 
         {channels && channels.length > 0 && (
-          <div className="absolute -bottom-[18px] sm:-bottom-4 md:-bottom-5 left-3 md:left-6" ref={popupRef}>
+          <div className="absolute -bottom-6 sm:-bottom-4 md:-bottom-5 left-3 md:left-6" ref={popupRef}>
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -253,23 +253,23 @@ export function EventCard({
                   setShowChannels(!showChannels);
                 }
               }}
-              className="flex items-center -space-x-3.5 md:-space-x-6 transition-transform hover:scale-105 active:scale-95"
+              className="flex items-center -space-x-5 sm:-space-x-3.5 md:-space-x-6 transition-transform hover:scale-105 active:scale-95"
             >
               {channels.slice(0, 3).map((channel, i) => (
                 <Avatar
                   key={i}
-                  className={`relative w-9 h-9 sm:w-10 sm:h-10 md:w-14 md:h-14 border border-border sm:border-2 sm:border-black/60 bg-muted ${i === 2 ? "hidden md:inline-flex" : ""}`}
+                  className={`relative w-12 h-12 sm:w-10 sm:h-10 md:w-14 md:h-14 border border-border sm:border-2 sm:border-black/60 bg-muted ${i === 2 ? "hidden md:inline-flex" : ""}`}
                   style={{ zIndex: 10 - i }}
                 >
                   <AvatarImage src={channel.image_url || undefined} alt={channel.name} className="object-cover" />
-                  <AvatarFallback className="text-[10px] sm:text-xs font-bold text-muted-foreground bg-muted">
+                  <AvatarFallback className="text-xs sm:text-xs font-bold text-muted-foreground bg-muted">
                     {channel.name.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
               ))}
               {channels.length > 2 && (
                 <div
-                  className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-border sm:border-2 sm:border-black/60 bg-secondary flex md:hidden items-center justify-center text-[10px] sm:text-xs font-bold text-secondary-foreground"
+                  className="relative w-12 h-12 sm:w-10 sm:h-10 rounded-full border border-border sm:border-2 sm:border-black/60 bg-secondary flex md:hidden items-center justify-center text-xs sm:text-xs font-bold text-secondary-foreground"
                   style={{ zIndex: 0 }}
                 >
                   +{channels.length - 2}
@@ -318,7 +318,7 @@ export function EventCard({
         className={cn(
           "flex flex-col justify-center",
           channels && channels.length > 0
-            ? "pt-[28px] pb-3 pr-3 pl-3 sm:pt-[clamp(0.35rem,0.9vw,0.6rem)] sm:pb-[clamp(0.2rem,0.6vw,0.4rem)] sm:px-[clamp(0.6rem,1.5vw,1rem)]"
+            ? "pt-[30px] pb-3 pr-3 pl-3 sm:pt-[clamp(0.35rem,0.9vw,0.6rem)] sm:pb-[clamp(0.2rem,0.6vw,0.4rem)] sm:px-[clamp(0.6rem,1.5vw,1rem)]"
             : "pt-3 pl-3 pb-3 pr-3 sm:pt-[clamp(0.3rem,0.8vw,0.5rem)] sm:pb-[clamp(0.2rem,0.6vw,0.4rem)] sm:px-[clamp(0.6rem,1.5vw,1rem)]"
         )}
       >

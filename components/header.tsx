@@ -255,7 +255,25 @@ export function Header() {
   const [recentChannels, setRecentChannels] = useState<ChannelSearchItem[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [showNoResultsMessage, setShowNoResultsMessage] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const activeSearchRequestIdRef = useRef(0);
+
+  // Close mobile search on navigation
+  useEffect(() => {
+    setIsMobileSearchOpen(false);
+    setSearchText("");
+  }, [pathname]);
+
+  // Focus mobile search input when opened
+  useEffect(() => {
+    if (isMobileSearchOpen && mobileSearchInputRef.current) {
+      const timer = setTimeout(() => {
+        mobileSearchInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isMobileSearchOpen]);
   const noResultsTimerRef = useRef<number | null>(null);
   const querySearchText = sanitizeSearchText(searchText)
     .replace(/\s+/g, " ")
@@ -673,6 +691,18 @@ export function Header() {
 
             {user ? (
               <div className="flex items-center gap-2 md:gap-3">
+                {/* Mobile Search Toggle Button */}
+                <button
+                  onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+                  className={cn(
+                    "p-2 rounded-full hover:bg-muted transition-colors block md:hidden",
+                    isMobileSearchOpen ? "bg-muted text-primary" : "text-slate-700 dark:text-slate-300"
+                  )}
+                  aria-label="검색창 열기"
+                >
+                  <Search className="w-5 h-5" />
+                </button>
+
                 {/* Notification Dropdown */}
                 <DropdownMenu open={isNotifDropdownOpen} onOpenChange={handleDropdownOpen}>
                   <DropdownMenuTrigger asChild>
@@ -753,114 +783,134 @@ export function Header() {
                 </DropdownMenu>
               </div>
             ) : (
-              <Button
-                variant="ghost"
-                className="text-xs md:text-sm font-medium"
-                onClick={handleGoogleLogin}
-              >
-                로그인
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* Mobile Search Toggle Button */}
+                <button
+                  onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+                  className={cn(
+                    "p-2 rounded-full hover:bg-muted transition-colors block md:hidden",
+                    isMobileSearchOpen ? "bg-muted text-primary" : "text-slate-700 dark:text-slate-300"
+                  )}
+                  aria-label="검색창 열기"
+                >
+                  <Search className="w-5 h-5" />
+                </button>
+
+                <Button
+                  variant="ghost"
+                  className="text-xs md:text-sm font-medium"
+                  onClick={handleGoogleLogin}
+                >
+                  로그인
+                </Button>
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Mobile Search Bar Row */}
-      {(pathname === "/" || pathname === "/subscriptions" || pathname === "/bookmarks") && (
-        <div className="border-b border-border/50 bg-transparent px-3.5 py-2 block md:hidden">
-          <div className="relative w-full max-w-lg mx-auto">
-            <div className="relative flex w-full items-center">
-              <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
-              <input
-                type="text"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                onKeyDown={handleSearchInputKeyDown}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => {
-                  window.setTimeout(() => {
-                    setIsSearchFocused(false);
-                  }, 120);
-                }}
-                placeholder="채널명을 검색해보세요"
-                className="h-10 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
-              />
-            </div>
+      {/* Mobile Search Bar Row (Collapsible/Slide-down) */}
+      <div
+        className={cn(
+          "border-b border-border/50 bg-transparent px-3.5 block md:hidden overflow-hidden transition-all duration-300 ease-in-out",
+          isMobileSearchOpen 
+            ? "max-h-[60px] opacity-100 py-2 border-b border-border/50" 
+            : "max-h-0 opacity-0 py-0 border-b-0 pointer-events-none"
+        )}
+      >
+        <div className="relative w-full max-w-lg mx-auto">
+          <div className="relative flex w-full items-center">
+            <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
+            <input
+              ref={mobileSearchInputRef}
+              type="text"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              onKeyDown={handleSearchInputKeyDown}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => {
+                window.setTimeout(() => {
+                  setIsSearchFocused(false);
+                }, 120);
+              }}
+              placeholder="채널명을 검색해보세요"
+              className="h-10 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
+            />
+          </div>
 
-            {isSearchFocused && (
-              <div className="absolute top-[48px] left-0 right-0 z-[100] w-full rounded-2xl border border-border bg-background p-2 shadow-xl">
-                {displayedChannels.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    {hasTypedInput
-                      ? showNoResultsMessage
-                        ? "검색 결과가 없습니다."
-                        : "검색 결과를 확인하는 중..."
-                      : "최근 검색한 채널이 없습니다."}
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {!hasTypedInput && displayedChannels.length > 0 && (
-                      <div className="flex items-center justify-between px-3 pt-1 pb-2">
-                        <span className="text-sm font-semibold">최근 검색</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearRecentChannels();
-                          }}
-                          className="text-xs text-muted-foreground hover:text-destructive"
-                        >
-                          모두 지우기
-                        </button>
-                      </div>
-                    )}
-                    <ul className="flex gap-3 overflow-x-auto p-1 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                      {displayedChannels.map((channel) => (
-                        <li
-                          key={channel.id}
-                          className="relative min-w-[100px] flex-shrink-0 group"
-                        >
-                          {!hasTypedInput && (
-                            <button
-                              type="button"
-                              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-background hover:text-foreground group-hover:opacity-100"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeRecentChannel(channel.id);
-                              }}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
+          {isSearchFocused && (
+            <div className="absolute top-[48px] left-0 right-0 z-[100] w-full rounded-2xl border border-border bg-background p-2 shadow-xl">
+              {displayedChannels.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  {hasTypedInput
+                    ? showNoResultsMessage
+                      ? "검색 결과가 없습니다."
+                      : "검색 결과를 확인하는 중..."
+                    : "최근 검색한 채널이 없습니다."}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {!hasTypedInput && displayedChannels.length > 0 && (
+                    <div className="flex items-center justify-between px-3 pt-1 pb-2">
+                      <span className="text-sm font-semibold">최근 검색</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearRecentChannels();
+                        }}
+                        className="text-xs text-muted-foreground hover:text-destructive"
+                      >
+                        모두 지우기
+                      </button>
+                    </div>
+                  )}
+                  <ul className="flex gap-3 overflow-x-auto p-1 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {displayedChannels.map((channel) => (
+                      <li
+                        key={channel.id}
+                        className="relative min-w-[100px] flex-shrink-0 group"
+                      >
+                        {!hasTypedInput && (
                           <button
                             type="button"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => handleChannelSelect(channel)}
-                            className="w-full rounded-xl border border-border p-2.5 text-center hover:bg-muted transition-colors"
+                            className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-background hover:text-foreground group-hover:opacity-100"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeRecentChannel(channel.id);
+                            }}
                           >
-                            <Avatar className="mx-auto mb-2 h-10 w-10 border border-border">
-                              <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
-                              <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
-                                {getChannelInitial(channel.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="truncate text-[13px] font-medium">
-                              {channel.name}
-                            </div>
-                            <div className="mt-0.5 text-[10.5px] text-muted-foreground">
-                              {renderChannelType(channel.type)}
-                            </div>
+                            <X className="h-3 w-3" />
                           </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                        )}
+                        <button
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handleChannelSelect(channel)}
+                          className="w-full rounded-xl border border-border p-2.5 text-center hover:bg-muted transition-colors"
+                        >
+                          <Avatar className="mx-auto mb-2 h-10 w-10 border border-border">
+                            <AvatarImage src={channel.image_url ?? undefined} alt={`${channel.name} 프로필`} className="object-cover" />
+                            <AvatarFallback className="bg-muted text-xs font-semibold text-foreground">
+                              {getChannelInitial(channel.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="truncate text-[13px] font-medium">
+                            {channel.name}
+                          </div>
+                          <div className="mt-0.5 text-[10.5px] text-muted-foreground">
+                            {renderChannelType(channel.type)}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Navigation Container */}
       <div className="border-t border-border bg-background w-full relative hidden md:block">

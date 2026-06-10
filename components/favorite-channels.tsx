@@ -274,7 +274,7 @@ export function FavoriteChannels({ user }: { user: any }) {
         <div className="flex items-center p-3 border-b border-border">
           <div className="h-4 bg-muted-foreground/30 rounded w-24" />
         </div>
-        <div className="p-4 pt-4 flex gap-4 overflow-x-auto no-scrollbar">
+        <div className="px-3.5 py-3 md:p-4 flex gap-4 overflow-x-auto no-scrollbar">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex flex-col items-center gap-2 min-w-[56px] md:min-w-[80px]">
               <div className="relative w-14 h-14 md:w-20 md:h-20">
@@ -282,7 +282,7 @@ export function FavoriteChannels({ user }: { user: any }) {
               </div>
               <div className="flex flex-col items-center gap-1.5 mt-0.5">
                 <div className="h-3 bg-muted-foreground/20 rounded w-12 md:w-16" />
-                <div className="h-2.5 bg-muted-foreground/20 rounded w-8 md:w-10" />
+                <div className="hidden md:block h-2.5 bg-muted-foreground/20 rounded w-8 md:w-10 mt-0.5" />
               </div>
             </div>
           ))}
@@ -302,9 +302,9 @@ export function FavoriteChannels({ user }: { user: any }) {
         <span className="font-semibold text-sm">관심 채널 &gt;&gt;</span>
       </Link>
 
-      <div className={`p-4 pt-4 pb-4 flex gap-x-3 md:gap-x-4 gap-y-4 md:gap-y-6 relative ${isExpanded ? "flex-wrap pr-4" : "flex-nowrap overflow-x-auto no-scrollbar pr-0"}`}>
+      <div className={`px-3.5 py-3 md:p-4 flex gap-x-3 md:gap-x-4 gap-y-4 md:gap-y-6 relative ${isExpanded ? "flex-wrap pr-4" : "flex-nowrap overflow-x-auto no-scrollbar pr-0"}`}>
         {channels.length === 0 ? (
-          <div className="w-full h-[120px] flex flex-col items-center justify-center">
+          <div className="w-full h-[100px] md:h-[120px] flex flex-col items-center justify-center">
             {hasTimedOut ? (
               <>
                 <p className="text-sm font-medium text-foreground">관심 채널 정보를 불러오는 중입니다...</p>
@@ -337,7 +337,7 @@ export function FavoriteChannels({ user }: { user: any }) {
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                   <span className="text-[10px] md:text-xs font-medium text-center truncate w-14 md:w-20 leading-tight">{channel.name}</span>
-                  <span className="text-[8px] md:text-[10px] text-muted-foreground text-center truncate w-14 md:w-20 leading-tight">{getChannelTypeText(channel.type)}</span>
+                  <span className="hidden md:block text-[8px] md:text-[10px] text-muted-foreground text-center truncate w-14 md:w-20 leading-tight">{getChannelTypeText(channel.type)}</span>
                 </div>
               </Link>
             ))}

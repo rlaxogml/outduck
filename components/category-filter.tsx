@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,25 +26,74 @@ export function CategoryFilter({
   sortType,
   onSortChange,
 }: CategoryFilterProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsExpanded(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 py-3 px-4 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-30">
-      <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 md:pb-0">
-        <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+      <div 
+        ref={containerRef}
+        className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 md:pb-0"
+      >
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-full border transition-all font-semibold shrink-0 cursor-pointer",
+            isExpanded 
+              ? "bg-slate-200 dark:bg-slate-800 border-slate-300 text-foreground" 
+              : "bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-primary"
+          )}
+        >
+          <Filter className="h-3.5 w-3.5" />
+          <span>필터</span>
+        </button>
+
         <div className="flex items-center gap-2">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              className={cn(
-                "px-2.5 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-full border transition-all whitespace-nowrap",
-                activeCategory === category.id
-                  ? "bg-primary text-primary-foreground border-primary font-semibold shadow-sm"
-                  : "bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-primary"
-              )}
-              onClick={() => onCategoryChange(category.id)}
-            >
-              {category.label}
-            </button>
-          ))}
+          {/* Always visible: Active Category */}
+          <button
+            className={cn(
+              "px-2.5 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-full border transition-all font-semibold shadow-sm whitespace-nowrap cursor-pointer",
+              "bg-primary text-primary-foreground border-primary"
+            )}
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {categories.find((c) => c.id === activeCategory)?.label || "전체"}
+          </button>
+
+          {/* Collapsible container for other categories */}
+          <div
+            className={cn(
+              "flex items-center gap-2 transition-all duration-300 ease-in-out origin-left",
+              isExpanded 
+                ? "max-w-[500px] opacity-100 scale-100" 
+                : "max-w-0 opacity-0 scale-95 pointer-events-none overflow-hidden"
+            )}
+          >
+            {categories
+              .filter((c) => c.id !== activeCategory)
+              .map((category) => (
+                <button
+                  key={category.id}
+                  className="px-2.5 py-1 md:px-3 md:py-1.5 text-xs md:text-sm rounded-full border bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-all whitespace-nowrap cursor-pointer"
+                  onClick={() => {
+                    onCategoryChange(category.id);
+                    setIsExpanded(false);
+                  }}
+                >
+                  {category.label}
+                </button>
+              ))}
+          </div>
         </div>
       </div>
 
