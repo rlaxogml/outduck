@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { cn } from "@/lib/utils";
@@ -25,16 +25,27 @@ let cachedAllEvents: WeeklyEvent[] | null = null;
 let cachedBookmarkedEventIds: number[] | null = null;
 let cachedSubscribedChannelIds: number[] | null = null;
 
-export function MiniCalendar({ user }: { user: User | null }) {
+export function MiniCalendar({
+  user,
+  initialEvents = [],
+  initialBookmarks = [],
+  initialSubscribedChannelIds = [],
+}: {
+  user: User | null;
+  initialEvents?: WeeklyEvent[];
+  initialBookmarks?: number[];
+  initialSubscribedChannelIds?: number[];
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [allEvents, setAllEvents] = useState<WeeklyEvent[]>(cachedAllEvents || []);
-  const [bookmarkedEventIds, setBookmarkedEventIds] = useState<number[]>(cachedBookmarkedEventIds || []);
-  const [subscribedChannelIds, setSubscribedChannelIds] = useState<number[]>(cachedSubscribedChannelIds || []);
+  const [allEvents, setAllEvents] = useState<WeeklyEvent[]>(() => cachedAllEvents || initialEvents);
+  const [bookmarkedEventIds, setBookmarkedEventIds] = useState<number[]>(() => cachedBookmarkedEventIds || initialBookmarks);
+  const [subscribedChannelIds, setSubscribedChannelIds] = useState<number[]>(() => cachedSubscribedChannelIds || initialSubscribedChannelIds);
   const [activeFilter, setActiveFilter] = useState<"all" | "subscribed" | "bookmarked">("all");
-  const [loading, setLoading] = useState(cachedAllEvents === null);
+  const [loading, setLoading] = useState(() => cachedAllEvents === null && initialEvents.length === 0);
   const [mounted, setMounted] = useState(false);
   const [hasTimedOut, setHasTimedOut] = useState(false);
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
     if (user) {
@@ -79,8 +90,28 @@ export function MiniCalendar({ user }: { user: User | null }) {
   const weekStart = sortedWeekDates[0].toLocaleDateString("sv-SE");
   const weekEnd = sortedWeekDates[6].toLocaleDateString("sv-SE");
 
+  const [initWeekStart] = useState(() => weekStart);
+  const [initWeekEnd] = useState(() => weekEnd);
+
   useEffect(() => {
-    console.log("MiniCalendar: Fetching weekly events...", { weekStart, weekEnd, hasUser: !!user });
+    setBookmarkedEventIds(initialBookmarks);
+  }, [initialBookmarks]);
+
+  useEffect(() => {
+    setSubscribedChannelIds(initialSubscribedChannelIds);
+  }, [initialSubscribedChannelIds]);
+
+  useEffect(() => {
+    // Skip fetching if we are on the initial week and initial pre-fetched events are provided
+    const isInitialWeek = weekStart === initWeekStart && weekEnd === initWeekEnd;
+    const skipFetch = isInitialWeek && initialEvents.length > 0;
+
+    if (skipFetch) {
+      console.log("MiniCalendar: Using initial pre-fetched weekly events, skipping DB call.");
+      return;
+    }
+
+    console.log("MiniCalendar: Fetching weekly events from Supabase...", { weekStart, weekEnd, hasUser: !!user });
     let ignore = false;
     const safetyTimeout = setTimeout(() => {
       if (!ignore) {

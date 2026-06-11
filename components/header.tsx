@@ -73,6 +73,7 @@ export function Header() {
   };
 
   const [user, setUser] = useState<User | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Notification states & hooks
   type Notification = {
@@ -449,12 +450,18 @@ export function Header() {
   }, []);
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
+    setIsLoggingIn(true);
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+    } catch (error) {
+      console.error("Login redirect failed:", error);
+      setIsLoggingIn(false);
+    }
   };
 
 
@@ -800,7 +807,9 @@ export function Header() {
                   variant="ghost"
                   className="text-xs md:text-sm font-medium"
                   onClick={handleGoogleLogin}
+                  disabled={isLoggingIn}
                 >
+                  {isLoggingIn && <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />}
                   로그인
                 </Button>
               </div>

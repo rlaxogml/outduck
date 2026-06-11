@@ -17,7 +17,6 @@ export function RegisterServerTimings({ timings }: { timings: ServerTiming[] }) 
 
     timings.forEach(t => {
       performanceTracker.addLog({
-        id: `server-${t.label}-${Date.now()}`,
         label: t.label,
         duration: t.duration,
         type: 'server'

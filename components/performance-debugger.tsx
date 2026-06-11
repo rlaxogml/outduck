@@ -22,10 +22,8 @@ export function PerformanceDebugger() {
     total: number;
   } | null>(null);
 
-  // Clear logs when navigating to a different page/route
-  useEffect(() => {
-    performanceTracker.clear();
-  }, [pathname]);
+  // No longer clearing on pathname change to prevent race condition.
+  // We filter logs dynamically by the current route instead.
 
   useEffect(() => {
     const handleLoad = () => {
@@ -80,24 +78,26 @@ export function PerformanceDebugger() {
   }, []);
 
   const filteredLogs = useMemo(() => {
-    if (activeFilter === 'all') return logs;
-    return logs.filter(log => log.type === activeFilter);
-  }, [logs, activeFilter]);
+    const pageLogs = logs.filter(log => !log.pathname || log.pathname === pathname);
+    if (activeFilter === 'all') return pageLogs;
+    return pageLogs.filter(log => log.type === activeFilter);
+  }, [logs, activeFilter, pathname]);
 
   const stats = useMemo(() => {
-    if (logs.length === 0) return { total: 0, server: 0, client: 0, count: 0 };
+    const pageLogs = logs.filter(log => !log.pathname || log.pathname === pathname);
+    if (pageLogs.length === 0) return { total: 0, server: 0, client: 0, count: 0 };
     
     // Server total is max of parallel queries plus sequential ones
-    const serverLogs = logs.filter(l => l.type === 'server');
+    const serverLogs = pageLogs.filter(l => l.type === 'server');
     const serverMax = serverLogs.length > 0 ? Math.max(...serverLogs.map(l => l.duration)) : 0;
     
-    const clientLogs = logs.filter(l => l.type === 'client');
+    const clientLogs = pageLogs.filter(l => l.type === 'client');
     const clientMax = clientLogs.length > 0 ? Math.max(...clientLogs.map(l => l.duration)) : 0;
 
-    const authLogs = logs.filter(l => l.type === 'auth');
+    const authLogs = pageLogs.filter(l => l.type === 'auth');
     const authMax = authLogs.filter(l => l.duration > 0).length > 0 ? Math.max(...authLogs.map(l => l.duration)) : 0;
 
-    const apiLogs = logs.filter(l => l.type === 'api');
+    const apiLogs = pageLogs.filter(l => l.type === 'api');
     const apiMax = apiLogs.filter(l => l.duration > 0).length > 0 ? Math.max(...apiLogs.map(l => l.duration)) : 0;
 
     // Estimate total real-world loading wait time:
@@ -110,9 +110,9 @@ export function PerformanceDebugger() {
       total: totalTime,
       server: serverMax,
       client: clientTime,
-      count: logs.length
+      count: pageLogs.length
     };
-  }, [logs]);
+  }, [logs, pathname]);
 
   if (!isVisible) return null;
 

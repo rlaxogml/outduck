@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import RichTextEditor from "./rich-text-editor";
 import { CommentsSection } from "@/components/events/comments-section";
+import { trackPerformance } from "@/lib/performance";
 
 interface ChannelInfo {
   id: number;
@@ -91,36 +92,24 @@ export default function EventNoticesBoard({
     if (isNoticesLoaded || !eventId) return;
     setIsNoticesLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('channel_notices')
-        .select('*, channels(name, image_url)')
-        .eq('event_id', eventId)
-        .order('created_at', { ascending: false });
+      const { data, error } = await trackPerformance("공지사항 목록 조회 (Client)", "client", () =>
+        supabase
+          .from('channel_notices')
+          .select('*, channels(name, image_url), comments(count)')
+          .eq('event_id', eventId)
+          .order('created_at', { ascending: false })
+      );
 
       if (error) throw error;
       
-      if (data && data.length > 0) {
-        const noticeIds = data.map(n => n.id);
-        const { data: commentsData } = await supabase
-          .from('comments')
-          .select('id, notice_id')
-          .in('notice_id', noticeIds);
-
-        const countsMap: Record<number, number> = {};
-        commentsData?.forEach(c => {
-          if (c.notice_id) {
-            countsMap[c.notice_id] = (countsMap[c.notice_id] || 0) + 1;
-          }
-        });
-
+      if (data) {
         const noticesWithComments = data.map(n => ({
           ...n,
-          commentsCount: countsMap[n.id] || 0
+          commentsCount: n.comments?.[0]?.count || 0
         }));
-
         setNotices(noticesWithComments);
       } else {
-        setNotices(data || []);
+        setNotices([]);
       }
     } catch (e) {
       console.error(e);

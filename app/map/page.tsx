@@ -772,7 +772,6 @@ function MapContent() {
                 const duration = performance.now() - mapInitStartTime;
                 console.log(`%c[Perf Client] CLIENT - 카카오 지도 및 마커 초기화 완료: ${duration.toFixed(1)}ms`, "color: #10b981; font-weight: bold;");
                 performanceTracker.addLog({
-                  id: `map-init-${Date.now()}`,
                   label: "카카오 지도 및 마커 초기화 완료 (Client)",
                   duration,
                   type: 'client'

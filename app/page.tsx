@@ -1,6 +1,5 @@
 import { HomeClient } from "@/components/home-client";
 import { createClient } from "@supabase/supabase-js";
-import { RegisterServerTimings } from "@/components/register-server-timings";
 
 export const revalidate = 60; // ISR cache revalidation every 60 seconds
 
@@ -28,6 +27,29 @@ const imageColors = [
   "bg-gradient-to-br from-red-400 to-red-600",
 ];
 
+const getWeekDates = (baseDate: Date) => {
+  const dates = [];
+  const day = baseDate.getDay(); // 0 = Sun
+  
+  if (day === 0) {
+    for (let i = 1; i <= 6; i++) {
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() + i);
+      dates.push(d);
+    }
+    dates.push(new Date(baseDate));
+    return dates;
+  }
+
+  const diff = baseDate.getDate() - day + 1; 
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(baseDate);
+    d.setDate(diff + i);
+    dates.push(d);
+  }
+  return dates;
+};
+
 export default async function Home() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,6 +58,13 @@ export default async function Home() {
   );
 
   const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+
+  const [year, month, day] = todayStr.split("-").map(Number);
+  const baseDate = new Date(year, month - 1, day);
+  const weekDates = getWeekDates(baseDate);
+  const sortedWeekDates = [...weekDates].sort((a, b) => a.getTime() - b.getTime());
+  const weekStart = sortedWeekDates[0].toLocaleDateString("sv-SE");
+  const weekEnd = sortedWeekDates[6].toLocaleDateString("sv-SE");
 
   const offlineQuery = supabase
     .from("offline_events")
@@ -94,6 +123,28 @@ export default async function Home() {
     .select("*")
     .order("order", { ascending: true });
 
+  const weeklyOfflineQuery = supabase
+    .from("offline_events")
+    .select(`
+      id, event_id, title, start_date, end_date,
+      offline_event_locations(location),
+      events(
+        event_channels(channels(id, name, image_url)),
+        event_schedules(date, day_of_week, reservation_type)
+      )
+    `)
+    .lte("start_date", weekEnd)
+    .gte("end_date", weekStart);
+
+  const weeklyOnlineQuery = supabase
+    .from("online_events")
+    .select(`
+      id, event_id, title, start_at, end_at,
+      events(event_channels(channels(id, name, image_url)))
+    `)
+    .lte("start_at", weekEnd)
+    .or(`end_at.gte.${weekStart},end_at.is.null`);
+
   const measureServerQuery = async <T,>(label: string, promise: PromiseLike<T>) => {
     const s = performance.now();
     try {
@@ -109,20 +160,26 @@ export default async function Home() {
     }
   };
 
-  const [offlineRes, onlineRes, posterRes] = await Promise.all([
+  const [offlineRes, onlineRes, posterRes, weeklyOfflineRes, weeklyOnlineRes] = await Promise.all([
     measureServerQuery("홈 오프라인 행사 조회 (Server)", offlineQuery),
     measureServerQuery("홈 온라인 행사 조회 (Server)", onlineQuery),
     measureServerQuery("홈 포스터 광고 조회 (Server)", posterQuery),
+    measureServerQuery("홈 주간 오프라인 일정 조회 (Server)", weeklyOfflineQuery),
+    measureServerQuery("홈 주간 온라인 일정 조회 (Server)", weeklyOnlineQuery),
   ]);
 
   const offlineData = offlineRes.res.data;
   const onlineData = onlineRes.res.data;
   const posterData = posterRes.res.data;
+  const weeklyOfflineData = weeklyOfflineRes.res.data || [];
+  const weeklyOnlineData = weeklyOnlineRes.res.data || [];
 
   const serverTimings = [
     { label: offlineRes.label, duration: offlineRes.duration },
     { label: onlineRes.label, duration: onlineRes.duration },
     { label: posterRes.label, duration: posterRes.duration },
+    { label: weeklyOfflineRes.label, duration: weeklyOfflineRes.duration },
+    { label: weeklyOnlineRes.label, duration: weeklyOnlineRes.duration },
   ];
 
   const formatEventDate = (start: string | null, end: string | null) => {
@@ -235,13 +292,60 @@ export default async function Home() {
     });
   }
 
+  // Format weekly events
+  const formatWeeklyOfflineEventDate = (start: string, end: string | null) => {
+    return end
+      ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
+      : start?.replaceAll("-", ".") ?? "상시";
+  };
+
+  const formatWeeklyOnlineEventDate = (start: string | null, end: string | null) => {
+    if (!start) return "상시";
+    const parseDate = (dStr: string) => {
+      const d = new Date(dStr);
+      return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+    };
+    return end ? `${parseDate(start)} ~ ${parseDate(end)}` : parseDate(start);
+  };
+
+  const weeklyOfflineEvents = weeklyOfflineData.map((e: any) => ({
+    id: e.id,
+    baseEventId: e.event_id,
+    title: e.title,
+    startDateValue: e.start_date,
+    endDateValue: e.end_date,
+    eventType: "offline" as const,
+    dateStr: formatWeeklyOfflineEventDate(e.start_date, e.end_date),
+    location: e.offline_event_locations?.[0]?.location || "장소 정보 없음",
+    channels: e.events?.event_channels?.map((c: any) => c.channels).filter(Boolean) || [],
+    schedules: e.events?.event_schedules || []
+  }));
+
+  const weeklyOnlineEvents = weeklyOnlineData.map((e: any) => {
+    const sDate = e.start_at ? new Date(e.start_at).toLocaleDateString("sv-SE") : null;
+    const eDate = e.end_at ? new Date(e.end_at).toLocaleDateString("sv-SE") : null;
+    return {
+      id: e.id,
+      baseEventId: e.event_id,
+      title: e.title,
+      startDateValue: sDate || "",
+      endDateValue: eDate,
+      eventType: "online" as const,
+      dateStr: formatWeeklyOnlineEventDate(e.start_at, e.end_at),
+      location: "온라인",
+      channels: e.events?.event_channels?.map((c: any) => c.channels).filter(Boolean) || []
+    };
+  }).filter((e: any) => e.startDateValue !== "");
+
+  const weeklyEvents = [...weeklyOfflineEvents, ...weeklyOnlineEvents];
+
   return (
     <>
-      <RegisterServerTimings timings={serverTimings} />
       <HomeClient 
         initialOfflineEvents={offlineEvents} 
         initialOnlineEvents={onlineEvents} 
         initialPosters={posters}
+        initialWeeklyEvents={weeklyEvents}
       />
     </>
   );

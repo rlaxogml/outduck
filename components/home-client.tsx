@@ -37,9 +37,15 @@ interface HomeClientProps {
   initialOfflineEvents: Event[];
   initialOnlineEvents: Event[];
   initialPosters?: any[];
+  initialWeeklyEvents?: any[];
 }
 
-export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialPosters = [] }: HomeClientProps) {
+export function HomeClient({
+  initialOfflineEvents,
+  initialOnlineEvents,
+  initialPosters = [],
+  initialWeeklyEvents = [],
+}: HomeClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
   const [activeCategory, setActiveCategory] = useState("all");
@@ -50,6 +56,8 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
   const [user, setUser] = useState<User | null>(null);
   const [isCompanyUser, setIsCompanyUser] = useState(false);
   const [isHostUser, setIsHostUser] = useState(false);
+  const [userBookmarks, setUserBookmarks] = useState<number[]>([]);
+  const [userFavorites, setUserFavorites] = useState<any[] | null>(null);
   const [visibleCount, setVisibleCount] = useState(10);
 
   // Reset visible count when filters change
@@ -98,55 +106,64 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
   useEffect(() => {
     if (!user) {
       setIsCompanyUser(false);
+      setIsHostUser(false);
+      setUserBookmarks([]);
+      setUserFavorites(null);
       return;
     }
 
     let isMounted = true;
-    const checkCompanyUser = async (userId: string) => {
-      console.log("HomeClient: Checking if user is a company user:", userId);
+    
+    const loadUserData = async (userId: string) => {
+      console.log("HomeClient: Initiating parallel user data queries...");
       try {
-        const { data } = await trackPerformance(
-          "회사 파트너 계정 확인 (Client)",
-          "client",
-          () => supabase
-            .from("companies")
-            .select("id")
-            .eq("user_id", userId)
-            .maybeSingle()
-        );
+        const [companyRes, hostRes, bookmarksRes, favoritesRes] = await Promise.all([
+          trackPerformance(
+            "회사 파트너 계정 확인 (Client)",
+            "client",
+            () => supabase.from("companies").select("id").eq("user_id", userId).maybeSingle()
+          ),
+          trackPerformance(
+            "주최자 계정 확인 (Client)",
+            "client",
+            () => supabase.from("channels").select("id").eq("owner_id", userId).limit(1).maybeSingle()
+          ),
+          trackPerformance(
+            "미니 캘린더/관심채널 북마크 통합 조회 (Client)",
+            "client",
+            () => supabase.from("event_bookmarks").select("event_id").eq("user_id", userId)
+          ),
+          trackPerformance(
+            "관심 채널 목록 통합 조회 (Client)",
+            "client",
+            () => supabase.from("favorites")
+              .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
+              .eq("user_id", userId)
+              .order("created_at", { ascending: false })
+          ),
+        ]);
 
-        console.log("HomeClient: Company check complete. User has company account:", !!data);
-        if (data && isMounted) {
+        if (!isMounted) return;
+
+        if (companyRes.data) {
           setIsCompanyUser(true);
         }
-      } catch (err) {
-        console.error("HomeClient: Company user check failed:", err);
-      }
-    };
-
-    const checkHostUser = async (userId: string) => {
-      try {
-        const { data } = await trackPerformance(
-          "주최자 계정 확인 (Client)",
-          "client",
-          () => supabase
-            .from("channels")
-            .select("id")
-            .eq("owner_id", userId)
-            .limit(1)
-            .maybeSingle()
-        );
-
-        if (data && isMounted) {
+        if (hostRes.data) {
           setIsHostUser(true);
         }
+        if (bookmarksRes.data) {
+          const bms = bookmarksRes.data.map(d => d.event_id).filter(Boolean);
+          setUserBookmarks(bms);
+        }
+        if (favoritesRes.data) {
+          setUserFavorites(favoritesRes.data);
+        }
       } catch (err) {
-        console.error("HomeClient: Host user check failed:", err);
+        console.error("HomeClient: Failed to load user data:", err);
       }
     };
 
-    checkCompanyUser(user.id);
-    checkHostUser(user.id);
+    loadUserData(user.id);
 
     return () => {
       isMounted = false;
@@ -311,10 +328,19 @@ export function HomeClient({ initialOfflineEvents, initialOnlineEvents, initialP
           )}
 
           {/* Favorite Channels */}
-          <FavoriteChannels user={user} />
+          <FavoriteChannels
+            user={user}
+            initialFavorites={userFavorites}
+            userBookmarks={userBookmarks}
+          />
 
           {/* Mini Calendar Section */}
-          <MiniCalendar user={user} />
+          <MiniCalendar
+            user={user}
+            initialEvents={initialWeeklyEvents}
+            initialBookmarks={userBookmarks}
+            initialSubscribedChannelIds={(userFavorites || []).map(f => f.channel_id).filter(Boolean)}
+          />
 
           {/* Tabs */}
           <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />

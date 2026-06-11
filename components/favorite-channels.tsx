@@ -31,10 +31,42 @@ function getChannelTypeText(type: string | null) {
 
 let cachedChannels: Channel[] | null = null;
 
-export function FavoriteChannels({ user }: { user: any }) {
-  const [channels, setChannels] = useState<Channel[]>(cachedChannels || []);
+export function FavoriteChannels({
+  user,
+  initialFavorites,
+  userBookmarks = [],
+}: {
+  user: any;
+  initialFavorites?: any[] | null;
+  userBookmarks?: number[];
+}) {
+  const [channels, setChannels] = useState<Channel[]>(() => {
+    if (cachedChannels) return cachedChannels;
+    if (initialFavorites && initialFavorites.length > 0) {
+      return initialFavorites.map((fav: any) => {
+        const ch = fav.channels;
+        return {
+          id: ch?.id,
+          name: ch?.name || "기타",
+          type: ch?.type,
+          image_url: ch?.image_url || null,
+          team_id: ch?.team_id,
+          is_team: ch?.is_team || false,
+          activeEventCount: undefined,
+          favoriteCreatedAt: fav.created_at,
+          relatedChannelIds: ch?.id ? [ch.id] : []
+        };
+      }).filter(c => c.id !== undefined);
+    }
+    return [];
+  });
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isLoading, setIsLoading] = useState(cachedChannels === null);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (cachedChannels) return false;
+    if (initialFavorites === null) return true;
+    if (initialFavorites === undefined) return true;
+    return false;
+  });
   const [mounted, setMounted] = useState(false);
   const [hasTimedOut, setHasTimedOut] = useState(false);
 
@@ -60,60 +92,85 @@ export function FavoriteChannels({ user }: { user: any }) {
 
     const checkAuthAndProgressiveFetch = async () => {
       try {
-        // 부모 컴포넌트에서 user={user}로 내려오므로 세션 확인 단계를 과감히 삭제하여 Waterfall 방지
         const currentUser = user;
         if (!currentUser) return;
 
-        if (isMounted && cachedChannels) {
-          setChannels(cachedChannels);
-          setIsLoading(false);
-        } else if (isMounted) {
-          setIsLoading(true);
+        let initialChannels: (Channel & { team_id?: number | null; is_team?: boolean; relatedChannelIds?: number[] })[] = [];
+
+        if (Array.isArray(initialFavorites)) {
+          initialChannels = initialFavorites.map((fav: any) => {
+            const ch = fav.channels;
+            return {
+              id: ch?.id,
+              name: ch?.name || "기타",
+              type: ch?.type,
+              image_url: ch?.image_url || null,
+              team_id: ch?.team_id,
+              is_team: ch?.is_team || false,
+              activeEventCount: undefined,
+              favoriteCreatedAt: fav.created_at,
+              relatedChannelIds: ch?.id ? [ch.id] : []
+            };
+          }).filter(c => c.id !== undefined);
+          
+          if (isMounted) {
+            setChannels(initialChannels);
+            setIsLoading(false);
+            clearTimeout(safetyTimeout);
+          }
+        } else if (initialFavorites === null) {
+          return;
+        } else {
+          if (isMounted && cachedChannels) {
+            setChannels(cachedChannels);
+            setIsLoading(false);
+            initialChannels = cachedChannels;
+          } else {
+            if (isMounted) setIsLoading(true);
+
+            console.log("FavoriteChannels: Fetching initial channel metadata for user:", currentUser.id);
+            
+            const { data: favoritesData, error: favError } = await trackPerformance(
+              "관심 채널 목록 조회 (Client)",
+              "client",
+              () => supabase
+                .from("favorites")
+                .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
+                .eq("user_id", currentUser.id)
+                .order("created_at", { ascending: false })
+            );
+
+            if (favError) {
+              console.error("FavoriteChannels: Error fetching favorites:", favError);
+              throw favError;
+            }
+
+            if (!isMounted) return;
+
+            initialChannels = (favoritesData || []).map((fav: any) => {
+              const ch = fav.channels;
+              return {
+                id: ch?.id,
+                name: ch?.name || "기타",
+                type: ch?.type,
+                image_url: ch?.image_url || null,
+                team_id: ch?.team_id,
+                is_team: ch?.is_team || false,
+                activeEventCount: undefined,
+                favoriteCreatedAt: fav.created_at,
+                relatedChannelIds: ch?.id ? [ch.id] : []
+              };
+            }).filter(c => c.id !== undefined);
+
+            cachedChannels = initialChannels;
+            setChannels(initialChannels);
+            setIsLoading(false);
+            clearTimeout(safetyTimeout);
+          }
         }
 
-        console.log("FavoriteChannels: Fetching initial channel metadata for user:", currentUser.id);
-        
-        // 1단계: 초고속 단일 조회 (소속 관계 매핑을 위해 team_id, is_team 추가 조회)
-        const { data: favoritesData, error: favError } = await trackPerformance(
-          "관심 채널 목록 조회 (Client)",
-          "client",
-          () => supabase
-            .from("favorites")
-            .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
-            .eq("user_id", currentUser.id)
-            .order("created_at", { ascending: false })
-        );
-
-        if (favError) {
-          console.error("FavoriteChannels: Error fetching favorites:", favError);
-          throw favError;
-        }
-
-        if (!isMounted) return;
-
-        // 메타데이터 매핑 및 렌더링 시작
-        const initialChannels: (Channel & { team_id?: number | null; is_team?: boolean; relatedChannelIds?: number[] })[] = (favoritesData || []).map((fav: any) => {
-          const ch = fav.channels;
-          return {
-            id: ch?.id,
-            name: ch?.name || "기타",
-            type: ch?.type,
-            image_url: ch?.image_url || null,
-            team_id: ch?.team_id,
-            is_team: ch?.is_team || false,
-            activeEventCount: undefined, // 배지는 백그라운드 로드
-            favoriteCreatedAt: fav.created_at,
-            relatedChannelIds: ch?.id ? [ch.id] : []
-          };
-        }).filter(c => c.id !== undefined);
-
-        // [핵심 최적화] 소속사 멤버/뱃지 계산을 기다리지 않고 즉시 렌더링!
-        cachedChannels = initialChannels;
-        setChannels(initialChannels);
-        setIsLoading(false);
-        clearTimeout(safetyTimeout);
-
-        // --- 화면이 뜬 상태에서 백그라운드로 도는 작업 ---
+        // --- 백그라운드 작업 ---
+        if (initialChannels.length === 0) return;
         
         // 소속 팀 채널들의 멤버 채널 목록 수집
         const teamIds = initialChannels.filter(c => c.is_team).map(c => c.id);
@@ -145,16 +202,18 @@ export function FavoriteChannels({ user }: { user: any }) {
           }
         });
 
-        // 연관 채널들의 고유 ID 목록 추출
         const allQueryChannelIds = Array.from(new Set(
           initialChannels.flatMap(c => c.relatedChannelIds || [])
         ));
 
-        // 2단계: 백그라운드에서 조용히 활성 행사 개수(Red Badge) 및 북마크 매핑 병렬 계산
         if (allQueryChannelIds.length > 0) {
           const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
           
-          const [{ data: eventsData }, { data: bookmarksData }] = await Promise.all([
+          // 2단계: 백그라운드에서 조용히 활성 행사 개수(Red Badge) 및 북마크 매핑 병렬 계산
+          // 만약 부모로부터 bookmarks 목록(userBookmarks)을 받았다면 event_bookmarks 조회 생략!
+          const hasUserBookmarks = userBookmarks && userBookmarks.length > 0;
+          
+          const [{ data: eventsData }, bookmarksData] = await Promise.all([
             trackPerformance(
               "관심 채널 활성 행사 개수 조회 (Client)",
               "client",
@@ -170,21 +229,24 @@ export function FavoriteChannels({ user }: { user: any }) {
                 `)
                 .in("channel_id", allQueryChannelIds)
             ),
-            trackPerformance(
-              "관심 채널 북마크 매핑 조회 (Client)",
-              "client",
-              () => supabase
-                .from("event_bookmarks")
-                .select("event_id")
-                .eq("user_id", currentUser.id)
-            ),
+            hasUserBookmarks
+              ? Promise.resolve({ data: null })
+              : trackPerformance(
+                  "관심 채널 북마크 매핑 조회 (Client)",
+                  "client",
+                  () => supabase
+                    .from("event_bookmarks")
+                    .select("event_id")
+                    .eq("user_id", currentUser.id)
+                ),
           ]);
 
           if (!isMounted) return;
 
-          const bookmarkedEventIds = new Set((bookmarksData || []).map(b => b.event_id).filter(Boolean));
+          const bookmarkedEventIds = hasUserBookmarks 
+            ? new Set(userBookmarks)
+            : new Set((bookmarksData.data || []).map((b: any) => b.event_id).filter(Boolean));
           
-          // 채널별 활성 행사 매핑 수집
           const channelActiveEventsMap: Record<number, { eventId: number; isBookmarked: boolean }[]> = {};
 
           (eventsData || []).forEach((ec: any) => {
@@ -216,7 +278,6 @@ export function FavoriteChannels({ user }: { user: any }) {
             }
           });
 
-          // 채널 상태 업데이트 (연관 채널의 행사 개수를 수집하되 co-host 중복 제거)
           setChannels(prev => {
             const updated = prev.map(ch => {
               const extraCh = ch as any;
@@ -228,7 +289,6 @@ export function FavoriteChannels({ user }: { user: any }) {
                 allRelatedEvents.push(...evs);
               });
 
-              // eventId 기준 중복 제거 및 수치 합산
               const seenEventIds = new Set<number>();
               let uniqueActiveCount = 0;
               let hasBookmarkedEvent = false;
@@ -264,7 +324,7 @@ export function FavoriteChannels({ user }: { user: any }) {
       isMounted = false;
       clearTimeout(safetyTimeout);
     };
-  }, [user, mounted]);
+  }, [user, mounted, initialFavorites]);
 
   if (!user) return null;
 
