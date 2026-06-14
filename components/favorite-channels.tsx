@@ -11,7 +11,6 @@ type Channel = {
   type: string | null;
   image_url: string | null;
   activeEventCount?: number;
-  hasBookmarkedEvent?: boolean;
   latestEventCreatedAt?: string;
   favoriteCreatedAt?: string;
 };
@@ -34,11 +33,9 @@ let cachedChannels: Channel[] | null = null;
 export function FavoriteChannels({
   user,
   initialFavorites,
-  userBookmarks = [],
 }: {
   user: any;
   initialFavorites?: any[] | null;
-  userBookmarks?: number[];
 }) {
   const [channels, setChannels] = useState<Channel[]>(() => {
     if (cachedChannels) return cachedChannels;
@@ -209,45 +206,26 @@ export function FavoriteChannels({
         if (allQueryChannelIds.length > 0) {
           const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
           
-          // 2단계: 백그라운드에서 조용히 활성 행사 개수(Red Badge) 및 북마크 매핑 병렬 계산
-          // 만약 부모로부터 bookmarks 목록(userBookmarks)을 받았다면 event_bookmarks 조회 생략!
-          const hasUserBookmarks = userBookmarks && userBookmarks.length > 0;
-          
-          const [{ data: eventsData }, bookmarksData] = await Promise.all([
-            trackPerformance(
-              "관심 채널 활성 행사 개수 조회 (Client)",
-              "client",
-              () => supabase
-                .from("event_channels")
-                .select(`
-                  channel_id,
-                  events!inner (
-                    id,
-                    offline_events(id, end_date),
-                    online_events(id, end_at)
-                  )
-                `)
-                .in("channel_id", allQueryChannelIds)
-            ),
-            hasUserBookmarks
-              ? Promise.resolve({ data: null })
-              : trackPerformance(
-                  "관심 채널 북마크 매핑 조회 (Client)",
-                  "client",
-                  () => supabase
-                    .from("event_bookmarks")
-                    .select("event_id")
-                    .eq("user_id", currentUser.id)
-                ),
-          ]);
+          // 2단계: 백그라운드에서 조용히 활성 행사 개수(Red Badge) 계산
+          const { data: eventsData } = await trackPerformance(
+            "관심 채널 활성 행사 개수 조회 (Client)",
+            "client",
+            () => supabase
+              .from("event_channels")
+              .select(`
+                channel_id,
+                events!inner (
+                  id,
+                  offline_events(id, end_date),
+                  online_events(id, end_at)
+                )
+              `)
+              .in("channel_id", allQueryChannelIds)
+          );
 
           if (!isMounted) return;
 
-          const bookmarkedEventIds = hasUserBookmarks 
-            ? new Set(userBookmarks)
-            : new Set((bookmarksData.data || []).map((b: any) => b.event_id).filter(Boolean));
-          
-          const channelActiveEventsMap: Record<number, { eventId: number; isBookmarked: boolean }[]> = {};
+          const channelActiveEventsMap: Record<number, number[]> = {};
 
           (eventsData || []).forEach((ec: any) => {
             const ev = ec.events;
@@ -271,10 +249,7 @@ export function FavoriteChannels({
               if (!channelActiveEventsMap[ec.channel_id]) {
                 channelActiveEventsMap[ec.channel_id] = [];
               }
-              channelActiveEventsMap[ec.channel_id].push({
-                eventId: ev.id,
-                isBookmarked: bookmarkedEventIds.has(ev.id)
-              });
+              channelActiveEventsMap[ec.channel_id].push(ev.id);
             }
           });
 
@@ -283,30 +258,17 @@ export function FavoriteChannels({
               const extraCh = ch as any;
               const relatedIds: number[] = extraCh.relatedChannelIds || [ch.id];
               
-              const allRelatedEvents: { eventId: number; isBookmarked: boolean }[] = [];
+              const allRelatedEventIds: number[] = [];
               relatedIds.forEach(rid => {
                 const evs = channelActiveEventsMap[rid] || [];
-                allRelatedEvents.push(...evs);
+                allRelatedEventIds.push(...evs);
               });
 
-              const seenEventIds = new Set<number>();
-              let uniqueActiveCount = 0;
-              let hasBookmarkedEvent = false;
-
-              allRelatedEvents.forEach(e => {
-                if (!seenEventIds.has(e.eventId)) {
-                  seenEventIds.add(e.eventId);
-                  uniqueActiveCount++;
-                  if (e.isBookmarked) {
-                    hasBookmarkedEvent = true;
-                  }
-                }
-              });
+              const uniqueActiveCount = new Set(allRelatedEventIds).size;
 
               return {
                 ...ch,
-                activeEventCount: uniqueActiveCount,
-                hasBookmarkedEvent
+                activeEventCount: uniqueActiveCount
               };
             });
             cachedChannels = updated;

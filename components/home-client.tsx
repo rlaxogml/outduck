@@ -115,52 +115,66 @@ export function HomeClient({
     let isMounted = true;
     
     const loadUserData = async (userId: string) => {
-      console.log("HomeClient: Initiating parallel user data queries...");
-      try {
-        const [companyRes, hostRes, bookmarksRes, favoritesRes] = await Promise.all([
-          trackPerformance(
-            "회사 파트너 계정 확인 (Client)",
-            "client",
-            () => supabase.from("companies").select("id").eq("user_id", userId).maybeSingle()
-          ),
-          trackPerformance(
-            "주최자 계정 확인 (Client)",
-            "client",
-            () => supabase.from("channels").select("id").eq("owner_id", userId).limit(1).maybeSingle()
-          ),
-          trackPerformance(
-            "미니 캘린더/관심채널 북마크 통합 조회 (Client)",
-            "client",
-            () => supabase.from("event_bookmarks").select("event_id").eq("user_id", userId)
-          ),
-          trackPerformance(
-            "관심 채널 목록 통합 조회 (Client)",
-            "client",
-            () => supabase.from("favorites")
-              .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
-              .eq("user_id", userId)
-              .order("created_at", { ascending: false })
-          ),
-        ]);
+      console.log("HomeClient: Initiating independent user data queries...");
 
-        if (!isMounted) return;
-
-        if (companyRes.data) {
+      // 1. 회사 파트너 계정 확인
+      trackPerformance(
+        "회사 파트너 계정 확인 (Client)",
+        "client",
+        () => supabase.from("companies").select("id").eq("user_id", userId).maybeSingle()
+      ).then(res => {
+        if (isMounted && res.data) {
           setIsCompanyUser(true);
         }
-        if (hostRes.data) {
+      }).catch(err => {
+        console.error("HomeClient: Failed to check company status:", err);
+      });
+
+      // 2. 주최자 계정 확인
+      trackPerformance(
+        "주최자 계정 확인 (Client)",
+        "client",
+        () => supabase.from("channels").select("id").eq("owner_id", userId).limit(1).maybeSingle()
+      ).then(res => {
+        if (isMounted && res.data) {
           setIsHostUser(true);
         }
-        if (bookmarksRes.data) {
-          const bms = bookmarksRes.data.map(d => d.event_id).filter(Boolean);
+      }).catch(err => {
+        console.error("HomeClient: Failed to check host status:", err);
+      });
+
+      // 3. 미니 캘린더/관심채널 북마크 통합 조회
+      trackPerformance(
+        "미니 캘린더/관심채널 북마크 통합 조회 (Client)",
+        "client",
+        () => supabase.from("event_bookmarks").select("event_id").eq("user_id", userId)
+      ).then(res => {
+        if (isMounted && res.data) {
+          const bms = res.data.map(d => d.event_id).filter(Boolean);
           setUserBookmarks(bms);
         }
-        if (favoritesRes.data) {
-          setUserFavorites(favoritesRes.data);
+      }).catch(err => {
+        console.error("HomeClient: Failed to fetch bookmarks:", err);
+      });
+
+      // 4. 관심 채널 목록 통합 조회
+      trackPerformance(
+        "관심 채널 목록 통합 조회 (Client)",
+        "client",
+        () => supabase.from("favorites")
+          .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+      ).then(res => {
+        if (isMounted) {
+          setUserFavorites(res.data || []);
         }
-      } catch (err) {
-        console.error("HomeClient: Failed to load user data:", err);
-      }
+      }).catch(err => {
+        console.error("HomeClient: Failed to fetch favorites:", err);
+        if (isMounted) {
+          setUserFavorites([]); // 에러 발생 시에도 빈 배열로 초기화하여 스켈레톤을 해제합니다.
+        }
+      });
     };
 
     loadUserData(user.id);
@@ -331,7 +345,6 @@ export function HomeClient({
           <FavoriteChannels
             user={user}
             initialFavorites={userFavorites}
-            userBookmarks={userBookmarks}
           />
 
           {/* Mini Calendar Section */}
