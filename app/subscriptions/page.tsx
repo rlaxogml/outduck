@@ -184,9 +184,19 @@ export default function SubscriptionsPage() {
           .in("channel_id", channelIds);
 
         const formatEventDate = (start: string, end: string | null) => {
-          return end
-            ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
-            : start?.replaceAll("-", ".") ?? "상시";
+          if (!start) return "상시";
+          const startPt = start.replaceAll("-", ".").split("T")[0];
+          const endPt = end ? end.replaceAll("-", ".").split("T")[0] : null;
+          if (startPt === endPt || !endPt) {
+            const parts = startPt.split(".");
+            if (parts.length === 3) {
+              const month = parseInt(parts[1], 10);
+              const day = parseInt(parts[2], 10);
+              return `${month}월 ${day}일`;
+            }
+            return startPt;
+          }
+          return `${startPt} - ${endPt}`;
         };
 
         const formatOnlineEventDate = (start: string | null, end: string | null) => {
@@ -200,8 +210,21 @@ export default function SubscriptionsPage() {
           };
 
           const startFormatted = formatDate(start);
-          if (!end) return startFormatted;
+          if (!end) {
+            const d = new Date(start);
+            if (!isNaN(d.getTime())) {
+              return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+            }
+            return startFormatted;
+          }
           const endFormatted = formatDate(end);
+          if (startFormatted === endFormatted) {
+            const d = new Date(start);
+            if (!isNaN(d.getTime())) {
+              return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+            }
+            return startFormatted;
+          }
           return `${startFormatted} ~ ${endFormatted}`;
         };
 

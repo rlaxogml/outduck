@@ -216,9 +216,18 @@ function MapContent() {
 
             const formatEventDate = (start: string | null, end: string | null) => {
               if (!start) return "상시";
-              return end
-                ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
-                : start.replaceAll("-", ".");
+              const startPt = start.replaceAll("-", ".").split("T")[0];
+              const endPt = end ? end.replaceAll("-", ".").split("T")[0] : null;
+              if (startPt === endPt || !endPt) {
+                const parts = startPt.split(".");
+                if (parts.length === 3) {
+                  const month = parseInt(parts[1], 10);
+                  const day = parseInt(parts[2], 10);
+                  return `${month}월 ${day}일`;
+                }
+                return startPt;
+              }
+              return `${startPt} - ${endPt}`;
             };
 
             return {

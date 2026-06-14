@@ -769,6 +769,19 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
     if (!end) return <div className="font-semibold text-[15px]">{startFormatted}</div>;
     
     const endFormatted = formatDate(end);
+    if (startFormatted === endFormatted) return <div className="font-semibold text-[15px]">{startFormatted}</div>;
+
+    const startParts = startFormatted.split(" ");
+    const endParts = endFormatted.split(" ");
+    if (startParts.slice(0, 2).join(" ") === endParts.slice(0, 2).join(" ")) {
+      // Same day, different times: e.g. "2026.07.11 (토) 13:00 ~ 15:00"
+      return (
+        <div className="flex flex-col text-[15px] font-semibold leading-snug text-foreground">
+          <span>{startFormatted} ~ {endParts[2]}</span>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col text-[15px] font-semibold leading-snug text-foreground">
         <span>{startFormatted} ~</span>

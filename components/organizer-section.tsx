@@ -157,9 +157,19 @@ export function OrganizerSection({ user }: { user: User | null }) {
         ]);
 
         const formatEventDate = (start: string | null, end: string | null) => {
-          return end
-            ? `${start?.replaceAll("-", ".").split("T")[0] ?? ""} - ${end.replaceAll("-", ".").split("T")[0]}`
-            : start?.replaceAll("-", ".").split("T")[0] ?? "상시";
+          if (!start) return "상시";
+          const startPt = start.replaceAll("-", ".").split("T")[0];
+          const endPt = end ? end.replaceAll("-", ".").split("T")[0] : null;
+          if (startPt === endPt || !endPt) {
+            const parts = startPt.split(".");
+            if (parts.length === 3) {
+              const month = parseInt(parts[1], 10);
+              const day = parseInt(parts[2], 10);
+              return `${month}월 ${day}일`;
+            }
+            return startPt;
+          }
+          return `${startPt} - ${endPt}`;
         };
 
         const getCategory = (type?: string) => {

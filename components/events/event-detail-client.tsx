@@ -421,13 +421,13 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
 
   const formatEventPeriod = (start: string, end: string | null) => {
     if (isPastEvent) {
-      if (end) {
+      if (end && start !== end) {
         return `${formatDateWithYear(start)} ~ ${formatDateWithYear(end)}`;
       }
       return start ? formatDateWithYear(start) : "상시 진행";
     }
 
-    if (end) {
+    if (end && start !== end) {
       return `${formatDateNoYear(start)} ~ ${formatDateNoYear(end)}`;
     }
     return start ? formatDateNoYear(start) : "상시 진행";

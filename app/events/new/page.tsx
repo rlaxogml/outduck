@@ -72,12 +72,12 @@ export default function NewEventPage() {
   const [endTimeMin, setEndTimeMin] = useState("");
   const [reservationType, setReservationType] = useState("자유 입장");
   const [showResSchedule, setShowResSchedule] = useState(false);
-  const [resStartYear, setResStartYear] = useState("");
+  const [resStartYear, setResStartYear] = useState(currentYear);
   const [resStartMonth, setResStartMonth] = useState("");
   const [resStartDay, setResStartDay] = useState("");
   const [resStartHour, setResStartHour] = useState("");
   const [resStartMin, setResStartMin] = useState("");
-  const [resEndYear, setResEndYear] = useState("");
+  const [resEndYear, setResEndYear] = useState(currentYear);
   const [resEndMonth, setResEndMonth] = useState("");
   const [resEndDay, setResEndDay] = useState("");
   const [resEndHour, setResEndHour] = useState("");
@@ -154,7 +154,7 @@ export default function NewEventPage() {
       ...prev,
       {
         id: Math.random().toString(36).substr(2, 9),
-        year: "", month: "", day: "",
+        year: currentYear, month: "", day: "",
         openHour: "", openMin: "",
         closeHour: "", closeMin: "",
         reservationType: "자유 입장"
@@ -308,13 +308,13 @@ export default function NewEventPage() {
 
   // Online specific schedule states
   const [isOnlineAlways, setIsOnlineAlways] = useState(false);
-  const [onlineStartYear, setOnlineStartYear] = useState("");
+  const [onlineStartYear, setOnlineStartYear] = useState(currentYear);
   const [onlineStartMonth, setOnlineStartMonth] = useState("");
   const [onlineStartDay, setOnlineStartDay] = useState("");
   const [onlineStartHour, setOnlineStartHour] = useState("");
   const [onlineStartMin, setOnlineStartMin] = useState("");
 
-  const [onlineEndYear, setOnlineEndYear] = useState("");
+  const [onlineEndYear, setOnlineEndYear] = useState(currentYear);
   const [onlineEndMonth, setOnlineEndMonth] = useState("");
   const [onlineEndDay, setOnlineEndDay] = useState("");
   const [onlineEndHour, setOnlineEndHour] = useState("");

@@ -199,9 +199,19 @@ export function MiniCalendar({
         });
 
         const formatOfflineEventDate = (start: string, end: string | null) => {
-          return end
-            ? `${start.replaceAll("-", ".")} - ${end.replaceAll("-", ".")}`
-            : start?.replaceAll("-", ".") ?? "상시";
+          if (!start) return "상시";
+          const startPt = start.replaceAll("-", ".").split("T")[0];
+          const endPt = end ? end.replaceAll("-", ".").split("T")[0] : null;
+          if (startPt === endPt || !endPt) {
+            const parts = startPt.split(".");
+            if (parts.length === 3) {
+              const month = parseInt(parts[1], 10);
+              const day = parseInt(parts[2], 10);
+              return `${month}월 ${day}일`;
+            }
+            return startPt;
+          }
+          return `${startPt} - ${endPt}`;
         };
 
         const formatOnlineEventDate = (start: string | null, end: string | null) => {
@@ -210,7 +220,24 @@ export function MiniCalendar({
             const d = new Date(dStr);
             return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
           };
-          return end ? `${parseDate(start)} ~ ${parseDate(end)}` : parseDate(start);
+          
+          const startFormatted = parseDate(start);
+          if (!end) {
+            const d = new Date(start);
+            if (!isNaN(d.getTime())) {
+              return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+            }
+            return startFormatted;
+          }
+          const endFormatted = parseDate(end);
+          if (startFormatted === endFormatted) {
+            const d = new Date(start);
+            if (!isNaN(d.getTime())) {
+              return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+            }
+            return startFormatted;
+          }
+          return `${startFormatted} ~ ${endFormatted}`;
         };
 
         const formattedOffline: WeeklyEvent[] = allRawOffline.map((e: any) => ({
