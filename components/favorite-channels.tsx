@@ -94,6 +94,8 @@ export function FavoriteChannels({
 
         let initialChannels: (Channel & { team_id?: number | null; is_team?: boolean; relatedChannelIds?: number[] })[] = [];
 
+        const cacheKey = `outduck-favorites-${currentUser.id}`;
+
         if (Array.isArray(initialFavorites)) {
           initialChannels = initialFavorites.map((fav: any) => {
             const ch = fav.channels;
@@ -112,10 +114,25 @@ export function FavoriteChannels({
           
           if (isMounted) {
             setChannels(initialChannels);
+            localStorage.setItem(cacheKey, JSON.stringify(initialChannels));
             setIsLoading(false);
             clearTimeout(safetyTimeout);
           }
         } else if (initialFavorites === null) {
+          if (isMounted) {
+            const cachedData = localStorage.getItem(cacheKey);
+            if (cachedData) {
+              try {
+                const parsed = JSON.parse(cachedData);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setChannels(parsed);
+                  setIsLoading(false);
+                }
+              } catch (e) {
+                console.error("Failed to parse cached favorites:", e);
+              }
+            }
+          }
           return;
         } else {
           if (isMounted && cachedChannels) {
@@ -124,6 +141,21 @@ export function FavoriteChannels({
             initialChannels = cachedChannels;
           } else {
             if (isMounted) setIsLoading(true);
+
+            // Try loading from localStorage first in case memory cache is empty
+            if (isMounted) {
+              const cachedData = localStorage.getItem(cacheKey);
+              if (cachedData) {
+                try {
+                  const parsed = JSON.parse(cachedData);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    setChannels(parsed);
+                    setIsLoading(false);
+                    initialChannels = parsed;
+                  }
+                } catch (e) {}
+              }
+            }
 
             console.log("FavoriteChannels: Fetching initial channel metadata for user:", currentUser.id);
             
@@ -161,6 +193,7 @@ export function FavoriteChannels({
 
             cachedChannels = initialChannels;
             setChannels(initialChannels);
+            localStorage.setItem(cacheKey, JSON.stringify(initialChannels));
             setIsLoading(false);
             clearTimeout(safetyTimeout);
           }
@@ -207,50 +240,73 @@ export function FavoriteChannels({
           const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
           
           // 2단계: 백그라운드에서 조용히 활성 행사 개수(Red Badge) 계산
-          const { data: eventsData } = await trackPerformance(
+          // DB 날짜 인덱스를 활용하기 위해, 날짜 필터를 걸어 active 행사만 직접 조회하는 병렬 쿼리로 최적화
+          const offlinePromise = supabase
+            .from("offline_events")
+            .select(`
+              id,
+              end_date,
+              events!inner (
+                id,
+                event_channels!inner (
+                  channel_id
+                )
+              )
+            `)
+            .or(`end_date.gte.${todayStr},end_date.is.null`)
+            .in("events.event_channels.channel_id", allQueryChannelIds);
+
+          const onlinePromise = supabase
+            .from("online_events")
+            .select(`
+              id,
+              end_at,
+              events!inner (
+                id,
+                event_channels!inner (
+                  channel_id
+                )
+              )
+            `)
+            .or(`end_at.gte.${todayStr},end_at.is.null`)
+            .in("events.event_channels.channel_id", allQueryChannelIds);
+
+          const [offlineRes, onlineRes] = await trackPerformance(
             "관심 채널 활성 행사 개수 조회 (Client)",
             "client",
-            () => supabase
-              .from("event_channels")
-              .select(`
-                channel_id,
-                events!inner (
-                  id,
-                  offline_events(id, end_date),
-                  online_events(id, end_at)
-                )
-              `)
-              .in("channel_id", allQueryChannelIds)
+            () => Promise.all([offlinePromise, onlinePromise])
           );
 
           if (!isMounted) return;
 
           const channelActiveEventsMap: Record<number, number[]> = {};
 
-          (eventsData || []).forEach((ec: any) => {
-            const ev = ec.events;
-            if (!ev) return;
+          // 오프라인 이벤트 가공
+          (offlineRes.data || []).forEach((item: any) => {
+            const evId = item.events?.id;
+            const channelsList = item.events?.event_channels || [];
+            if (!evId) return;
 
-            let isEventActive = false;
-            if (ev.offline_events && ev.offline_events.length > 0) {
-              const off = ev.offline_events[0];
-              if (!off.end_date || off.end_date >= todayStr) {
-                isEventActive = true;
-              }
-            } else if (ev.online_events && ev.online_events.length > 0) {
-              const on = ev.online_events[0];
-              const endAtDate = on.end_at ? on.end_at.split("T")[0] : null;
-              if (!endAtDate || endAtDate >= todayStr) {
-                isEventActive = true;
-              }
-            }
-
-            if (isEventActive) {
+            channelsList.forEach((ec: any) => {
               if (!channelActiveEventsMap[ec.channel_id]) {
                 channelActiveEventsMap[ec.channel_id] = [];
               }
-              channelActiveEventsMap[ec.channel_id].push(ev.id);
-            }
+              channelActiveEventsMap[ec.channel_id].push(evId);
+            });
+          });
+
+          // 온라인 이벤트 가공
+          (onlineRes.data || []).forEach((item: any) => {
+            const evId = item.events?.id;
+            const channelsList = item.events?.event_channels || [];
+            if (!evId) return;
+
+            channelsList.forEach((ec: any) => {
+              if (!channelActiveEventsMap[ec.channel_id]) {
+                channelActiveEventsMap[ec.channel_id] = [];
+              }
+              channelActiveEventsMap[ec.channel_id].push(evId);
+            });
           });
 
           setChannels(prev => {
@@ -272,6 +328,7 @@ export function FavoriteChannels({
               };
             });
             cachedChannels = updated;
+            localStorage.setItem(cacheKey, JSON.stringify(updated));
             return updated;
           });
         }

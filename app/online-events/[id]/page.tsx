@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import { OnlineEventDetailClient, type OnlineEventDetail } from "@/components/events/online-event-detail-client";
@@ -5,22 +6,38 @@ import { RegisterServerTimings } from "@/components/register-server-timings";
 
 export const revalidate = 0; // Dynamic rendering for online event details
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const eventId = Number(id);
-  if (isNaN(eventId)) return {};
-
+const getOnlineEvent = cache(async (eventId: number) => {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { persistSession: false } }
   );
 
-  const { data } = await supabase
+  const start = performance.now();
+  const res = await supabase
     .from("online_events")
-    .select("title, description")
+    .select(`
+      id, event_id, title, description, start_at, end_at, image_url, links,
+      events (
+        event_channels ( channels ( id, name, type, image_url, owner_id, company ) )
+      )
+    `)
     .eq("id", eventId)
     .maybeSingle();
+
+  const duration = performance.now() - start;
+  const color = duration > 500 ? '\x1b[31m' : duration > 150 ? '\x1b[33m' : '\x1b[32m';
+  console.log(`${color}[Perf Server] SERVER - 온라인 행사 상세 조회 (Server): ${duration.toFixed(1)}ms\x1b[0m`);
+
+  return { ...res, duration };
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const eventId = Number(id);
+  if (isNaN(eventId)) return {};
+
+  const { data } = await getOnlineEvent(eventId);
 
   if (!data) return { title: "온라인 행사를 찾을 수 없습니다 - 아웃덕" };
 
@@ -37,27 +54,7 @@ export default async function OnlineEventDetailPage({ params }: { params: Promis
     notFound();
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false } }
-  );
-
-  const start = performance.now();
-  const { data, error } = await supabase
-    .from("online_events")
-    .select(`
-      id, event_id, title, description, start_at, end_at, image_url, links,
-      events (
-        event_channels ( channels ( id, name, type, image_url, owner_id, company ) )
-      )
-    `)
-    .eq("id", eventId)
-    .maybeSingle();
-
-  const duration = performance.now() - start;
-  const color = duration > 500 ? '\x1b[31m' : duration > 150 ? '\x1b[33m' : '\x1b[32m';
-  console.log(`${color}[Perf Server] SERVER - 온라인 행사 상세 조회 (Server): ${duration.toFixed(1)}ms\x1b[0m`);
+  const { data, error, duration } = await getOnlineEvent(eventId);
 
   if (error || !data) {
     notFound();

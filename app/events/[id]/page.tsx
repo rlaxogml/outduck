@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import { EventDetailClient, type EventDetail } from "@/components/events/event-detail-client";
@@ -5,38 +6,7 @@ import { RegisterServerTimings } from "@/components/register-server-timings";
 
 export const revalidate = 0; // Dynamic rendering for event details
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const eventId = Number(id);
-  if (isNaN(eventId)) return {};
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false } }
-  );
-
-  const { data } = await supabase
-    .from("offline_events")
-    .select("title, description")
-    .eq("id", eventId)
-    .maybeSingle();
-
-  if (!data) return { title: "행사를 찾을 수 없습니다 - 아웃덕" };
-
-  return {
-    title: `${data.title} - 아웃덕`,
-    description: data.description ? data.description.substring(0, 150) : `${data.title} 행사 상세 정보입니다.`,
-  };
-}
-
-export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const eventId = Number(id);
-  if (isNaN(eventId)) {
-    notFound();
-  }
-
+const getOfflineEvent = cache(async (eventId: number) => {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -44,7 +14,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   );
 
   const start = performance.now();
-  const { data, error } = await supabase
+  const res = await supabase
     .from("offline_events")
     .select(`
       id, event_id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type, reservation_starts_at, reservation_ends_at, links,
@@ -61,6 +31,33 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const duration = performance.now() - start;
   const color = duration > 500 ? '\x1b[31m' : duration > 150 ? '\x1b[33m' : '\x1b[32m';
   console.log(`${color}[Perf Server] SERVER - 오프라인 행사 상세 조회 (Server): ${duration.toFixed(1)}ms\x1b[0m`);
+
+  return { ...res, duration };
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const eventId = Number(id);
+  if (isNaN(eventId)) return {};
+
+  const { data } = await getOfflineEvent(eventId);
+
+  if (!data) return { title: "행사를 찾을 수 없습니다 - 아웃덕" };
+
+  return {
+    title: `${data.title} - 아웃덕`,
+    description: data.description ? data.description.substring(0, 150) : `${data.title} 행사 상세 정보입니다.`,
+  };
+}
+
+export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const eventId = Number(id);
+  if (isNaN(eventId)) {
+    notFound();
+  }
+
+  const { data, error, duration } = await getOfflineEvent(eventId);
 
   if (error || !data) {
     notFound();

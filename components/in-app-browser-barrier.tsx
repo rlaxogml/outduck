@@ -14,12 +14,13 @@ export function InAppBrowserBarrier() {
 
     const userAgent = navigator.userAgent.toLowerCase();
     const isKakaoTalk = userAgent.includes("kakaotalk");
+    const isNaver = userAgent.includes("naver");
     const isInstagram = userAgent.includes("instagram");
     const isFacebook = userAgent.includes("fb_iab") || userAgent.includes("fbios");
     const isLine = userAgent.includes("line");
     
-    // 전체적인 인앱 브라우저 여부 감지
-    const isInAppBrowser = isKakaoTalk || isInstagram || isFacebook || isLine || userAgent.includes("webview");
+    // 전체적인 인앱 브라우저 여부 감지 (자체 앱의 webview는 허용하기 위해 webview 조건 제외)
+    const isInAppBrowser = isKakaoTalk || isNaver || isInstagram || isFacebook || isLine;
     
     const iOS = /ipad|iphone|ipod/.test(userAgent) && !(window as any).MSStream;
 
