@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, Fragment, useRef, useId } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
+import { revalidatePaths } from "@/app/actions/events";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { Heart, Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLink, Link2, Info, User as UserIcon, Eye, MessageSquare } from "lucide-react";
@@ -739,6 +740,18 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
       if (delBaseErr) throw delBaseErr;
       
       toast.success("행사가 삭제되었습니다.");
+      try {
+        const channelIds = event.channels?.map(c => c.id) || [];
+        const pathsToRevalidate = [
+          "/",
+          "/calendar",
+          ...channelIds.map(id => `/channels/${id}`)
+        ];
+        await revalidatePaths(pathsToRevalidate);
+      } catch (err) {
+        console.error("Revalidation error:", err);
+      }
+      router.refresh();
       router.push("/");
     } catch (err: any) {
       console.error(err);

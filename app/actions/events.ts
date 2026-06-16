@@ -200,3 +200,17 @@ export async function fetchMoreEvents(
     return { data: null, error: error.message };
   }
 }
+
+export async function revalidatePaths(paths: string[]) {
+  const { revalidatePath } = await import("next/cache");
+  try {
+    for (const p of paths) {
+      console.log(`[revalidatePaths] Revalidating path: ${p}`);
+      revalidatePath(p);
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error("Revalidation failed:", error);
+    return { success: false, error: error.message };
+  }
+}

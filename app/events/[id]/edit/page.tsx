@@ -18,6 +18,7 @@ import { DateInputTriple } from "@/components/events/date-input-triple";
 import { useKakaoAddress } from "@/hooks/use-kakao-address";
 import { useEventImageUpload } from "@/hooks/use-event-image-upload";
 import RichTextEditor from "@/components/events/rich-text-editor";
+import { revalidatePaths } from "@/app/actions/events";
 
 type Channel = {
   id: number;
@@ -86,6 +87,7 @@ export default function EditEventPage() {
   const [imagesToDelete, setImagesToDelete] = useState<{ id?: number; path?: string }[]>([]);
   const [hostId, setHostId] = useState<string>("");
   const [coHosts, setCoHosts] = useState<Channel[]>([]);
+  const [originalChannelIds, setOriginalChannelIds] = useState<number[]>([]);
   const [eventBaseId, setEventBaseId] = useState<number | null>(null);
   const [eventLinks, setEventLinks] = useState<{ link_name: string; link_url: string }[]>([]);
 
@@ -495,8 +497,10 @@ export default function EditEventPage() {
                 .filter(Boolean);
 
               if (mappedChannels.length > 0) {
+                const ids = mappedChannels.map((c: any) => c.id);
                 setHostId(mappedChannels[0].id.toString());
                 setCoHosts(mappedChannels.slice(1));
+                setOriginalChannelIds(ids);
               }
             }
 
@@ -883,6 +887,20 @@ export default function EditEventPage() {
       }
 
       toast.success("행사가 성공적으로 수정되었습니다!");
+      try {
+        const currentChannelIds = [parseInt(hostId), ...coHosts.map(c => c.id)].filter(id => !isNaN(id));
+        const allChannelIds = Array.from(new Set([...originalChannelIds, ...currentChannelIds]));
+        const pathsToRevalidate = [
+          "/",
+          `/events/${eventId}`,
+          "/calendar",
+          ...allChannelIds.map(id => `/channels/${id}`)
+        ];
+        await revalidatePaths(pathsToRevalidate);
+      } catch (err) {
+        console.error("Revalidation error:", err);
+      }
+      router.refresh();
       router.back();
     } catch (error: any) {
       console.error("Submission error:", error);

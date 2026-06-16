@@ -12,6 +12,7 @@ import type { User } from "@supabase/supabase-js";
 import { CommentsSection } from "@/components/events/comments-section";
 import dynamic from "next/dynamic";
 import { trackPerformance } from "@/lib/performance";
+import { revalidatePaths } from "@/app/actions/events";
 
 const EventNoticesBoard = dynamic(() => import("@/components/events/event-notices-board"), {
   ssr: false,
@@ -376,6 +377,18 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
       if (delBaseErr) throw delBaseErr;
       
       toast.success("행사가 삭제되었습니다.");
+      try {
+        const channelIds = event.channels?.map(c => c.id) || [];
+        const pathsToRevalidate = [
+          "/",
+          "/calendar",
+          ...channelIds.map(id => `/channels/${id}`)
+        ];
+        await revalidatePaths(pathsToRevalidate);
+      } catch (err) {
+        console.error("Revalidation error:", err);
+      }
+      router.refresh();
       router.push("/");
     } catch (err: any) {
       console.error(err);

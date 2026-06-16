@@ -18,6 +18,7 @@ import { DateInputTriple } from "@/components/events/date-input-triple";
 import { useKakaoAddress } from "@/hooks/use-kakao-address";
 import { useEventImageUpload } from "@/hooks/use-event-image-upload";
 import RichTextEditor from "@/components/events/rich-text-editor";
+import { revalidatePaths } from "@/app/actions/events";
 
 type Channel = {
   id: number;
@@ -718,6 +719,19 @@ export default function NewEventPage() {
         }
 
         toast.success("오프라인 행사가 성공적으로 등록되었습니다!");
+        try {
+          const channelIds = [parseInt(hostId), ...coHosts.map(c => c.id)].filter(id => !isNaN(id));
+          const pathsToRevalidate = [
+            "/",
+            `/events/${eventData.id}`,
+            "/calendar",
+            ...channelIds.map(id => `/channels/${id}`)
+          ];
+          await revalidatePaths(pathsToRevalidate);
+        } catch (err) {
+          console.error("Revalidation error:", err);
+        }
+        router.refresh();
         router.replace(`/events/${eventData.id}`);
 
       } else {
@@ -805,6 +819,19 @@ export default function NewEventPage() {
         }
 
         toast.success("온라인 행사가 성공적으로 등록되었습니다!");
+        try {
+          const channelIds = [parseInt(hostId), ...coHosts.map(c => c.id)].filter(id => !isNaN(id));
+          const pathsToRevalidate = [
+            "/",
+            `/online-events/${eventData.id}`,
+            "/calendar",
+            ...channelIds.map(id => `/channels/${id}`)
+          ];
+          await revalidatePaths(pathsToRevalidate);
+        } catch (err) {
+          console.error("Revalidation error:", err);
+        }
+        router.refresh();
         router.replace(`/online-events/${eventData.id}`);
       }
     } catch (error: any) {

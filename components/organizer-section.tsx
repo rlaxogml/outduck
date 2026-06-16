@@ -13,6 +13,7 @@ import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ChannelSettingsCard } from "@/app/settings/page";
+import { revalidatePaths } from "@/app/actions/events";
 
 const channelTypeLabel: Record<string, string> = {
   game: "게임",
@@ -65,6 +66,19 @@ export function OrganizerSection({ user }: { user: User | null }) {
       if (delBaseErr) throw delBaseErr;
       
       toast.success("행사가 성공적으로 삭제되었습니다.");
+      try {
+        const pathsToRevalidate = [
+          "/",
+          "/calendar"
+        ];
+        if (channel?.id) {
+          pathsToRevalidate.push(`/channels/${channel.id}`);
+        }
+        await revalidatePaths(pathsToRevalidate);
+      } catch (err) {
+        console.error("Revalidation error:", err);
+      }
+      router.refresh();
       
       // Refresh state without reload
       setEvents(prev => prev.filter(e => e.id !== eventId));

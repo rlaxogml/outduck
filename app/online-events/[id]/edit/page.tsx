@@ -14,8 +14,8 @@ import { Calendar, Plus, X, Upload, Loader2, Link as LinkIcon, Check, Search } f
 import type { User } from "@supabase/supabase-js";
 import { TimeInputPair } from "@/components/events/time-input-pair";
 import { DateInputTriple } from "@/components/events/date-input-triple";
-import { useEventImageUpload } from "@/hooks/use-event-image-upload";
 import RichTextEditor from "@/components/events/rich-text-editor";
+import { revalidatePaths } from "@/app/actions/events";
 
 type Channel = {
   id: number;
@@ -63,6 +63,7 @@ export default function EditOnlineEventPage() {
   
   const [hostId, setHostId] = useState<string>("");
   const [coHosts, setCoHosts] = useState<Channel[]>([]);
+  const [originalChannelIds, setOriginalChannelIds] = useState<number[]>([]);
   const [eventBaseId, setEventBaseId] = useState<number | null>(null);
   const [eventLinks, setEventLinks] = useState<{ link_name: string; link_url: string }[]>([]);
 
@@ -155,8 +156,10 @@ export default function EditOnlineEventPage() {
               .filter(Boolean);
 
             if (mappedChannels.length > 0) {
+              const ids = mappedChannels.map((c: any) => c.id);
               setHostId(mappedChannels[0].id.toString());
               setCoHosts(mappedChannels.slice(1));
+              setOriginalChannelIds(ids);
               
               // Verify ownership against the current user's session
               let isEventOwner = mappedChannels.some((ch: any) => ch.owner_id === session.user.id);
@@ -352,6 +355,20 @@ export default function EditOnlineEventPage() {
       }
 
       toast.success("온라인 행사가 성공적으로 수정되었습니다!");
+      try {
+        const currentChannelIds = [parseInt(hostId), ...coHosts.map(c => c.id)].filter(id => !isNaN(id));
+        const allChannelIds = Array.from(new Set([...originalChannelIds, ...currentChannelIds]));
+        const pathsToRevalidate = [
+          "/",
+          `/online-events/${eventId}`,
+          "/calendar",
+          ...allChannelIds.map(id => `/channels/${id}`)
+        ];
+        await revalidatePaths(pathsToRevalidate);
+      } catch (err) {
+        console.error("Revalidation error:", err);
+      }
+      router.refresh();
       router.push(`/online-events/${eventId}`);
     } catch (error: any) {
       console.error("Submission error:", error);

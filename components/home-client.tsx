@@ -69,6 +69,37 @@ export function HomeClient({
     console.log("HomeClient: Component mounted and session check starting...");
     let isMounted = true;
 
+    // 1. 즉시 로컬스토리지에서 로그인 세션 및 사용자 메타 복구 (0초 렌더링 최적화)
+    try {
+      const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const projectId = projectUrl ? new URL(projectUrl).hostname.split('.')[0] : null;
+      const sessionKey = projectId ? `sb-${projectId}-auth-token` : null;
+      const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
+      
+      if (sessionData) {
+        const parsed = JSON.parse(sessionData);
+        const currentUser = parsed?.currentSession?.user;
+        if (currentUser && isMounted) {
+          setUser(currentUser);
+          console.log("HomeClient: Restored cached user session from localStorage:", currentUser.id);
+          
+          // 사용자 메타데이터 캐시 복구
+          const metaKey = `outduck-user-meta-${currentUser.id}`;
+          const cachedMeta = localStorage.getItem(metaKey);
+          if (cachedMeta) {
+            const { isCompany, isHost, bookmarks, favorites } = JSON.parse(cachedMeta);
+            if (isCompany !== undefined) setIsCompanyUser(isCompany);
+            if (isHost !== undefined) setIsHostUser(isHost);
+            if (Array.isArray(bookmarks)) setUserBookmarks(bookmarks);
+            if (Array.isArray(favorites)) setUserFavorites(favorites);
+            console.log("HomeClient: Restored cached user metadata from localStorage");
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("HomeClient: Failed to restore session cache:", e);
+    }
+
     const syncSession = async () => {
       try {
         console.log("HomeClient: Calling supabase.auth.getSession()...");
@@ -117,14 +148,28 @@ export function HomeClient({
     const loadUserData = async (userId: string) => {
       console.log("HomeClient: Initiating independent user data queries...");
 
+      const updateMetaCache = (updates: any) => {
+        try {
+          const metaKey = `outduck-user-meta-${userId}`;
+          const cached = localStorage.getItem(metaKey);
+          const current = cached ? JSON.parse(cached) : {};
+          const next = { ...current, ...updates };
+          localStorage.setItem(metaKey, JSON.stringify(next));
+        } catch (e) {
+          console.warn("HomeClient: Failed to write to meta cache:", e);
+        }
+      };
+
       // 1. 회사 파트너 계정 확인
       trackPerformance(
         "회사 파트너 계정 확인 (Client)",
         "client",
         () => supabase.from("companies").select("id").eq("user_id", userId).maybeSingle()
       ).then(res => {
-        if (isMounted && res.data) {
-          setIsCompanyUser(true);
+        if (isMounted) {
+          const hasCompany = !!res.data;
+          setIsCompanyUser(hasCompany);
+          updateMetaCache({ isCompany: hasCompany });
         }
       }).catch(err => {
         console.error("HomeClient: Failed to check company status:", err);
@@ -136,8 +181,10 @@ export function HomeClient({
         "client",
         () => supabase.from("channels").select("id").eq("owner_id", userId).limit(1).maybeSingle()
       ).then(res => {
-        if (isMounted && res.data) {
-          setIsHostUser(true);
+        if (isMounted) {
+          const hasHost = !!res.data;
+          setIsHostUser(hasHost);
+          updateMetaCache({ isHost: hasHost });
         }
       }).catch(err => {
         console.error("HomeClient: Failed to check host status:", err);
@@ -152,6 +199,7 @@ export function HomeClient({
         if (isMounted && res.data) {
           const bms = res.data.map(d => d.event_id).filter(Boolean);
           setUserBookmarks(bms);
+          updateMetaCache({ bookmarks: bms });
         }
       }).catch(err => {
         console.error("HomeClient: Failed to fetch bookmarks:", err);
@@ -167,12 +215,18 @@ export function HomeClient({
           .order("created_at", { ascending: false })
       ).then(res => {
         if (isMounted) {
-          setUserFavorites(res.data || []);
+          const favs = res.data || [];
+          setUserFavorites(favs);
+          updateMetaCache({ favorites: favs });
+          // 기존 관심채널 컴포넌트용 로컬스토리지 키도 동기화
+          try {
+            localStorage.setItem(`outduck-favorites-${userId}`, JSON.stringify(favs));
+          } catch (e) {}
         }
       }).catch(err => {
         console.error("HomeClient: Failed to fetch favorites:", err);
         if (isMounted) {
-          setUserFavorites([]); // 에러 발생 시에도 빈 배열로 초기화하여 스켈레톤을 해제합니다.
+          setUserFavorites(prev => prev || []); // 캐시된 값이 없을 때만 빈 배열로 스켈레톤 해제
         }
       });
     };
