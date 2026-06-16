@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { User } from "@supabase/supabase-js";
-import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, Menu, X } from "lucide-react";
+import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, Menu, X, MessageSquare } from "lucide-react";
 import { Header } from "@/components/header";
 import { toast } from "sonner"; // Assuming sonner is available, or use alert
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,7 +23,7 @@ import { CompanyAffiliation, isAffiliationSupported } from "@/components/company
 import { sendCustomerInquiry } from "@/app/actions/email";
 import { Textarea } from "@/components/ui/textarea";
 
-type Tab = "account" | "notifications" | "advanced";
+type Tab = "account" | "notifications" | "advanced" | "inquiry";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -468,6 +468,21 @@ export default function SettingsPage() {
               <Settings2 className="h-5 w-5" />
               주최자 설정
             </button>
+            
+            <button
+              onClick={() => {
+                setActiveTab("inquiry");
+                setIsSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === "inquiry" 
+                  ? "bg-primary/10 text-primary" 
+                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <MessageSquare className="h-5 w-5" />
+              고객 문의
+            </button>
           </div>
         </div>
 
@@ -522,6 +537,18 @@ export default function SettingsPage() {
               >
                 <Settings2 className="h-5 w-5" />
                 주최자 설정
+              </button>
+              
+              <button
+                onClick={() => setActiveTab("inquiry")}
+                className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                  activeTab === "inquiry" 
+                    ? "bg-primary/10 text-primary" 
+                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <MessageSquare className="h-5 w-5" />
+                고객 문의
               </button>
             </div>
           </aside>
@@ -653,9 +680,12 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* 고객 문의 / 피드백 */}
-              <div className="mt-8 md:mt-12">
+          {activeTab === "inquiry" && (
+            <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div>
                 <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-1">고객 문의 & 피드백</h3>
                 <p className="text-muted-foreground text-xs md:text-sm">서비스 개선을 위한 의견이나 불편 사항을 보내주세요.</p>
               </div>
