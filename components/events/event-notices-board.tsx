@@ -396,13 +396,13 @@ export default function EventNoticesBoard({
                   {/* Author Info Row */}
                   <div className="flex items-center gap-3 mb-6 select-text">
                     <Avatar className="w-10 h-10 border border-border shadow-sm shrink-0">
-                      <AvatarImage src={notice.channels?.image_url || undefined} className="object-cover bg-muted" />
-                      <AvatarFallback className="bg-muted text-xs font-bold">{notice.channels?.name?.charAt(0) || "운"}</AvatarFallback>
+                      <AvatarImage src={notice.channels?.image_url || eventChannels[0]?.image_url || undefined} className="object-cover bg-muted" />
+                      <AvatarFallback className="bg-muted text-xs font-bold">{(notice.channels?.name || eventChannels[0]?.name || "공식 채널").charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-bold text-foreground">{notice.channels?.name || "공식 채널"}</span>
+                          <span className="text-sm font-bold text-foreground">{notice.channels?.name || eventChannels[0]?.name || "공식 채널"}</span>
                           <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-extrabold select-none">작성자</span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground font-semibold">
@@ -493,7 +493,7 @@ export default function EventNoticesBoard({
                         
                         {/* Meta stats */}
                         <div className="flex items-center gap-1.5 md:gap-2.5 text-xs text-muted-foreground font-semibold min-w-0">
-                          <span className="text-slate-700 dark:text-slate-300 font-bold truncate shrink">{notice.channels?.name || "공식 채널"}</span>
+                          <span className="text-slate-700 dark:text-slate-300 font-bold truncate shrink">{notice.channels?.name || eventChannels[0]?.name || "공식 채널"}</span>
                           <span className="text-muted-foreground/30 shrink-0">•</span>
                           <span className="shrink-0">{dateStr}</span>
                           <span className="text-muted-foreground/30 shrink-0">•</span>
