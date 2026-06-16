@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { EventDetailClient, type EventDetail } from "@/components/events/event-detail-client";
 import { RegisterServerTimings } from "@/components/register-server-timings";
 
-export const revalidate = 0; // Dynamic rendering for event details
+export const revalidate = 3600; // Enable ISR static cache (revalidated on-demand)
 
 const getOfflineEvent = cache(async (eventId: number) => {
   const supabase = createClient(
