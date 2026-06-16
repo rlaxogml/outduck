@@ -733,11 +733,11 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
           {/* --- MAIN TAB --- */}
           {activeTab === 'main' && (
             <div className="animate-in fade-in duration-300">
-              <div className="flex flex-col select-text divide-y divide-slate-100 dark:divide-slate-800/60 pb-4">
+              <div className="flex flex-col select-text divide-y divide-slate-100 dark:divide-slate-800/60 pb-0">
                 
                 {/* 1. 장소 (Location) */}
                 {isPastEvent ? (
-                  <div className="flex items-start gap-4 py-4 sm:py-5 first:pt-0 -mx-4 px-4">
+                  <div className="flex items-start gap-4 py-4 sm:py-5 first:pt-0 -mx-4 px-4 last:pb-0">
                     <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
                       <MapPin className="w-[22px] h-[22px] stroke-[2]" />
                     </div>
@@ -759,7 +759,7 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
                   <div 
                     onClick={isMapAvailable ? () => router.push(`/map?eventId=${event.id}`) : undefined}
                     className={cn(
-                      "flex items-start gap-4 py-4 sm:py-5 first:pt-0 rounded-xl -mx-4 px-4",
+                      "flex items-start gap-4 py-4 sm:py-5 first:pt-0 rounded-xl -mx-4 px-4 last:pb-0",
                       isMapAvailable && "cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all group"
                     )}
                   >
@@ -807,7 +807,7 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
                 {/* 2. 행사 기간 (Event Period) */}
                 <div 
                   onClick={() => router.push(`/calendar?event=${event.id}`)}
-                  className="flex items-start gap-4 py-4 sm:py-5 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all rounded-xl -mx-4 px-4 group"
+                  className="flex items-start gap-4 py-4 sm:py-5 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all rounded-xl -mx-4 px-4 group last:pb-0"
                 >
                   <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
                     <Calendar className="w-[22px] h-[22px] stroke-[2] group-hover:text-primary transition-colors" />
@@ -916,7 +916,7 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
 
                 {/* 3. 입장 방식 & 예약 기간 (Admission Method & Reservation Period) */}
                 {(event.reservation_type || event.reservation_starts_at || event.reservation_ends_at) && (
-                  <div className="flex items-start gap-4 py-4 sm:py-5">
+                  <div className="flex items-start gap-4 py-4 sm:py-5 last:pb-0">
                     <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
                       <Info className="w-[22px] h-[22px] stroke-[2]" />
                     </div>
@@ -965,7 +965,7 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
 
                 {/* 5. 주최자 (Organizer) */}
                 {event.channels.length > 0 && (
-                  <div className="flex items-start gap-4 py-4 sm:py-5">
+                  <div className="flex items-start gap-4 py-4 sm:py-5 last:pb-0">
                     <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
                       <UserIcon className="w-[22px] h-[22px] stroke-[2]" />
                     </div>

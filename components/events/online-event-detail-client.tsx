@@ -1000,10 +1000,10 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
           {/* --- MAIN TAB --- */}
           {activeTab === 'main' && (
             <div className="animate-in fade-in duration-300">
-              <div className="flex flex-col select-text divide-y divide-slate-100 dark:divide-slate-800/60 pb-2">
+              <div className="flex flex-col select-text divide-y divide-slate-100 dark:divide-slate-800/60 pb-0">
                 
                 {/* 1. 진행 기간 */}
-                <div className="flex items-start gap-4 py-4 sm:py-5 first:pt-0">
+                <div className="flex items-start gap-4 py-4 sm:py-5 first:pt-0 last:pb-0">
                   <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
                     <Calendar className="w-[22px] h-[22px] stroke-[2]" />
                   </div>
@@ -1017,7 +1017,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
 
                 {/* 2. 주최 채널 */}
                 {event.channels.length > 0 && (
-                  <div className="flex items-start gap-4 py-4 sm:py-5">
+                  <div className="flex items-start gap-4 py-4 sm:py-5 last:pb-0">
                     <div className="w-6 h-6 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[22px] h-[22px] stroke-[2]">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
