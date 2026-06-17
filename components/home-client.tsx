@@ -14,7 +14,6 @@ import { PosterSlider } from "@/components/poster-slider";
 import { OrganizerSection } from "@/components/organizer-section";
 import { FavoriteChannels } from "@/components/favorite-channels";
 import { MiniCalendar } from "@/components/mini-calendar";
-import { GoogleAd } from "@/components/google-ad";
 import { Building2, ArrowRight, UserCircle } from "lucide-react";
 import { trackPerformance } from "@/lib/performance";
 
@@ -209,18 +208,68 @@ export function HomeClient({
       trackPerformance(
         "관심 채널 목록 통합 조회 (Client)",
         "client",
-        () => supabase.from("favorites")
-          .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-      ).then(res => {
-        if (isMounted) {
-          const favs = res.data || [];
-          setUserFavorites(favs);
-          updateMetaCache({ favorites: favs });
-          // 기존 관심채널 컴포넌트용 로컬스토리지 키도 동기화
+        async () => {
           try {
-            localStorage.setItem(`outduck-favorites-${userId}`, JSON.stringify(favs));
+            // 1. RPC 호출 시도 (최적화 경로)
+            const { data, error } = await supabase.rpc("get_favorite_channels_with_counts", { p_user_id: userId });
+            if (!error && data) {
+              // 원래의 favorites 테이블 형식과 호환되도록 매핑 (active_event_count 추가)
+              return data.map((row: any) => ({
+                channel_id: row.id,
+                created_at: row.favorite_created_at,
+                active_event_count: row.active_event_count,
+                channels: {
+                  id: row.id,
+                  name: row.name,
+                  type: row.type,
+                  image_url: row.image_url,
+                  team_id: row.team_id,
+                  is_team: row.is_team
+                }
+              }));
+            }
+            if (error) {
+              console.warn("HomeClient: RPC failed, falling back to query:", error.message);
+            }
+          } catch (e) {
+            console.warn("HomeClient: RPC error, falling back to query:", e);
+          }
+
+          // 2. 원래 테이블 조회 폴백 (RPC가 없거나 실패한 경우)
+          const { data, error } = await supabase.from("favorites")
+            .select("channel_id, created_at, channels(id, name, type, image_url, team_id, is_team)")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false });
+
+          if (error) throw error;
+          return data;
+        }
+      ).then(favs => {
+        if (isMounted) {
+          const finalFavs = favs || [];
+          setUserFavorites(finalFavs);
+          
+          // Strip active_event_count before saving to meta cache to prevent showing stale counts on next load
+          const favsForMetaCache = finalFavs.map((fav: any) => ({
+            ...fav,
+            active_event_count: undefined
+          }));
+          updateMetaCache({ favorites: favsForMetaCache });
+
+          // 기존 관심채널 컴포넌트용 로컬스토리지 키도 동기화 (배지 숫자는 캐시하지 않음)
+          try {
+            const mappedForFavChannels = finalFavs.map((fav: any) => ({
+              id: fav.channels?.id,
+              name: fav.channels?.name || "기타",
+              type: fav.channels?.type,
+              image_url: fav.channels?.image_url || null,
+              team_id: fav.channels?.team_id,
+              is_team: fav.channels?.is_team || false,
+              activeEventCount: undefined, // 배지 숫자는 캐시하지 않음
+              favoriteCreatedAt: fav.created_at
+            })).filter((c: any) => c.id !== undefined);
+            
+            localStorage.setItem(`outduck-favorites-${userId}`, JSON.stringify(mappedForFavChannels));
           } catch (e) {}
         }
       }).catch(err => {
@@ -337,12 +386,6 @@ export function HomeClient({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Left Google Ad */}
-      <GoogleAd position="left" />
-
-      {/* Right Google Ad */}
-      <GoogleAd position="right" />
-
       <Header />
 
       {/* Poster Slider */}

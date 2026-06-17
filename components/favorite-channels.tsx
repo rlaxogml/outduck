@@ -37,6 +37,7 @@ export function FavoriteChannels({
   user: any;
   initialFavorites?: any[] | null;
 }) {
+  // Synchronously restore from cached channels (including counts) to avoid layout flash on client mount
   const [channels, setChannels] = useState<Channel[]>(() => {
     if (cachedChannels) return cachedChannels;
     if (initialFavorites && initialFavorites.length > 0) {
@@ -49,23 +50,70 @@ export function FavoriteChannels({
           image_url: ch?.image_url || null,
           team_id: ch?.team_id,
           is_team: ch?.is_team || false,
-          activeEventCount: undefined,
+          activeEventCount: fav.active_event_count ?? fav.activeEventCount,
           favoriteCreatedAt: fav.created_at,
           relatedChannelIds: ch?.id ? [ch.id] : []
         };
       }).filter(c => c.id !== undefined);
     }
+    
+    // Direct localStorage load in constructor if running on client (for user-favorites)
+    if (typeof window !== "undefined" && user) {
+      try {
+        const cacheKey = `outduck-favorites-${user.id}`;
+        const cachedData = localStorage.getItem(cacheKey);
+        if (cachedData) {
+          const parsed = JSON.parse(cachedData);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map((c: any) => ({ ...c, activeEventCount: undefined }));
+          }
+        }
+      } catch (e) {}
+    }
     return [];
   });
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(() => {
     if (cachedChannels) return false;
+    if (channels.length > 0) return false; // Don't show skeleton if we have cached channels
     if (initialFavorites === null) return true;
     if (initialFavorites === undefined) return true;
     return false;
   });
   const [mounted, setMounted] = useState(false);
   const [hasTimedOut, setHasTimedOut] = useState(false);
+
+  // Sync state from props during render if initialFavorites changes (React state-from-prop sync pattern)
+  const [prevInitialFavorites, setPrevInitialFavorites] = useState(initialFavorites);
+  if (initialFavorites !== prevInitialFavorites) {
+    setPrevInitialFavorites(initialFavorites);
+    if (initialFavorites && initialFavorites.length > 0) {
+      const mapped = initialFavorites.map((fav: any) => {
+        const ch = fav.channels;
+        return {
+          id: ch?.id,
+          name: ch?.name || "기타",
+          type: ch?.type,
+          image_url: ch?.image_url || null,
+          team_id: ch?.team_id,
+          is_team: ch?.is_team || false,
+          activeEventCount: fav.active_event_count ?? fav.activeEventCount,
+          favoriteCreatedAt: fav.created_at,
+          relatedChannelIds: ch?.id ? [ch.id] : []
+        };
+      }).filter(c => c.id !== undefined);
+      setChannels(mapped);
+      setIsLoading(false);
+    } else if (initialFavorites === null || initialFavorites === undefined) {
+      if (channels.length === 0) {
+        setIsLoading(true);
+      }
+    } else {
+      setChannels([]);
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
     console.log("FavoriteChannels: Component mounted.");
@@ -74,8 +122,7 @@ export function FavoriteChannels({
 
   useEffect(() => {
     console.log("FavoriteChannels: Auth changed or mounted.", { hasUser: !!user, mounted });
-    if (!mounted) return;
-
+    // Run cache loading instantly even if not fully mounted in React state to avoid delays
     let isMounted = true;
     setHasTimedOut(false);
 
@@ -93,7 +140,6 @@ export function FavoriteChannels({
         if (!currentUser) return;
 
         let initialChannels: (Channel & { team_id?: number | null; is_team?: boolean; relatedChannelIds?: number[] })[] = [];
-
         const cacheKey = `outduck-favorites-${currentUser.id}`;
 
         if (Array.isArray(initialFavorites)) {
@@ -106,7 +152,7 @@ export function FavoriteChannels({
               image_url: ch?.image_url || null,
               team_id: ch?.team_id,
               is_team: ch?.is_team || false,
-              activeEventCount: undefined,
+              activeEventCount: fav.active_event_count ?? fav.activeEventCount,
               favoriteCreatedAt: fav.created_at,
               relatedChannelIds: ch?.id ? [ch.id] : []
             };
@@ -114,7 +160,8 @@ export function FavoriteChannels({
           
           if (isMounted) {
             setChannels(initialChannels);
-            localStorage.setItem(cacheKey, JSON.stringify(initialChannels));
+            const cacheDataWithoutCounts = initialChannels.map(c => ({ ...c, activeEventCount: undefined }));
+            localStorage.setItem(cacheKey, JSON.stringify(cacheDataWithoutCounts));
             setIsLoading(false);
             clearTimeout(safetyTimeout);
           }
@@ -133,7 +180,7 @@ export function FavoriteChannels({
               }
             }
           }
-          return;
+          // Do not return early, let the background fetch run to get updated data if needed
         } else {
           if (isMounted && cachedChannels) {
             setChannels(cachedChannels);
@@ -201,6 +248,14 @@ export function FavoriteChannels({
 
         // --- 백그라운드 작업 ---
         if (initialChannels.length === 0) return;
+
+        // 만약 이미 모든 관심 채널들의 activeEventCount가 채워져 있다면 (RPC 최적화로 가져온 경우), 추가 백그라운드 쿼리 생략
+        const hasPreCalculatedCounts = initialChannels.length > 0 && 
+          initialChannels.every(c => c.activeEventCount !== undefined);
+
+        if (hasPreCalculatedCounts) {
+          return;
+        }
         
         // 소속 팀 채널들의 멤버 채널 목록 수집
         const teamIds = initialChannels.filter(c => c.is_team).map(c => c.id);
@@ -328,7 +383,8 @@ export function FavoriteChannels({
               };
             });
             cachedChannels = updated;
-            localStorage.setItem(cacheKey, JSON.stringify(updated));
+            const cacheDataWithoutCounts = updated.map(c => ({ ...c, activeEventCount: undefined }));
+            localStorage.setItem(cacheKey, JSON.stringify(cacheDataWithoutCounts));
             return updated;
           });
         }

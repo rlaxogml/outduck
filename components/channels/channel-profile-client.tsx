@@ -76,6 +76,67 @@ interface ChannelProfileClientProps {
   initialOnlineEvents: ChannelEvent[];
 }
 
+const syncFavoriteCache = (userId: string, targetChannel: Channel, isAdding: boolean) => {
+  try {
+    const favsKey = `outduck-favorites-${userId}`;
+    const metaKey = `outduck-user-meta-${userId}`;
+
+    // 1. Update outduck-favorites-${userId}
+    const cachedFavs = localStorage.getItem(favsKey);
+    let favsList = cachedFavs ? JSON.parse(cachedFavs) : [];
+    if (Array.isArray(favsList)) {
+      if (isAdding) {
+        if (!favsList.some(c => c.id === targetChannel.id)) {
+          favsList.unshift({
+            id: targetChannel.id,
+            name: targetChannel.name,
+            type: targetChannel.type,
+            image_url: targetChannel.image_url,
+            team_id: targetChannel.team_id,
+            is_team: targetChannel.is_team,
+            activeEventCount: 0, // default placeholder
+            favoriteCreatedAt: new Date().toISOString()
+          });
+        }
+      } else {
+        favsList = favsList.filter(c => c.id !== targetChannel.id);
+      }
+      localStorage.setItem(favsKey, JSON.stringify(favsList));
+    }
+
+    // 2. Update outduck-user-meta-${userId}
+    const cachedMeta = localStorage.getItem(metaKey);
+    if (cachedMeta) {
+      const parsedMeta = JSON.parse(cachedMeta);
+      let metaFavs = parsedMeta.favorites || [];
+      if (Array.isArray(metaFavs)) {
+        if (isAdding) {
+          if (!metaFavs.some(f => f.channel_id === targetChannel.id)) {
+            metaFavs.unshift({
+              channel_id: targetChannel.id,
+              created_at: new Date().toISOString(),
+              channels: {
+                id: targetChannel.id,
+                name: targetChannel.name,
+                type: targetChannel.type,
+                image_url: targetChannel.image_url,
+                team_id: targetChannel.team_id,
+                is_team: targetChannel.is_team
+              }
+            });
+          }
+        } else {
+          metaFavs = metaFavs.filter(f => f.channel_id !== targetChannel.id);
+        }
+        parsedMeta.favorites = metaFavs;
+        localStorage.setItem(metaKey, JSON.stringify(parsedMeta));
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to sync favorites cache:", e);
+  }
+};
+
 export function ChannelProfileClient({
   channelId,
   initialChannel,
@@ -337,8 +398,10 @@ export function ChannelProfileClient({
                   try {
                     if (previousSubscribed) {
                       await supabase.from("favorites").delete().eq("channel_id", channelId).eq("user_id", user.id);
+                      syncFavoriteCache(user.id, channel, false);
                     } else {
                       await supabase.from("favorites").insert({ channel_id: channelId, user_id: user.id });
+                      syncFavoriteCache(user.id, channel, true);
                     }
                   } catch {
                     setIsSubscribed(previousSubscribed);
