@@ -10,6 +10,7 @@ import type { User } from "@supabase/supabase-js";
 import RichTextEditor from "./rich-text-editor";
 import { CommentsSection } from "@/components/events/comments-section";
 import { trackPerformance } from "@/lib/performance";
+import { linkifyHtml } from "@/lib/utils";
 
 interface ChannelInfo {
   id: number;
@@ -443,7 +444,7 @@ export default function EventNoticesBoard({
                   <div className="flex-1 select-text">
                     <div 
                       className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor-display"
-                      dangerouslySetInnerHTML={{ __html: notice.content }}
+                      dangerouslySetInnerHTML={{ __html: linkifyHtml(notice.content) }}
                     />
                   </div>
 

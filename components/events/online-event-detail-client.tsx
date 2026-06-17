@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { revalidatePaths } from "@/app/actions/events";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+import { cn, linkifyHtml } from "@/lib/utils";
 import { Heart, Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLink, Link2, Info, User as UserIcon, Eye, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
@@ -1405,7 +1405,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
                           <div className="flex-1 select-text">
                             <div 
                               className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor-display"
-                              dangerouslySetInnerHTML={{ __html: notice.content }}
+                              dangerouslySetInnerHTML={{ __html: linkifyHtml(notice.content) }}
                             />
                           </div>
 
@@ -1516,7 +1516,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
               return (
                 <div 
                   className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed break-words ql-editor-display"
-                  dangerouslySetInnerHTML={{ __html: event.description }}
+                  dangerouslySetInnerHTML={{ __html: linkifyHtml(event.description) }}
                 />
               );
             }
