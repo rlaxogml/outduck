@@ -1051,13 +1051,13 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
             if (isHtml) {
               return (
                 <div 
-                  className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor-display"
+                  className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words break-keep ql-editor-display"
                   dangerouslySetInnerHTML={{ __html: linkifyHtml(event.description) }}
                 />
               );
             }
             return (
-              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-foreground/90 font-medium">
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none whitespace-pre-wrap break-keep leading-relaxed text-foreground/90 font-medium">
                 {descriptionWithLinks}
               </div>
             );
@@ -1123,6 +1123,9 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
       )}
       
       <style jsx global>{`
+        .ql-editor-display {
+          word-break: keep-all;
+        }
         .ql-editor-display img {
           max-width: 100%;
           height: auto;
