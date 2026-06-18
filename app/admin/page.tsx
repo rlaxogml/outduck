@@ -28,10 +28,12 @@ import {
   ImageIcon,
   Plus,
   LayoutGrid,
-  DollarSign
+  DollarSign,
+  CalendarPlus
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RevenueDashboard } from "@/components/admin/revenue-dashboard";
+import { ProposalsTab } from "@/components/admin/proposals-tab";
 
 type ChannelRequest = {
   id: number;
@@ -108,7 +110,7 @@ export default function AdminPage() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"all" | "requests" | "reports" | "bans" | "channels" | "posters" | "revenue">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "requests" | "reports" | "bans" | "channels" | "posters" | "revenue" | "proposals">("all");
 
   // 주최자 신청 관련 상태
   const [requests, setRequests] = useState<ChannelRequest[]>([]);
@@ -1188,6 +1190,17 @@ export default function AdminPage() {
             <DollarSign className="w-4 h-4" />
             <span>수익 관리</span>
           </button>
+          <button
+            onClick={() => setActiveTab("proposals")}
+            className={`pb-3 px-5 text-sm font-extrabold transition-all border-b-2 flex items-center gap-2 shrink-0 ${
+              activeTab === "proposals"
+                ? "border-orange-500 text-orange-500"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <CalendarPlus className="w-4 h-4" />
+            <span>제보/제안 관리</span>
+          </button>
         </div>
 
         {activeTab === "revenue" && (
@@ -1197,6 +1210,16 @@ export default function AdminPage() {
               <h2 className="text-xl font-extrabold tracking-tight">수익 관리 및 단가 설정</h2>
             </div>
             <RevenueDashboard />
+          </div>
+        )}
+
+        {activeTab === "proposals" && (
+          <div className="animate-in fade-in duration-300">
+            <div className="flex items-center gap-2 mb-6">
+              <CalendarPlus className="w-5 h-5 text-orange-500" />
+              <h2 className="text-xl font-extrabold tracking-tight">제보 및 제안 관리</h2>
+            </div>
+            <ProposalsTab adminUserId={adminUserId} />
           </div>
         )}
 

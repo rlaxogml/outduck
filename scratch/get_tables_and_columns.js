@@ -18,24 +18,30 @@ envContent.split('\n').forEach(line => {
 const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
 async function main() {
-  console.log("=== Querying existing Channels ===");
-  const { data: ch } = await supabase.from('channels').select('*').limit(1);
-  console.log(JSON.stringify(ch, null, 2));
+  // Test invalid company to check foreign key constraint
+  console.log("=== Testing invalid company insert on channels ===");
+  const { data, error } = await supabase
+    .from('channels')
+    .insert({
+      name: 'FK Test Channel',
+      type: 'youtuber',
+      company: 'NON_EXISTENT_COMPANY_XYZ_123'
+    })
+    .select();
 
-  console.log("\n=== Querying existing Events ===");
-  const { data: ev } = await supabase.from('events').select('*').limit(1);
-  console.log(JSON.stringify(ev, null, 2));
-
-  console.log("\n=== Querying existing Offline Events ===");
-  const { data: off } = await supabase.from('offline_events').select('*').limit(1);
-  console.log(JSON.stringify(off, null, 2));
-
-  console.log("\n=== Querying existing Event Channels ===");
-  const { data: ec } = await supabase.from('event_channels').select('*').limit(1);
-  console.log(JSON.stringify(ec, null, 2));
-
-  console.log("\n=== Querying existing Offline Event Locations ===");
-  const { data: loc } = await supabase.from('offline_event_locations').select('*').limit(1);
-  console.log(JSON.stringify(loc, null, 2));
+  if (error) {
+    console.log("Insert failed as expected! Error details:");
+    console.log("Message:", error.message);
+    console.log("Details:", error.details);
+    console.log("Hint:", error.hint);
+    console.log("Code:", error.code);
+  } else {
+    console.log("Insert succeeded! This means 'company' is NOT a strict foreign key or there is no constraint.");
+    // Clean up
+    if (data && data[0]) {
+      await supabase.from('channels').delete().eq('id', data[0].id);
+      console.log("Cleanup: deleted test channel.");
+    }
+  }
 }
 main();

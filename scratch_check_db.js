@@ -34,12 +34,19 @@ async function checkTable(tableName) {
 }
 
 async function check() {
-  const tables = ['offline_events', 'online_events', 'event_bookmarks'];
+  const tables = [
+    'events', 
+    'online_events',
+    'offline_events', 
+    'offline_event_locations',
+    'event_channels',
+    'channels',
+    'channel_requests',
+    'companies'
+  ];
   for (const table of tables) {
     await checkTable(table);
   }
 }
 
 check();
-
-
