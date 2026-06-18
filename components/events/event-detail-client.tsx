@@ -500,16 +500,7 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
           <ChevronLeft className="w-5 h-5 md:w-8 md:h-8 stroke-[2.5]" />
         </button>
 
-        {/* Floating Map Button (Mobile Only) */}
-        {!isPastEvent && isMapAvailable && (
-          <button
-            onClick={() => router.push(`/map?eventId=${event.id}`)}
-            className="absolute right-6 top-2 z-40 flex items-center justify-center w-10 h-10 rounded-full border border-border/60 bg-white/90 dark:bg-muted/90 text-foreground shadow-md backdrop-blur-sm hover:scale-105 active:scale-95 transition-all md:hidden"
-            aria-label="위치보기"
-          >
-            <MapPin className="w-5 h-5 stroke-[2.5] text-primary" />
-          </button>
-        )}
+
 
         {/* Hero Card content */}
         <div className="bg-background border-b border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:rounded-3xl md:border md:border-slate-200/80 overflow-hidden">
