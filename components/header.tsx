@@ -782,6 +782,9 @@ export function Header() {
                     <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer font-semibold">
                       마이페이지
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/suggest')} className="cursor-pointer font-semibold">
+                      제보 / 제안하기
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-50 dark:focus:bg-rose-500/10">
                       로그아웃
