@@ -1,3 +1,0 @@
-              </>
-            ) : (
-                {(isChannelsExpanded ? channels : (channels.length > 10 ? channels.slice(0, 9) : channels)).map((channel) => (
