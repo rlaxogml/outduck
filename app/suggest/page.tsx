@@ -83,7 +83,7 @@ export default function SuggestPage() {
     <div className="min-h-screen bg-gray-50/50 dark:bg-background flex flex-col pb-20">
       <Header />
 
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 pt-12">
+      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 pt-6 sm:pt-12">
         {mode === "selection" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center space-y-2">
@@ -91,29 +91,33 @@ export default function SuggestPage() {
               <p className="text-muted-foreground text-lg">아웃덕 플랫폼을 함께 만들어갈 제보 및 제안을 선택해 주세요.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
+            <div className="grid grid-cols-2 gap-4 sm:gap-6 mt-12">
               {/* Event Suggestion */}
               <button
                 onClick={() => setMode("event")}
-                className="group relative flex flex-col items-center justify-center p-8 bg-background border-2 border-border rounded-3xl shadow-sm transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 text-left cursor-pointer"
+                className="group relative flex flex-col items-center justify-center p-4 sm:p-8 bg-background border-2 border-border rounded-3xl shadow-sm transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 text-left cursor-pointer"
               >
-                <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <CalendarPlus className="w-8 h-8" />
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <CalendarPlus className="w-6 h-6 sm:w-8 sm:h-8" />
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-center">행사 제보</h3>
-                <p className="text-muted-foreground text-sm text-center">아직 아웃덕에 등록되지 않은<br/>오프라인/온라인 행사를 제보</p>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 text-center">행사 제보</h3>
+                <p className="text-muted-foreground text-[11px] sm:text-sm text-center break-keep leading-relaxed">
+                  등록되지 않은 <span className="whitespace-nowrap">온/오프라인</span> 행사 제보
+                </p>
               </button>
 
               {/* Channel Proposal */}
               <button
                 onClick={() => setMode("channel")}
-                className="group relative flex flex-col items-center justify-center p-8 bg-background border-2 border-border rounded-3xl shadow-sm transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 text-left cursor-pointer"
+                className="group relative flex flex-col items-center justify-center p-4 sm:p-8 bg-background border-2 border-border rounded-3xl shadow-sm transition-all duration-300 hover:border-primary/50 hover:shadow-lg hover:-translate-y-1 text-left cursor-pointer"
               >
-                <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Tv2 className="w-8 h-8" />
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <Tv2 className="w-6 h-6 sm:w-8 sm:h-8" />
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-center">채널 증설 제안</h3>
-                <p className="text-muted-foreground text-sm text-center">활동 중인 크리에이터 또는 게임 등<br/>신규 주최 채널 추가 제안</p>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 text-center">채널 증설 제안</h3>
+                <p className="text-muted-foreground text-[11px] sm:text-sm text-center break-keep leading-relaxed">
+                  크리에이터 및 게임 등 신규 채널 제안
+                </p>
               </button>
             </div>
           </div>

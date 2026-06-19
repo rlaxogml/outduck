@@ -95,7 +95,7 @@ export function ChannelProposalForm({ user, onSuccess }: ChannelProposalFormProp
   };
 
   return (
-    <div className="bg-background border border-border rounded-3xl p-6 sm:p-10 shadow-xl animate-in fade-in duration-300">
+    <div className="bg-transparent sm:bg-background border-0 sm:border border-border rounded-none sm:rounded-3xl p-0 sm:p-10 shadow-none sm:shadow-xl animate-in fade-in duration-300">
       <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-8">채널 증설 제안서</h2>
       
       <form onSubmit={handleSubmit} className="space-y-8">

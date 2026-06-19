@@ -52,31 +52,58 @@ export function ProposalsTab({ adminUserId }: ProposalsTabProps) {
   const fetchProposals = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch channel proposals with profile nicknames
+      // 1. Fetch channel proposals
       const { data: chanData, error: chanErr } = await supabase
         .from("channel_proposals")
-        .select(`
-          *,
-          profiles:user_id ( nickname )
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (chanErr) throw chanErr;
 
-      // 2. Fetch event proposals with profiles and related channel proposals
+      // 2. Fetch event proposals with related channel proposals
       const { data: eventData, error: eventErr } = await supabase
         .from("event_proposals")
         .select(`
           *,
-          profiles:user_id ( nickname ),
           channel_proposals:channel_proposal_id ( id, name, type, status, approved_channel_id )
         `)
         .order("created_at", { ascending: false });
 
       if (eventErr) throw eventErr;
 
-      setChannelProposals(chanData || []);
-      setEventProposals(eventData || []);
+      // 3. Extract unique user_ids and fetch profiles mapping
+      const userIds = Array.from(new Set([
+        ...(chanData || []).map((c: any) => c.user_id),
+        ...(eventData || []).map((e: any) => e.user_id)
+      ].filter(Boolean)));
+
+      const profilesMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profData, error: profErr } = await supabase
+          .from("profiles")
+          .select("id, nickname")
+          .in("id", userIds);
+
+        if (!profErr && profData) {
+          profData.forEach((p: any) => {
+            profilesMap[p.id] = p.nickname;
+          });
+        }
+      }
+
+      // 4. Map profiles into the returned datasets
+      const formattedChannels = (chanData || []).map((c: any) => ({
+        ...c,
+        profiles: c.user_id ? { nickname: profilesMap[c.user_id] || "알 수 없음" } : null
+      }));
+
+      const formattedEvents = (eventData || []).map((e: any) => ({
+        ...e,
+        profiles: e.user_id ? { nickname: profilesMap[e.user_id] || "알 수 없음" } : null
+      }));
+
+      setChannelProposals(formattedChannels);
+      setEventProposals(formattedEvents);
     } catch (err: any) {
       console.error("Error fetching proposals:", err);
       toast.error("제안 목록을 가져오는 데 실패했습니다.");

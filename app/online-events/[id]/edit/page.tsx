@@ -16,6 +16,8 @@ import { TimeInputPair } from "@/components/events/time-input-pair";
 import { DateInputTriple } from "@/components/events/date-input-triple";
 import RichTextEditor from "@/components/events/rich-text-editor";
 import { revalidatePaths } from "@/app/actions/events";
+import { useEventImageUpload } from "@/hooks/use-event-image-upload";
+
 
 type Channel = {
   id: number;
