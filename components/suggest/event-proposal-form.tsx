@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { Textarea } from "@/components/ui/textarea";
+import { notifyAdminsNewEventProposal } from "@/app/actions/email";
 
 
 interface EventProposalFormProps {
@@ -72,6 +73,16 @@ export function EventProposalForm({ user, onSuccess }: EventProposalFormProps) {
         .insert([eventProposalData]);
 
       if (eventProposalErr) throw eventProposalErr;
+
+      // Trigger admin email notification in the background
+      notifyAdminsNewEventProposal({
+        title: title.trim(),
+        is_online: eventType === "online",
+        is_offline: eventType === "offline",
+        description: description || null,
+      }).catch((err) => {
+        console.error("Failed to send admin notification email:", err);
+      });
 
       toast.success("행사 제보가 성공적으로 등록되었습니다!");
       onSuccess();

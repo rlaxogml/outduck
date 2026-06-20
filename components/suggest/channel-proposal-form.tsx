@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { useImageUpload } from "@/hooks/use-image-upload";
+import { notifyAdminsNewChannelProposal } from "@/app/actions/email";
 
 interface ChannelLink {
   id: string;
@@ -83,6 +84,16 @@ export function ChannelProposalForm({ user, onSuccess }: ChannelProposalFormProp
         .insert([insertData]);
 
       if (requestError) throw requestError;
+
+      // Trigger admin email notification in the background
+      notifyAdminsNewChannelProposal({
+        name: insertData.name,
+        type: insertData.type,
+        image_url: insertData.image_url,
+        links: insertData.links,
+      }).catch((err) => {
+        console.error("Failed to send admin notification email for channel proposal:", err);
+      });
 
       toast.success("채널 증설 제안이 완료되었습니다.");
       onSuccess();
