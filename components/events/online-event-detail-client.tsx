@@ -1404,7 +1404,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
 
                           <div className="flex-1 select-text">
                             <div 
-                              className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor-display"
+                              className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor ql-editor-display"
                               dangerouslySetInnerHTML={{ __html: linkifyHtml(notice.content) }}
                             />
                           </div>
@@ -1515,7 +1515,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
             if (isHtml) {
               return (
                 <div 
-                  className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed break-words ql-editor-display"
+                  className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed break-words ql-editor ql-editor-display"
                   dangerouslySetInnerHTML={{ __html: linkifyHtml(event.description) }}
                 />
               );

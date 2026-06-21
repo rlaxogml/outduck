@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import 'react-quill/dist/quill.snow.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -161,3 +162,15 @@ body[data-scroll-locked],
 [style*="margin-right"] {
   margin-right: 0px !important;
 }
+
+/* Quill Editor & Display List Specificity Overrides for Tailwind CSS Preflight/Prose */
+.ql-editor-display.ql-editor ol,
+.ql-editor-display.ql-editor ul {
+  list-style-type: none !important;
+  padding-left: 0px !important;
+}
+.ql-editor-display.ql-editor ol > li,
+.ql-editor-display.ql-editor ul > li {
+  list-style-type: none !important;
+}
+

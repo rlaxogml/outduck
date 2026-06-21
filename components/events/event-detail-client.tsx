@@ -1042,7 +1042,7 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
             if (isHtml) {
               return (
                 <div 
-                  className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words break-keep ql-editor-display"
+                  className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words break-keep ql-editor ql-editor-display"
                   dangerouslySetInnerHTML={{ __html: linkifyHtml(event.description) }}
                 />
               );

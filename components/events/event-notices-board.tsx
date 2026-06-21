@@ -443,7 +443,7 @@ export default function EventNoticesBoard({
                   {/* Post Body (Rich Text HTML content) */}
                   <div className="flex-1 select-text">
                     <div 
-                      className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor-display"
+                      className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-foreground/90 leading-relaxed break-words ql-editor ql-editor-display"
                       dangerouslySetInnerHTML={{ __html: linkifyHtml(notice.content) }}
                     />
                   </div>
