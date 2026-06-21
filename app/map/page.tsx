@@ -16,6 +16,57 @@ declare global {
   }
 }
 
+const createGroupMarkerCanvas = (count: number): string => {
+  if (typeof document === "undefined") return "";
+  const canvas = document.createElement("canvas");
+  canvas.width = 88;
+  canvas.height = 98;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+
+  // 1. Draw bottom arrow
+  ctx.beginPath();
+  ctx.moveTo(44, 98);
+  ctx.lineTo(32, 76);
+  ctx.lineTo(56, 76);
+  ctx.closePath();
+  ctx.fillStyle = "#FBBF24"; // Amber-400
+  ctx.strokeStyle = "#D97706"; // Amber-600
+  ctx.lineWidth = 2.5;
+  ctx.fill();
+  ctx.stroke();
+
+  // 2. Draw circle border
+  ctx.beginPath();
+  ctx.arc(44, 44, 40, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.fillStyle = "#FBBF24"; // Amber-400
+  ctx.strokeStyle = "#D97706"; // Amber-600
+  ctx.lineWidth = 3.5;
+  ctx.fill();
+  ctx.stroke();
+
+  // 3. Draw inner circle bg
+  ctx.beginPath();
+  ctx.arc(44, 44, 36, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.fillStyle = "#FEF3C7"; // Amber-100
+  ctx.fill();
+
+  // 4. Draw "+n" text
+  ctx.fillStyle = "#B45309"; // Amber-700
+  ctx.font = "bold 28px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(`+${count}`, 44, 44);
+
+  try {
+    return canvas.toDataURL();
+  } catch {
+    return "";
+  }
+};
+
 export default function MapPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-background" />}>
@@ -516,41 +567,130 @@ function MapContent() {
             const targetCoords: any[] = [];
             const targetOverlays: any[] = [];
 
+            const resolvedCoordsList: Array<{ event: any; coords: any; location: string }> = [];
             const addressPromises: Promise<void>[] = [];
 
             filteredEvents.forEach((event) => {
-              const createMarkerAndPopup = (result: any, status: any, activeLocation: string) => {
-                if (!isMounted) return;
-                if (status === kakao.maps.services.Status.OK) {
-                  const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+              const currentLocs = event.locationsList && event.locationsList.length > 0 
+                ? event.locationsList 
+                : [event.location];
 
-                  bounds.extend(coords);
-                  boundsChanged = true;
+              currentLocs.forEach((singleLocation: string) => {
+                if (!singleLocation || !singleLocation.trim()) return;
 
-                  const markerWidth = isMobile ? 54 : 68;
-                  const markerHeight = isMobile ? 60 : 76;
-                  const offsetX = isMobile ? 27 : 34;
-                  const offsetY = isMobile ? 60 : 76;
+                const promise = new Promise<void>((resolve) => {
+                  try {
+                    geocoder.addressSearch(singleLocation.trim(), (result: any, status: any) => {
+                      if (!isMounted) {
+                        resolve();
+                        return;
+                      }
+                      if (status === kakao.maps.services.Status.OK) {
+                        resolvedCoordsList.push({
+                          event,
+                          coords: new kakao.maps.LatLng(result[0].y, result[0].x),
+                          location: singleLocation.trim()
+                        });
+                        resolve();
+                      } else {
+                        places.keywordSearch(singleLocation.trim(), (data: any, placeStatus: any) => {
+                          if (!isMounted) {
+                            resolve();
+                            return;
+                          }
+                          if (placeStatus === kakao.maps.services.Status.OK) {
+                            resolvedCoordsList.push({
+                              event,
+                              coords: new kakao.maps.LatLng(data[0].y, data[0].x),
+                              location: singleLocation.trim()
+                            });
+                          }
+                          resolve();
+                        });
+                      }
+                    });
+                  } catch (err) {
+                    console.error("[Map Error] Failed to invoke addressSearch:", err);
+                    resolve();
+                  }
+                });
+                addressPromises.push(promise);
+              });
+            });
 
-                  const markerImage = new kakao.maps.MarkerImage(
-                    event.canvasDataUrl,
-                    new kakao.maps.Size(markerWidth, markerHeight),
-                    { offset: new kakao.maps.Point(offsetX, offsetY) }
-                  );
+            const timeoutPromise = new Promise<void>((resolve) => {
+              setTimeout(resolve, 1000);
+            });
 
-                  // 축제(festival) 채널인 경우 마커가 다른 마커보다 항상 위에 노출되도록 zIndex 설정
-                  const isFestival = event.channelType === "festival" || event.channels?.some((c: any) => c.type === "festival");
-                  const markerZIndex = isFestival ? 10 : 2;
+            Promise.race([Promise.all(addressPromises), timeoutPromise]).then(() => {
+              if (!isMounted) return;
 
-                  const marker = new kakao.maps.Marker({
-                    position: coords,
-                    image: markerImage,
-                    zIndex: markerZIndex,
-                  });
-                  marker.setMap(map);
+              // 1. Group by coordinates rounded to 5 decimal places (~1.1m accuracy)
+              const coordGroups: { [key: string]: { coords: any; location: string; events: any[] } } = {};
+              resolvedCoordsList.forEach((item) => {
+                const lat = item.coords.getLat();
+                const lng = item.coords.getLng();
+                const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+                if (!coordGroups[key]) {
+                  coordGroups[key] = {
+                    coords: item.coords,
+                    location: item.location,
+                    events: []
+                  };
+                }
+                if (!coordGroups[key].events.some((e: any) => e.id === item.event.id)) {
+                  coordGroups[key].events.push(item.event);
+                }
+              });
 
-                  const infoContent = document.createElement("div");
-                  infoContent.className = "relative bg-background border border-border shadow-2xl rounded-2xl p-4 min-w-[260px] max-w-[320px] -translate-y-3 cursor-default select-none z-50 animate-in fade-in duration-200";
+              // 2. Sync the Kakao Map canvas to the DOM size first
+              map.relayout();
+
+              // 3. Render markers & overlays for each group
+              let successCount = 0;
+
+              Object.values(coordGroups).forEach((group) => {
+                const { coords, location: activeLocation, events: groupEvents } = group;
+
+                bounds.extend(coords);
+                boundsChanged = true;
+
+                const markerWidth = isMobile ? 54 : 68;
+                const markerHeight = isMobile ? 60 : 76;
+                const offsetX = isMobile ? 27 : 34;
+                const offsetY = isMobile ? 60 : 76;
+
+                let markerImageSrc = "";
+                let groupCanvasDataUrl = "";
+
+                if (groupEvents.length === 1) {
+                  markerImageSrc = groupEvents[0].canvasDataUrl;
+                } else {
+                  groupCanvasDataUrl = createGroupMarkerCanvas(groupEvents.length);
+                  markerImageSrc = groupCanvasDataUrl;
+                }
+
+                const markerImage = new kakao.maps.MarkerImage(
+                  markerImageSrc,
+                  new kakao.maps.Size(markerWidth, markerHeight),
+                  { offset: new kakao.maps.Point(offsetX, offsetY) }
+                );
+
+                const hasFestival = groupEvents.some((ev) => ev.channelType === "festival" || ev.channels?.some((c: any) => c.type === "festival"));
+                const markerZIndex = hasFestival ? 10 : 2;
+
+                const marker = new kakao.maps.Marker({
+                  position: coords,
+                  image: markerImage,
+                  zIndex: markerZIndex,
+                });
+                marker.setMap(map);
+
+                const infoContent = document.createElement("div");
+                infoContent.className = "relative bg-background border border-border shadow-2xl rounded-2xl p-4 min-w-[260px] max-w-[320px] -translate-y-3 cursor-default select-none z-50 animate-in fade-in duration-200";
+
+                if (groupEvents.length === 1) {
+                  const event = groupEvents[0];
                   infoContent.innerHTML = `
                     <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-background border-b border-r border-border rotate-45"></div>
                     <div class="flex justify-between items-start gap-4 mb-2">
@@ -581,10 +721,6 @@ function MapContent() {
 
                   infoContent.querySelector(".close-btn")?.addEventListener("click", (e) => {
                     e.stopPropagation();
-                    if (overlayRevealTimerRef.current) {
-                      window.clearTimeout(overlayRevealTimerRef.current);
-                      overlayRevealTimerRef.current = null;
-                    }
                     infoOverlay.setMap(null);
                     openOverlayRef.current = null;
                   });
@@ -601,47 +737,159 @@ function MapContent() {
                       animate: { duration: 320 }
                     });
                   });
+                } else {
+                  infoContent.innerHTML = `
+                    <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-background border-b border-r border-border rotate-45"></div>
+                    <div class="flex justify-between items-start gap-4 mb-2">
+                      <h4 class="font-extrabold text-sm text-foreground pr-2 leading-snug">진행 행사 목록 (${groupEvents.length})</h4>
+                      <button class="close-btn text-muted-foreground hover:text-foreground text-xl leading-none font-semibold">&times;</button>
+                    </div>
+                    <div class="space-y-2 max-h-[260px] overflow-y-auto pr-1 no-scrollbar border-t border-border/60 pt-2.5">
+                      ${groupEvents.map((event) => `
+                        <div class="event-item border border-border/80 rounded-xl overflow-hidden bg-muted/20 hover:bg-muted/30 transition-all duration-200" data-event-id="${event.id}">
+                          <div class="event-header flex justify-between items-center px-3 py-2 cursor-pointer">
+                            <span class="font-bold text-[12px] text-foreground line-clamp-1 flex-1 pr-2">${event.title}</span>
+                            <svg class="chevron-icon w-3.5 h-3.5 text-muted-foreground transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                          </div>
+                          <div class="event-body hidden px-3 pb-3 border-t border-border/40 pt-2.5 space-y-1.5 bg-background/50">
+                            <p class="text-[11px] text-muted-foreground flex items-center gap-1">
+                              <span class="font-bold text-foreground/80 shrink-0 min-w-[44px]">주최자:</span>
+                              <span class="truncate">${event.channelName}</span>
+                            </p>
+                            <p class="text-[11px] text-muted-foreground flex items-center gap-1">
+                              <span class="font-bold text-foreground/80 shrink-0 min-w-[44px]">일시:</span>
+                              <span class="truncate">${event.date}</span>
+                            </p>
+                            <p class="text-[11px] text-muted-foreground flex items-center gap-1">
+                              <span class="font-bold text-foreground/80 shrink-0 min-w-[44px]">장소:</span>
+                              <span class="truncate font-medium text-blue-600 dark:text-blue-400">${activeLocation}</span>
+                            </p>
+                            <div class="grid grid-cols-10 gap-2 mt-2.5 w-full select-none">
+                              <button class="detail-btn col-span-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-lg hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer">상세 보기</button>
+                              <button class="zoom-btn col-span-2 h-8 bg-background dark:bg-slate-900 border border-border/80 hover:bg-muted text-foreground rounded-lg transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      `).join("")}
+                    </div>
+                  `;
 
-                  const infoOverlay = new kakao.maps.CustomOverlay({
-                    position: coords,
-                    content: infoContent,
-                    yAnchor: 1.35,
-                    zIndex: 20,
-                  });
-
-                  if (String(event.id) === String(focusedEventId)) {
-                    targetCoords.push(coords);
-                    targetOverlays.push(infoOverlay);
-                  }
-
-                  kakao.maps.event.addListener(marker, "click", () => {
-                    userAdjustedMapView = true;
-                    if (overlayRevealTimerRef.current) {
-                      window.clearTimeout(overlayRevealTimerRef.current);
-                      overlayRevealTimerRef.current = null;
-                    }
-                    if (openOverlayRef.current) openOverlayRef.current.setMap(null);
+                  infoContent.querySelector(".close-btn")?.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    infoOverlay.setMap(null);
                     openOverlayRef.current = null;
 
-                    // 1. Smoothly pan to the marker without zooming
-                    const projection = map.getProjection();
-                    if (projection) {
-                      const markerPoint = projection.pointFromCoords(coords);
-                      if (markerPoint) {
-                        const targetPoint = new kakao.maps.Point(markerPoint.x, markerPoint.y - 40);
-                        const targetCoords = projection.coordsFromPoint(targetPoint);
-                        map.panTo(targetCoords);
+                    const originalMarkerImage = new kakao.maps.MarkerImage(
+                      groupCanvasDataUrl,
+                      new kakao.maps.Size(markerWidth, markerHeight),
+                      { offset: new kakao.maps.Point(offsetX, offsetY) }
+                    );
+                    marker.setImage(originalMarkerImage);
+                    marker.setZIndex(markerZIndex);
+                  });
+
+                  infoContent.querySelectorAll(".event-item").forEach((itemNode: any) => {
+                    const eventId = itemNode.getAttribute("data-event-id");
+                    const event = groupEvents.find((e: any) => String(e.id) === String(eventId));
+                    const headerNode = itemNode.querySelector(".event-header");
+                    const bodyNode = itemNode.querySelector(".event-body");
+                    const chevronIcon = itemNode.querySelector(".chevron-icon");
+
+                    headerNode?.addEventListener("click", () => {
+                      const isCurrentlyHidden = bodyNode.classList.contains("hidden");
+
+                      infoContent.querySelectorAll(".event-item").forEach((otherItem: any) => {
+                        if (otherItem !== itemNode) {
+                          otherItem.querySelector(".event-body").classList.add("hidden");
+                          const otherChevron = otherItem.querySelector(".chevron-icon");
+                          if (otherChevron) otherChevron.style.transform = "rotate(0deg)";
+                          otherItem.classList.remove("border-blue-500/40", "bg-blue-500/5");
+                        }
+                      });
+
+                      if (isCurrentlyHidden) {
+                        bodyNode.classList.remove("hidden");
+                        if (chevronIcon) chevronIcon.style.transform = "rotate(180deg)";
+                        itemNode.classList.add("border-blue-500/40", "bg-blue-500/5");
+
+                        if (event) {
+                          const activeMarkerImage = new kakao.maps.MarkerImage(
+                            event.canvasDataUrl,
+                            new kakao.maps.Size(markerWidth, markerHeight),
+                            { offset: new kakao.maps.Point(offsetX, offsetY) }
+                          );
+                          marker.setImage(activeMarkerImage);
+                          marker.setZIndex(15);
+                        }
                       } else {
-                        map.panTo(coords);
+                        bodyNode.classList.add("hidden");
+                        if (chevronIcon) chevronIcon.style.transform = "rotate(0deg)";
+                        itemNode.classList.remove("border-blue-500/40", "bg-blue-500/5");
+
+                        const groupMarkerImage = new kakao.maps.MarkerImage(
+                          groupCanvasDataUrl,
+                          new kakao.maps.Size(markerWidth, markerHeight),
+                          { offset: new kakao.maps.Point(offsetX, offsetY) }
+                        );
+                        marker.setImage(groupMarkerImage);
+                        marker.setZIndex(markerZIndex);
                       }
+                    });
+
+                    itemNode.querySelector(".detail-btn")?.addEventListener("click", (e: any) => {
+                      e.stopPropagation();
+                      window.location.href = `/events/${eventId}`;
+                    });
+
+                    itemNode.querySelector(".zoom-btn")?.addEventListener("click", (e: any) => {
+                      e.stopPropagation();
+                      map.setLevel(3, {
+                        anchor: coords,
+                        animate: { duration: 320 }
+                      });
+                    });
+                  });
+                }
+
+                const infoOverlay = new kakao.maps.CustomOverlay({
+                  position: coords,
+                  content: infoContent,
+                  yAnchor: 1.35,
+                  zIndex: 20,
+                });
+
+                const hasFocusedEvent = groupEvents.some((ev) => String(ev.id) === String(focusedEventId));
+                if (hasFocusedEvent) {
+                  targetCoords.push(coords);
+                  targetOverlays.push(infoOverlay);
+                }
+
+                kakao.maps.event.addListener(marker, "click", () => {
+                  userAdjustedMapView = true;
+                  if (openOverlayRef.current) openOverlayRef.current.setMap(null);
+                  openOverlayRef.current = null;
+
+                  const projection = map.getProjection();
+                  if (projection) {
+                    const markerPoint = projection.pointFromCoords(coords);
+                    if (markerPoint) {
+                      const targetPoint = new kakao.maps.Point(markerPoint.x, markerPoint.y - 40);
+                      const targetCoords = projection.coordsFromPoint(targetPoint);
+                      map.panTo(targetCoords);
                     } else {
                       map.panTo(coords);
                     }
+                  } else {
+                    map.panTo(coords);
+                  }
 
-                    // 2. Update and synchronize popup buttons for correct scale view
-                    if (!isMounted) return;
-                    const currentLevel = map.getLevel();
-                    const isZoomedOut = currentLevel > 3;
+                  if (!isMounted) return;
+                  const currentLevel = map.getLevel();
+                  const isZoomedOut = currentLevel > 3;
+
+                  if (groupEvents.length === 1) {
                     const dBtn = infoContent.querySelector(".detail-btn") as HTMLButtonElement;
                     const zBtn = infoContent.querySelector(".zoom-btn") as HTMLButtonElement;
                     if (dBtn && zBtn) {
@@ -653,85 +901,22 @@ function MapContent() {
                         zBtn.style.display = "none";
                       }
                     }
-
-                    infoOverlay.setMap(map);
-                    openOverlayRef.current = infoOverlay;
-                  });
-
-                  markersRef.current.push(marker);
-                  overlaysRef.current.push(infoOverlay);
-
-                  successCount++;
-                  setDrawnMarkersCount(successCount);
-                }
-              };
-
-              const currentLocs = event.locationsList && event.locationsList.length > 0 
-                ? event.locationsList 
-                : [event.location];
-
-              currentLocs.forEach((singleLocation: string) => {
-                if (!singleLocation || !singleLocation.trim()) return;
-
-                const promise = new Promise<void>((resolve) => {
-                  try {
-                    geocoder.addressSearch(singleLocation.trim(), (result: any, status: any) => {
-                      if (!isMounted) {
-                        resolve();
-                        return;
-                      }
-                      try {
-                        if (status === kakao.maps.services.Status.OK) {
-                          createMarkerAndPopup(result, status, singleLocation.trim());
-                          resolve();
-                        } else {
-                          // Try keyword search if address search fails
-                          places.keywordSearch(singleLocation.trim(), (data: any, placeStatus: any) => {
-                            if (!isMounted) {
-                              resolve();
-                              return;
-                            }
-                            try {
-                              if (placeStatus === kakao.maps.services.Status.OK) {
-                                createMarkerAndPopup(data, placeStatus, singleLocation.trim());
-                              }
-                            } catch (err) {
-                              console.error("[Map Error] Error in keywordSearch callback:", err);
-                            } finally {
-                              resolve();
-                            }
-                          });
-                        }
-                      } catch (err) {
-                        console.error("[Map Error] Error in addressSearch callback:", err);
-                        resolve();
-                      }
-                    });
-                  } catch (err) {
-                    console.error("[Map Error] Failed to invoke addressSearch:", err);
-                    resolve();
                   }
+
+                  infoOverlay.setMap(map);
+                  openOverlayRef.current = infoOverlay;
                 });
-                addressPromises.push(promise);
+
+                markersRef.current.push(marker);
+                overlaysRef.current.push(infoOverlay);
+
+                successCount++;
               });
-            });
 
-            const timeoutPromise = new Promise<void>((resolve) => {
-              setTimeout(resolve, 1000);
-            });
+              setDrawnMarkersCount(successCount);
 
-            Promise.race([Promise.all(addressPromises), timeoutPromise]).then(() => {
-              if (!isMounted) return;
-
-              // 1. Sync the Kakao Map canvas to the DOM size first
-              map.relayout();
-
-              // 2. Determine safety delay based on whether it is the first map creation.
-              // Kakao map needs a small initialization window (e.g. 350ms) to load tiles and handle bounds correctly.
+              // 4. Set map viewport bounds
               const safetyDelay = isFirstMapCreation ? 350 : 50;
-
-              // 3. Allow safety delay for the rendering engine,
-              // then perform the bounding and centering calculations.
               setTimeout(() => {
                 if (!isMounted) return;
 
@@ -756,7 +941,6 @@ function MapContent() {
                       }
                     }, 50);
 
-                    // Ensure startup popup matches level 3 styling on first load
                     const cNode = targetOverlays[0].getContent();
                     if (cNode && cNode.querySelector) {
                       const dBtn = cNode.querySelector(".detail-btn");
