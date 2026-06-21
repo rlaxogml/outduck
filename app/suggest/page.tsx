@@ -34,12 +34,11 @@ export default function SuggestPage() {
         "auth",
         () => supabase.auth.getSession()
       );
-      if (!session) {
-        toast.error("로그인이 필요합니다.");
-        router.push("/");
-        return;
+      if (session) {
+        setUser(session.user);
+      } else {
+        setUser(null);
       }
-      setUser(session.user);
       setIsLoadingAuth(false);
     };
     checkAuth();
@@ -123,7 +122,7 @@ export default function SuggestPage() {
           </div>
         )}
 
-        {mode === "channel" && user && (
+        {mode === "channel" && (
           <div>
             <button 
               onClick={() => setMode("selection")}
@@ -141,7 +140,7 @@ export default function SuggestPage() {
           </div>
         )}
 
-        {mode === "event" && user && (
+        {mode === "event" && (
           <div>
             <button 
               onClick={() => setMode("selection")}

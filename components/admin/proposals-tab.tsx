@@ -94,12 +94,12 @@ export function ProposalsTab({ adminUserId }: ProposalsTabProps) {
       // 4. Map profiles into the returned datasets
       const formattedChannels = (chanData || []).map((c: any) => ({
         ...c,
-        profiles: c.user_id ? { nickname: profilesMap[c.user_id] || "알 수 없음" } : null
+        profiles: c.user_id ? { nickname: profilesMap[c.user_id] || "알 수 없음" } : { nickname: "비로그인 제안자" }
       }));
 
       const formattedEvents = (eventData || []).map((e: any) => ({
         ...e,
-        profiles: e.user_id ? { nickname: profilesMap[e.user_id] || "알 수 없음" } : null
+        profiles: e.user_id ? { nickname: profilesMap[e.user_id] || "알 수 없음" } : { nickname: "비로그인 제보자" }
       }));
 
       setChannelProposals(formattedChannels);

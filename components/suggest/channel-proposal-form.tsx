@@ -31,7 +31,7 @@ interface ChannelLink {
 }
 
 interface ChannelProposalFormProps {
-  user: User;
+  user: User | null;
   onSuccess: () => void;
 }
 
@@ -71,7 +71,7 @@ export function ChannelProposalForm({ user, onSuccess }: ChannelProposalFormProp
         .map(({ name, url }) => ({ name: name.trim(), url: url.trim() }));
 
       const insertData = {
-        user_id: user.id,
+        user_id: user?.id ?? null,
         name: name.trim(),
         type: type,
         links: links.length > 0 ? links : null,

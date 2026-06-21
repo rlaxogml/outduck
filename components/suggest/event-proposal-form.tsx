@@ -13,7 +13,7 @@ import { notifyAdminsNewEventProposal } from "@/app/actions/email";
 
 
 interface EventProposalFormProps {
-  user: User;
+  user: User | null;
   onSuccess: () => void;
 }
 
@@ -43,7 +43,7 @@ export function EventProposalForm({ user, onSuccess }: EventProposalFormProps) {
     setIsSubmitting(true);
     try {
       const eventProposalData = {
-        user_id: user.id,
+        user_id: user?.id ?? null,
         status: "pending",
         is_offline: eventType === "offline",
         is_online: eventType === "online",
