@@ -140,6 +140,7 @@ export async function fetchMoreEvents(
           isAlways: !event.start_date,
           createdAt: event.created_at,
           startDateValue: event.start_date,
+          endDateValue: event.end_date,
         };
       });
 
@@ -190,6 +191,7 @@ export async function fetchMoreEvents(
           isAlways: !event.start_at,
           createdAt: event.created_at,
           startDateValue: event.start_at,
+          endDateValue: event.end_at,
         };
       });
 

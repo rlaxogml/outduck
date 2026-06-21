@@ -16,6 +16,7 @@ type Event = {
   isAlways: boolean;
   createdAt: string;
   startDateValue: string | null;
+  endDateValue: string | null;
 };
 
 const imageColors = [
@@ -268,6 +269,7 @@ export default async function Home() {
         isAlways: !event.start_date,
         createdAt: event.created_at,
         startDateValue: event.start_date,
+        endDateValue: event.end_date,
       };
     });
   }
@@ -295,6 +297,7 @@ export default async function Home() {
         isAlways: !event.start_at,
         createdAt: event.created_at,
         startDateValue: event.start_at,
+        endDateValue: event.end_at,
       };
     });
   }

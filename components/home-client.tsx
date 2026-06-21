@@ -30,6 +30,7 @@ type Event = {
   isAlways: boolean;
   createdAt: string;
   startDateValue: string | null;
+  endDateValue: string | null;
 };
 
 interface HomeClientProps {
@@ -314,12 +315,58 @@ export function HomeClient({
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
     } else {
-      // Upcoming sort
+      // Upcoming sort: Ongoing first (sorted by earliest end date), then Future (sorted by earliest start date), then Always at the bottom.
+      const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+      const todayMs = new Date(today).getTime();
+
+      const isOngoing = (ev: Event) => {
+        if (ev.isAlways) return false;
+        if (!ev.startDateValue) return false;
+        
+        const startOnly = ev.startDateValue.split("T")[0];
+        const startMs = new Date(startOnly).getTime();
+        if (startMs > todayMs) return false; // Starts in the future
+
+        if (ev.endDateValue) {
+          const endOnly = ev.endDateValue.split("T")[0];
+          const endMs = new Date(endOnly).getTime();
+          if (endMs < todayMs) return false; // Ended in the past
+        }
+        return true;
+      };
+
       result = [...result].sort((a, b) => {
         if (a.isAlways && !b.isAlways) return 1;
         if (!a.isAlways && b.isAlways) return -1;
-        if (!a.startDateValue || !b.startDateValue) return 0;
-        return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
+        if (a.isAlways && b.isAlways) return 0;
+
+        const isOngoingA = isOngoing(a);
+        const isOngoingB = isOngoing(b);
+
+        if (isOngoingA && !isOngoingB) return -1;
+        if (!isOngoingA && isOngoingB) return 1;
+
+        if (isOngoingA && isOngoingB) {
+          // Both ongoing: earliest end date first
+          if (a.endDateValue && b.endDateValue) {
+            const timeA = new Date(a.endDateValue.split("T")[0]).getTime();
+            const timeB = new Date(b.endDateValue.split("T")[0]).getTime();
+            if (timeA !== timeB) return timeA - timeB;
+          } else if (a.endDateValue && !b.endDateValue) {
+            return -1;
+          } else if (!a.endDateValue && b.endDateValue) {
+            return 1;
+          }
+          // Fallback to start date ascending
+          const startA = a.startDateValue ? new Date(a.startDateValue.split("T")[0]).getTime() : 0;
+          const startB = b.startDateValue ? new Date(b.startDateValue.split("T")[0]).getTime() : 0;
+          return startA - startB;
+        } else {
+          // Both future: earliest start date first
+          const startA = a.startDateValue ? new Date(a.startDateValue.split("T")[0]).getTime() : 0;
+          const startB = b.startDateValue ? new Date(b.startDateValue.split("T")[0]).getTime() : 0;
+          return startA - startB;
+        }
       });
     }
 
