@@ -49,7 +49,7 @@ export function HomeClient({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
+  const [sortType, setSortType] = useState<"recent" | "upcoming">("upcoming");
 
   const [offlineEvents, setOfflineEvents] = useState<Event[]>(initialOfflineEvents);
   const [onlineEvents, setOnlineEvents] = useState<Event[]>(initialOnlineEvents);

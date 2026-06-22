@@ -102,20 +102,9 @@ export function CategoryFilter({
         <div
           className={cn(
             "absolute top-[4px] bottom-[4px] left-[4px] w-[calc(50%-4px)] bg-background rounded-lg shadow-sm border border-border/10 transition-transform duration-300 ease-out z-0",
-            sortType === "recent" ? "translate-x-0" : "translate-x-full"
+            sortType === "upcoming" ? "translate-x-0" : "translate-x-full"
           )}
         />
-        <button
-          className={cn(
-            "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
-            sortType === "recent"
-              ? "text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => onSortChange("recent")}
-        >
-          최근 등록
-        </button>
         <button
           className={cn(
             "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
@@ -126,6 +115,17 @@ export function CategoryFilter({
           onClick={() => onSortChange("upcoming")}
         >
           가까운 일정
+        </button>
+        <button
+          className={cn(
+            "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
+            sortType === "recent"
+              ? "text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          onClick={() => onSortChange("recent")}
+        >
+          최근 등록
         </button>
       </div>
     </div>
