@@ -536,6 +536,13 @@ function MapContent() {
               }, panMs);
             };
 
+            kakao.maps.event.addListener(map, "dragstart", () => {
+              if (openOverlayRef.current) {
+                openOverlayRef.current.setMap(null);
+                openOverlayRef.current = null;
+              }
+            });
+
             kakao.maps.event.addListener(map, "idle", () => {
               if (!isMounted) return;
               if (openOverlayRef.current && !userAdjustedMapView) {
@@ -663,7 +670,10 @@ function MapContent() {
                 let markerImageSrc = "";
                 let groupCanvasDataUrl = "";
 
-                if (groupEvents.length === 1) {
+                const firstChannelId = groupEvents[0]?.channels[0]?.id;
+                const isAllSameChannel = groupEvents.every((ev: any) => ev.channels[0]?.id === firstChannelId);
+
+                if (groupEvents.length === 1 || isAllSameChannel) {
                   markerImageSrc = groupEvents[0].canvasDataUrl;
                 } else {
                   groupCanvasDataUrl = createGroupMarkerCanvas(groupEvents.length);
@@ -687,15 +697,23 @@ function MapContent() {
                 marker.setMap(map);
 
                 const infoContent = document.createElement("div");
-                infoContent.className = "relative bg-background border border-border shadow-2xl rounded-2xl p-4 min-w-[260px] max-w-[320px] -translate-y-3 cursor-default select-none z-50 animate-in fade-in duration-200";
+                infoContent.className = "relative bg-background border border-border shadow-2xl rounded-2xl p-4 w-[300px] -translate-y-3 cursor-default select-none z-50 animate-in fade-in duration-200";
 
-                if (groupEvents.length === 1) {
-                  const event = groupEvents[0];
+                // Function to render a single event detail view in the custom overlay
+                const showSingleEvent = (event: any) => {
                   infoContent.innerHTML = `
                     <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-background border-b border-r border-border rotate-45"></div>
-                    <div class="flex justify-between items-start gap-4 mb-2">
-                      <h4 class="font-bold text-sm text-foreground line-clamp-2 pr-2 leading-snug">${event.title}</h4>
-                      <button class="close-btn text-muted-foreground hover:text-foreground text-xl leading-none font-semibold">&times;</button>
+                    <div class="flex justify-between items-start gap-3 mb-2">
+                      <div class="flex items-center gap-1 min-w-0 flex-1">
+                        ${groupEvents.length > 1 ? `
+                          <button class="back-btn text-muted-foreground hover:text-foreground text-[11px] font-bold flex items-center shrink-0 mr-1.5 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mr-0.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            목록
+                          </button>
+                        ` : ''}
+                        <h4 class="font-bold text-sm text-foreground line-clamp-2 leading-snug">${event.title}</h4>
+                      </div>
+                      <button class="close-btn text-muted-foreground hover:text-foreground text-xl leading-none font-semibold shrink-0">&times;</button>
                     </div>
                     <div class="space-y-1.5 border-t border-border/60 pt-2.5">
                       <p class="text-xs text-muted-foreground flex items-center gap-1">
@@ -723,7 +741,22 @@ function MapContent() {
                     e.stopPropagation();
                     infoOverlay.setMap(null);
                     openOverlayRef.current = null;
+
+                    const originalMarkerImage = new kakao.maps.MarkerImage(
+                      isAllSameChannel ? groupEvents[0].canvasDataUrl : (groupCanvasDataUrl || groupEvents[0].canvasDataUrl),
+                      new kakao.maps.Size(markerWidth, markerHeight),
+                      { offset: new kakao.maps.Point(offsetX, offsetY) }
+                    );
+                    marker.setImage(originalMarkerImage);
+                    marker.setZIndex(markerZIndex);
                   });
+
+                  if (groupEvents.length > 1) {
+                    infoContent.querySelector(".back-btn")?.addEventListener("click", (e) => {
+                      e.stopPropagation();
+                      showEventList();
+                    });
+                  }
 
                   infoContent.querySelector(".detail-btn")?.addEventListener("click", (e) => {
                     e.stopPropagation();
@@ -737,120 +770,67 @@ function MapContent() {
                       animate: { duration: 320 }
                     });
                   });
-                } else {
+
+                  // Change marker image to the specific clicked event's channel image
+                  const activeMarkerImage = new kakao.maps.MarkerImage(
+                    event.canvasDataUrl,
+                    new kakao.maps.Size(markerWidth, markerHeight),
+                    { offset: new kakao.maps.Point(offsetX, offsetY) }
+                  );
+                  marker.setImage(activeMarkerImage);
+                  marker.setZIndex(15);
+                };
+
+                // Function to render the list of events in the custom overlay
+                const showEventList = () => {
                   infoContent.innerHTML = `
                     <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-background border-b border-r border-border rotate-45"></div>
                     <div class="flex justify-between items-start gap-4 mb-2">
                       <h4 class="font-extrabold text-sm text-foreground pr-2 leading-snug">진행 행사 목록 (${groupEvents.length})</h4>
-                      <button class="close-btn text-muted-foreground hover:text-foreground text-xl leading-none font-semibold">&times;</button>
+                      <button class="close-btn text-muted-foreground hover:text-foreground text-xl leading-none font-semibold shrink-0">&times;</button>
                     </div>
-                    <div class="space-y-2 max-h-[260px] overflow-y-auto pr-1 no-scrollbar border-t border-border/60 pt-2.5">
+                    <div class="space-y-2 max-h-[130px] overflow-y-auto pr-1 border-t border-border/60 pt-2.5 custom-scrollbar">
                       ${groupEvents.map((event) => `
-                        <div class="event-item border border-border/80 rounded-xl overflow-hidden bg-muted/20 hover:bg-muted/30 transition-all duration-200" data-event-id="${event.id}">
-                          <div class="event-header flex justify-between items-center px-3 py-2 cursor-pointer">
-                            <span class="font-bold text-[12px] text-foreground line-clamp-1 flex-1 pr-2">${event.title}</span>
-                            <svg class="chevron-icon w-3.5 h-3.5 text-muted-foreground transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-                          </div>
-                          <div class="event-body hidden px-3 pb-3 border-t border-border/40 pt-2.5 space-y-1.5 bg-background/50">
-                            <p class="text-[11px] text-muted-foreground flex items-center gap-1">
-                              <span class="font-bold text-foreground/80 shrink-0 min-w-[44px]">주최자:</span>
-                              <span class="truncate">${event.channelName}</span>
-                            </p>
-                            <p class="text-[11px] text-muted-foreground flex items-center gap-1">
-                              <span class="font-bold text-foreground/80 shrink-0 min-w-[44px]">일시:</span>
-                              <span class="truncate">${event.date}</span>
-                            </p>
-                            <p class="text-[11px] text-muted-foreground flex items-center gap-1">
-                              <span class="font-bold text-foreground/80 shrink-0 min-w-[44px]">장소:</span>
-                              <span class="truncate font-medium text-blue-600 dark:text-blue-400">${activeLocation}</span>
-                            </p>
-                            <div class="grid grid-cols-10 gap-2 mt-2.5 w-full select-none">
-                              <button class="detail-btn col-span-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold rounded-lg hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer">상세 보기</button>
-                              <button class="zoom-btn col-span-2 h-8 bg-background dark:bg-slate-900 border border-border/80 hover:bg-muted text-foreground rounded-lg transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-                              </button>
-                            </div>
-                          </div>
+                        <div class="event-item border border-border/80 rounded-xl overflow-hidden bg-muted/20 hover:bg-muted/30 transition-all duration-200 cursor-pointer px-3 py-2 flex justify-between items-center" data-event-id="${event.id}">
+                          <span class="font-bold text-[12px] text-foreground line-clamp-1 flex-1 pr-2">${event.title}</span>
+                          <svg class="w-3 h-3 text-muted-foreground shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5-7.5" /></svg>
                         </div>
                       `).join("")}
                     </div>
                   `;
 
+                  // Reset the marker to group representation when returning to list
+                  const originalMarkerImage = new kakao.maps.MarkerImage(
+                    isAllSameChannel ? groupEvents[0].canvasDataUrl : (groupCanvasDataUrl || groupEvents[0].canvasDataUrl),
+                    new kakao.maps.Size(markerWidth, markerHeight),
+                    { offset: new kakao.maps.Point(offsetX, offsetY) }
+                  );
+                  marker.setImage(originalMarkerImage);
+                  marker.setZIndex(markerZIndex);
+
                   infoContent.querySelector(".close-btn")?.addEventListener("click", (e) => {
                     e.stopPropagation();
                     infoOverlay.setMap(null);
                     openOverlayRef.current = null;
-
-                    const originalMarkerImage = new kakao.maps.MarkerImage(
-                      groupCanvasDataUrl,
-                      new kakao.maps.Size(markerWidth, markerHeight),
-                      { offset: new kakao.maps.Point(offsetX, offsetY) }
-                    );
-                    marker.setImage(originalMarkerImage);
-                    marker.setZIndex(markerZIndex);
                   });
 
                   infoContent.querySelectorAll(".event-item").forEach((itemNode: any) => {
                     const eventId = itemNode.getAttribute("data-event-id");
                     const event = groupEvents.find((e: any) => String(e.id) === String(eventId));
-                    const headerNode = itemNode.querySelector(".event-header");
-                    const bodyNode = itemNode.querySelector(".event-body");
-                    const chevronIcon = itemNode.querySelector(".chevron-icon");
-
-                    headerNode?.addEventListener("click", () => {
-                      const isCurrentlyHidden = bodyNode.classList.contains("hidden");
-
-                      infoContent.querySelectorAll(".event-item").forEach((otherItem: any) => {
-                        if (otherItem !== itemNode) {
-                          otherItem.querySelector(".event-body").classList.add("hidden");
-                          const otherChevron = otherItem.querySelector(".chevron-icon");
-                          if (otherChevron) otherChevron.style.transform = "rotate(0deg)";
-                          otherItem.classList.remove("border-blue-500/40", "bg-blue-500/5");
-                        }
-                      });
-
-                      if (isCurrentlyHidden) {
-                        bodyNode.classList.remove("hidden");
-                        if (chevronIcon) chevronIcon.style.transform = "rotate(180deg)";
-                        itemNode.classList.add("border-blue-500/40", "bg-blue-500/5");
-
-                        if (event) {
-                          const activeMarkerImage = new kakao.maps.MarkerImage(
-                            event.canvasDataUrl,
-                            new kakao.maps.Size(markerWidth, markerHeight),
-                            { offset: new kakao.maps.Point(offsetX, offsetY) }
-                          );
-                          marker.setImage(activeMarkerImage);
-                          marker.setZIndex(15);
-                        }
-                      } else {
-                        bodyNode.classList.add("hidden");
-                        if (chevronIcon) chevronIcon.style.transform = "rotate(0deg)";
-                        itemNode.classList.remove("border-blue-500/40", "bg-blue-500/5");
-
-                        const groupMarkerImage = new kakao.maps.MarkerImage(
-                          groupCanvasDataUrl,
-                          new kakao.maps.Size(markerWidth, markerHeight),
-                          { offset: new kakao.maps.Point(offsetX, offsetY) }
-                        );
-                        marker.setImage(groupMarkerImage);
-                        marker.setZIndex(markerZIndex);
+                    itemNode.addEventListener("click", (e: any) => {
+                      e.stopPropagation();
+                      if (event) {
+                        showSingleEvent(event);
                       }
                     });
-
-                    itemNode.querySelector(".detail-btn")?.addEventListener("click", (e: any) => {
-                      e.stopPropagation();
-                      window.location.href = `/events/${eventId}`;
-                    });
-
-                    itemNode.querySelector(".zoom-btn")?.addEventListener("click", (e: any) => {
-                      e.stopPropagation();
-                      map.setLevel(3, {
-                        anchor: coords,
-                        animate: { duration: 320 }
-                      });
-                    });
                   });
+                };
+
+                // Initialize the content based on number of events in this cluster
+                if (groupEvents.length === 1) {
+                  showSingleEvent(groupEvents[0]);
+                } else {
+                  showEventList();
                 }
 
                 const infoOverlay = new kakao.maps.CustomOverlay({
@@ -886,21 +866,11 @@ function MapContent() {
                   }
 
                   if (!isMounted) return;
-                  const currentLevel = map.getLevel();
-                  const isZoomedOut = currentLevel > 3;
 
                   if (groupEvents.length === 1) {
-                    const dBtn = infoContent.querySelector(".detail-btn") as HTMLButtonElement;
-                    const zBtn = infoContent.querySelector(".zoom-btn") as HTMLButtonElement;
-                    if (dBtn && zBtn) {
-                      if (isZoomedOut) {
-                        dBtn.className = "detail-btn col-span-8 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer";
-                        zBtn.style.display = "flex";
-                      } else {
-                        dBtn.className = "detail-btn col-span-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all duration-200 active:scale-[0.98] shadow-sm flex items-center justify-center cursor-pointer";
-                        zBtn.style.display = "none";
-                      }
-                    }
+                    showSingleEvent(groupEvents[0]);
+                  } else {
+                    showEventList();
                   }
 
                   infoOverlay.setMap(map);
