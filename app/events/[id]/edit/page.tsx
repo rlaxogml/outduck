@@ -44,7 +44,7 @@ export default function EditEventPage() {
   // Form states
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [locations, setLocations] = useState<string[]>([]);
+  const [locations, setLocations] = useState<{ location: string; latitude: number | null; longitude: number | null }[]>([]);
   const [locationInput, setLocationInput] = useState("");
   const [isManualLocation, setIsManualLocation] = useState(false);
   const currentYear = new Date().getFullYear().toString();
@@ -326,8 +326,8 @@ export default function EditEventPage() {
     return () => clearInterval(interval);
   }, [isScriptLoaded]);
 
-  const selectAddress = (addr: string) => {
-    setLocations(prev => [...prev, addr]);
+  const selectAddress = (addr: string, lat: number | null, lng: number | null) => {
+    setLocations(prev => [...prev, { location: addr, latitude: lat, longitude: lng }]);
     setLocationInput("");
     setAddrResults([]);
     toast.success("장소가 등록 되었습니다");
@@ -392,7 +392,7 @@ export default function EditEventPage() {
                 event_channels ( channels ( id, name, type, image_url, owner_id, company ) ),
                 event_images ( id, image_url, order )
               ),
-              offline_event_locations ( location )
+              offline_event_locations ( location, latitude, longitude )
             `)
             .eq("id", eventId)
             .maybeSingle();
@@ -488,7 +488,11 @@ export default function EditEventPage() {
             }
 
             if (event.offline_event_locations) {
-              setLocations(event.offline_event_locations.map((l: any) => l.location));
+              setLocations(event.offline_event_locations.map((l: any) => ({
+                location: l.location,
+                latitude: l.latitude,
+                longitude: l.longitude
+              })));
             }
 
             if (eventObj && eventObj.event_channels) {
@@ -785,7 +789,9 @@ export default function EditEventPage() {
 
       const locationRelations = locations.map((loc, idx) => ({
         offline_event_id: eventId,
-        location: loc,
+        location: loc.location,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
         order_num: idx,
       }));
 
@@ -1096,7 +1102,7 @@ export default function EditEventPage() {
                   <div className="flex flex-col gap-2">
                     {locations.map((loc, idx) => (
                       <div key={idx} className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-xl border border-border">
-                        <span className="text-sm">{loc}</span>
+                        <span className="text-sm">{loc.location}</span>
                         <button type="button" onClick={() => setLocations(prev => prev.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive">
                           <X className="w-4 h-4" />
                         </button>
@@ -1128,7 +1134,7 @@ export default function EditEventPage() {
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           if (locationInput.trim()) {
-                            setLocations(prev => [...prev, locationInput.trim()]);
+                            setLocations(prev => [...prev, { location: locationInput.trim(), latitude: null, longitude: null }]);
                             setLocationInput("");
                             toast.success("장소가 등록 되었습니다");
                           }
@@ -1149,7 +1155,7 @@ export default function EditEventPage() {
                           <button
                             key={idx}
                             type="button"
-                            onClick={() => selectAddress(item.placeName || item.address)}
+                            onClick={() => selectAddress(item.placeName || item.address, item.lat, item.lng)}
                             className="w-full text-left px-4 py-3 hover:bg-muted transition-colors text-sm flex flex-col gap-0.5 select-none"
                           >
                             <span className="font-semibold text-foreground">{item.placeName}</span>
@@ -1163,7 +1169,7 @@ export default function EditEventPage() {
                     type="button" 
                     onClick={() => {
                       if (locationInput.trim()) {
-                        setLocations(prev => [...prev, locationInput.trim()]);
+                        setLocations(prev => [...prev, { location: locationInput.trim(), latitude: null, longitude: null }]);
                         setLocationInput("");
                         toast.success("장소가 등록 되었습니다");
                       }

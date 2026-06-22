@@ -547,7 +547,7 @@ export function MiniCalendar({
                       className="flex items-center justify-start gap-4 md:gap-x-8 p-3 md:p-4 bg-card border border-border rounded-xl md:rounded-2xl hover:bg-muted/40 transition-all cursor-pointer relative shadow-sm"
                     >
                       {/* 1. Channels Avatar Group + Names */}
-                      <div className="flex items-center gap-3 w-[130px] sm:w-[180px] flex-shrink-0">
+                      <div className="flex items-center gap-3 w-auto sm:w-[180px] flex-shrink-0">
                         <div className="flex -space-x-3 flex-shrink-0">
                           {event.channels.slice(0, 2).map((ch, idx) => (
                             <div key={idx} className="w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-background overflow-hidden bg-muted flex-shrink-0 shadow-sm">

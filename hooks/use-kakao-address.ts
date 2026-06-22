@@ -30,6 +30,8 @@ export function useKakaoAddress(
             const formatted = data.map((item: any) => ({
               address: item.address_name,
               placeName: item.place_name,
+              lat: item.y ? parseFloat(item.y) : null,
+              lng: item.x ? parseFloat(item.x) : null,
             }));
             setAddrResults(formatted);
             setIsSearchingAddr(false);
@@ -38,7 +40,9 @@ export function useKakaoAddress(
               if (addrStatus === window.kakao.maps.services.Status.OK && result && result.length > 0) {
                 const formatted = result.map((item: any) => ({
                   address: item.address_name,
-                  placeName: item.place_name,
+                  placeName: item.place_name || item.address_name,
+                  lat: item.y ? parseFloat(item.y) : null,
+                  lng: item.x ? parseFloat(item.x) : null,
                 }));
                 setAddrResults(formatted);
               } else {

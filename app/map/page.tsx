@@ -249,7 +249,9 @@ function MapContent() {
                 )
               ),
               offline_event_locations!inner(
-                location
+                location,
+                latitude,
+                longitude
               )
             `)
             .or(`end_date.gte.${todayStr},end_date.is.null`)
@@ -288,7 +290,11 @@ function MapContent() {
               date: formatEventDate(item.start_date, item.end_date),
               rawStartDate: item.start_date,
               location: item.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
-              locationsList: item.offline_event_locations?.map((l: any) => l.location).filter(Boolean) || [],
+              locationsList: item.offline_event_locations?.map((l: any) => ({
+                location: l.location,
+                latitude: l.latitude,
+                longitude: l.longitude
+              })).filter((l: any) => l.location) || [],
               channelName: channel?.name || "기타",
               channelImage: channel?.image_url || null,
               channelType: channel?.type || null,
@@ -580,14 +586,36 @@ function MapContent() {
             filteredEvents.forEach((event) => {
               const currentLocs = event.locationsList && event.locationsList.length > 0 
                 ? event.locationsList 
-                : [event.location];
+                : [{ location: event.location, latitude: null, longitude: null }];
 
-              currentLocs.forEach((singleLocation: string) => {
-                if (!singleLocation || !singleLocation.trim()) return;
+              currentLocs.forEach((locObj: any) => {
+                const isObj = locObj && typeof locObj === "object";
+                const locationName = (isObj ? locObj.location : locObj) || "";
+                if (!locationName || !locationName.trim()) return;
 
+                const trimmedLoc = locationName.trim();
+                const lat = isObj ? locObj.latitude : null;
+                const lng = isObj ? locObj.longitude : null;
+
+                // Skip geocoding if the location indicates a nationwide or online event
+                if (trimmedLoc.includes("전국") || trimmedLoc.includes("온라인")) {
+                  return;
+                }
+
+                // If coordinates are already cached in DB, use them directly (Major performance boost!)
+                if (lat !== null && lng !== null) {
+                  resolvedCoordsList.push({
+                    event,
+                    coords: new kakao.maps.LatLng(lat, lng),
+                    location: trimmedLoc
+                  });
+                  return;
+                }
+
+                // Fallback to geocoder address search (for legacy data)
                 const promise = new Promise<void>((resolve) => {
                   try {
-                    geocoder.addressSearch(singleLocation.trim(), (result: any, status: any) => {
+                    geocoder.addressSearch(trimmedLoc, (result: any, status: any) => {
                       if (!isMounted) {
                         resolve();
                         return;
@@ -596,11 +624,11 @@ function MapContent() {
                         resolvedCoordsList.push({
                           event,
                           coords: new kakao.maps.LatLng(result[0].y, result[0].x),
-                          location: singleLocation.trim()
+                          location: trimmedLoc
                         });
                         resolve();
                       } else {
-                        places.keywordSearch(singleLocation.trim(), (data: any, placeStatus: any) => {
+                        places.keywordSearch(trimmedLoc, (data: any, placeStatus: any) => {
                           if (!isMounted) {
                             resolve();
                             return;
@@ -609,7 +637,7 @@ function MapContent() {
                             resolvedCoordsList.push({
                               event,
                               coords: new kakao.maps.LatLng(data[0].y, data[0].x),
-                              location: singleLocation.trim()
+                              location: trimmedLoc
                             });
                           }
                           resolve();
@@ -697,7 +725,8 @@ function MapContent() {
                 marker.setMap(map);
 
                 const infoContent = document.createElement("div");
-                infoContent.className = "relative bg-background border border-border shadow-2xl rounded-2xl p-4 w-[300px] -translate-y-3 cursor-default select-none z-50 animate-in fade-in duration-200";
+                infoContent.className = "relative bg-background border border-border shadow-2xl rounded-2xl p-4 w-[300px] cursor-default select-none z-50 animate-in fade-in duration-200";
+                infoContent.style.transform = `translateY(${isMobile ? -60 : -76}px)`;
 
                 // Function to render a single event detail view in the custom overlay
                 const showSingleEvent = (event: any) => {
@@ -705,12 +734,6 @@ function MapContent() {
                     <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-background border-b border-r border-border rotate-45"></div>
                     <div class="flex justify-between items-start gap-3 mb-2">
                       <div class="flex items-center gap-1 min-w-0 flex-1">
-                        ${groupEvents.length > 1 ? `
-                          <button class="back-btn text-muted-foreground hover:text-foreground text-[11px] font-bold flex items-center shrink-0 mr-1.5 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mr-0.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                            목록
-                          </button>
-                        ` : ''}
                         <h4 class="font-bold text-sm text-foreground line-clamp-2 leading-snug">${event.title}</h4>
                       </div>
                       <button class="close-btn text-muted-foreground hover:text-foreground text-xl leading-none font-semibold shrink-0">&times;</button>
@@ -751,12 +774,7 @@ function MapContent() {
                     marker.setZIndex(markerZIndex);
                   });
 
-                  if (groupEvents.length > 1) {
-                    infoContent.querySelector(".back-btn")?.addEventListener("click", (e) => {
-                      e.stopPropagation();
-                      showEventList();
-                    });
-                  }
+
 
                   infoContent.querySelector(".detail-btn")?.addEventListener("click", (e) => {
                     e.stopPropagation();
@@ -836,7 +854,7 @@ function MapContent() {
                 const infoOverlay = new kakao.maps.CustomOverlay({
                   position: coords,
                   content: infoContent,
-                  yAnchor: 1.35,
+                  yAnchor: 1.0,
                   zIndex: 20,
                 });
 

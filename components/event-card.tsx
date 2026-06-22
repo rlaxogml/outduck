@@ -323,16 +323,16 @@ export function EventCard({
         {/* 1. 모바일 전용 뷰 (sm 미만) */}
         <div className="sm:hidden flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex justify-between items-start gap-2">
-            <h3 className="font-semibold text-[13px] min-[380px]:text-[14px] leading-[18px] tracking-tight line-clamp-2 text-foreground flex-1">
+            <h3 className="font-semibold text-[15px] min-[380px]:text-[16px] leading-[20px] tracking-tight line-clamp-2 text-foreground flex-1 break-keep">
               {title}
             </h3>
             {reservationType && (
-              <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold ${reservationBadgeColors[reservationType]}`}>
+              <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold ${reservationBadgeColors[reservationType]}`}>
                 {reservationType}
               </span>
             )}
           </div>
-          <div className="flex flex-col gap-1.5 text-[11px] text-muted-foreground/80 dark:text-muted-foreground/60 mt-1 leading-none">
+          <div className="flex flex-col gap-1.5 text-[12px] text-muted-foreground/80 dark:text-muted-foreground/60 mt-1 leading-[18px]">
             {location && (
               <span className="truncate w-full block text-foreground/90 dark:text-foreground/80 font-medium">
                 장소: {location}
@@ -341,7 +341,7 @@ export function EventCard({
             <div className="flex items-center gap-x-1 whitespace-nowrap overflow-hidden text-ellipsis w-full">
               {hostText && (
                 <>
-                  <span className="font-semibold text-foreground/85 dark:text-foreground/90 truncate max-w-[90px]">
+                  <span className="font-semibold text-foreground/85 dark:text-foreground/90 truncate max-w-[100px]">
                     {hostText}
                   </span>
                   <span className="text-muted-foreground/60 select-none">·</span>
@@ -355,7 +355,7 @@ export function EventCard({
         {/* 2. PC 전용 뷰 (sm 이상) - 최초 순정 코드 100% 완전 복원 */}
         <div className="hidden sm:block w-full">
           <div className="flex justify-between items-start gap-[clamp(0.25rem,1vw,0.75rem)]">
-            <h3 className="font-semibold text-[clamp(0.75rem,1.3vw,1rem)] line-clamp-2 mb-0.5 md:mb-1 leading-tight">{title}</h3>
+            <h3 className="font-semibold text-[clamp(0.75rem,1.3vw,1rem)] line-clamp-2 mb-0.5 md:mb-1 leading-tight break-keep">{title}</h3>
             {reservationType && (
               <span className={`shrink-0 mt-0.5 px-[clamp(0.3rem,0.8vw,0.6rem)] py-[clamp(0.1rem,0.3vw,0.2rem)] rounded text-[clamp(0.6rem,1vw,0.75rem)] font-semibold ${reservationBadgeColors[reservationType]}`}>
                 {reservationType}

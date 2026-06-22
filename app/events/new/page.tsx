@@ -54,7 +54,7 @@ export default function NewEventPage() {
   // Form states
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [locations, setLocations] = useState<string[]>([]);
+  const [locations, setLocations] = useState<{ location: string; latitude: number | null; longitude: number | null }[]>([]);
   const [locationInput, setLocationInput] = useState("");
   const [isManualLocation, setIsManualLocation] = useState(false);
   const currentYear = new Date().getFullYear().toString();
@@ -345,8 +345,8 @@ export default function NewEventPage() {
     isScriptLoaded
   );
 
-  const selectAddress = (addr: string) => {
-    setLocations(prev => [...prev, addr]);
+  const selectAddress = (addr: string, lat: number | null, lng: number | null) => {
+    setLocations(prev => [...prev, { location: addr, latitude: lat, longitude: lng }]);
     setLocationInput("");
     setAddrResults([]);
     toast.success("장소가 등록 되었습니다");
@@ -625,7 +625,9 @@ export default function NewEventPage() {
         // 3. Insert into offline_event_locations
         const locationRelations = locations.map((loc, idx) => ({
           offline_event_id: eventData.id,
-          location: loc,
+          location: loc.location,
+          latitude: loc.latitude,
+          longitude: loc.longitude,
           order_num: idx,
         }));
 
@@ -1056,7 +1058,7 @@ export default function NewEventPage() {
                     <div className="flex flex-col gap-2">
                       {locations.map((loc, idx) => (
                         <div key={idx} className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-xl border border-border">
-                          <span className="text-sm">{loc}</span>
+                          <span className="text-sm">{loc.location}</span>
                           <button type="button" onClick={() => setLocations(prev => prev.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive">
                             <X className="w-4 h-4" />
                           </button>
@@ -1088,7 +1090,7 @@ export default function NewEventPage() {
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             if (locationInput.trim()) {
-                              setLocations(prev => [...prev, locationInput.trim()]);
+                              setLocations(prev => [...prev, { location: locationInput.trim(), latitude: null, longitude: null }]);
                               setLocationInput("");
                               toast.success("장소가 등록 되었습니다");
                             }
@@ -1109,7 +1111,7 @@ export default function NewEventPage() {
                             <button
                               key={idx}
                               type="button"
-                              onClick={() => selectAddress(item.placeName || item.address)}
+                              onClick={() => selectAddress(item.placeName || item.address, item.lat, item.lng)}
                               className="w-full text-left px-4 py-3 hover:bg-muted transition-colors text-sm flex flex-col gap-0.5 select-none"
                             >
                               <span className="font-semibold text-foreground">{item.placeName}</span>
@@ -1123,7 +1125,7 @@ export default function NewEventPage() {
                       type="button" 
                       onClick={() => {
                         if (locationInput.trim()) {
-                          setLocations(prev => [...prev, locationInput.trim()]);
+                          setLocations(prev => [...prev, { location: locationInput.trim(), latitude: null, longitude: null }]);
                           setLocationInput("");
                           toast.success("장소가 등록 되었습니다");
                         }
