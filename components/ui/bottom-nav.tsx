@@ -1,12 +1,12 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { House, Calendar, MapPinned, Star, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
 
   const navItems = [
     { id: "home", label: "홈", path: "/", icon: House },
@@ -33,9 +33,9 @@ export function BottomNav() {
         const Icon = item.icon;
 
         return (
-          <button
+          <Link
             key={item.id}
-            onClick={() => router.push(item.path)}
+            href={item.path}
             className={cn(
               "flex flex-col items-center justify-center flex-1 h-full py-1.5 transition-all duration-200 cursor-pointer relative rounded-2xl mx-1",
               isActive ? "bg-slate-100 dark:bg-slate-800/60" : "bg-transparent hover:bg-slate-50 dark:hover:bg-slate-900/30"
@@ -59,7 +59,7 @@ export function BottomNav() {
             >
               {item.label}
             </span>
-          </button>
+          </Link>
         );
       })}
     </nav>

@@ -13,8 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PosterSlider } from "@/components/poster-slider";
 import { OrganizerSection } from "@/components/organizer-section";
 import { FavoriteChannels } from "@/components/favorite-channels";
-import { MiniCalendar } from "@/components/mini-calendar";
-import { Building2, ArrowRight, UserCircle, Sparkles } from "lucide-react";
+import { Building2, ArrowRight, UserCircle } from "lucide-react";
 import { trackPerformance } from "@/lib/performance";
 
 type Event = {
@@ -37,14 +36,12 @@ interface HomeClientProps {
   initialOfflineEvents: Event[];
   initialOnlineEvents: Event[];
   initialPosters?: any[];
-  initialWeeklyEvents?: any[];
 }
 
 export function HomeClient({
   initialOfflineEvents,
   initialOnlineEvents,
   initialPosters = [],
-  initialWeeklyEvents = [],
 }: HomeClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
@@ -485,37 +482,10 @@ export function HomeClient({
             </div>
           )}
 
-          {/* User Suggestion Banner */}
-          <div className="mb-6 p-4 md:p-5 bg-gradient-to-r from-blue-500/10 to-indigo-500/5 border border-blue-500/20 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-2 fade-in duration-300">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-500 text-white rounded-2xl shrink-0">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div className="space-y-0.5">
-                <h4 className="text-sm md:text-base font-extrabold text-foreground">아웃덕에 새로운 행사 / 채널 제보하기</h4>
-                <p className="text-xs text-muted-foreground font-medium">찾으시는 채널이 없거나 새로운 행사가 있다면 직접 추가를 제안해 보세요.</p>
-              </div>
-            </div>
-            <button
-              onClick={() => router.push("/suggest")}
-              className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-md shrink-0 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-            >
-              제보 / 제안하러 가기 <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
           {/* Favorite Channels */}
           <FavoriteChannels
             user={user}
             initialFavorites={userFavorites}
-          />
-
-          {/* Mini Calendar Section */}
-          <MiniCalendar
-            user={user}
-            initialEvents={initialWeeklyEvents}
-            initialBookmarks={userBookmarks}
-            initialSubscribedChannelIds={(userFavorites || []).map(f => f.channel_id).filter(Boolean)}
           />
 
           {/* Tabs */}

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { User } from "@supabase/supabase-js";
 import { Bell, Calendar, CheckCircle2, Heart, House, Loader2, MapPinned, Megaphone, PlusCircle, Search, Star, X } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -932,45 +933,45 @@ export function Header() {
             "flex items-center justify-around sm:justify-center gap-2 sm:gap-6 px-3.5 py-2.5 sm:py-3.5 w-full overflow-x-auto no-scrollbar sm:pr-0",
             !isCompanyUser ? "pr-28" : "pr-3.5"
           )}>
-            <button
-              onClick={() => router.push("/")}
+            <Link
+              href="/"
               className={getNavStyle("/").button}
             >
               <House className={getNavStyle("/").icon} />
               <span className={getNavStyle("/").textClassName}>홈</span>
-            </button>
+            </Link>
             <span className="text-border shrink-0 select-none">|</span>
-            <button
-              onClick={() => router.push("/calendar")}
+            <Link
+              href="/calendar"
               className={getNavStyle("/calendar").button}
             >
               <Calendar className={getNavStyle("/calendar").icon} />
               <span className={getNavStyle("/calendar").textClassName}>캘린더</span>
-            </button>
+            </Link>
             <span className="text-border shrink-0 select-none">|</span>
-            <button
-              onClick={() => router.push("/map")}
+            <Link
+              href="/map"
               className={getNavStyle("/map").button}
             >
               <MapPinned className={getNavStyle("/map").icon} />
               <span className={getNavStyle("/map").textClassName}>지도</span>
-            </button>
+            </Link>
             <span className="text-border shrink-0 select-none">|</span>
-            <button
-              onClick={() => router.push("/subscriptions")}
+            <Link
+              href="/subscriptions"
               className={getNavStyle("/subscriptions").button}
             >
               <Star className={getNavStyle("/subscriptions").icon} />
               <span className={getNavStyle("/subscriptions").textClassName}>구독 행사</span>
-            </button>
+            </Link>
             <span className="text-border shrink-0 select-none">|</span>
-            <button
-              onClick={() => router.push("/bookmarks")}
+            <Link
+              href="/bookmarks"
               className={getNavStyle("/bookmarks").button}
             >
               <Heart className={getNavStyle("/bookmarks").icon} />
               <span className={getNavStyle("/bookmarks").textClassName}>찜한 행사</span>
-            </button>
+            </Link>
           </nav>
 
           {/* Floating Action Button: Pushed visibly inward to fully detach from edge and made slightly lusher */}
