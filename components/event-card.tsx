@@ -48,6 +48,7 @@ const categoryBadgeColors: Record<string, string> = {
   "게임": "bg-blue-500/80 text-white",
   "버튜버": "bg-purple-500/80 text-white",
   "유튜버": "bg-red-500/80 text-white",
+  "축제": "bg-amber-500/80 text-white",
 };
 
 export function EventCard({

@@ -144,7 +144,7 @@ function MapContent() {
               () => supabase.from("event_bookmarks").select("event_id").eq("user_id", currentUser.id).abortSignal(abortController.signal)
             ),
             trackPerformance(
-              "지도시각화 구독 채널 조회 (Client)",
+              "지도시각화 팔로우 채널 조회 (Client)",
               "client",
               () => supabase.from("favorites").select("channel_id").eq("user_id", currentUser.id).abortSignal(abortController.signal)
             ),
@@ -1114,7 +1114,7 @@ function MapContent() {
                           전체
                         </button>
                         {[
-                          { id: "subscribed", label: "구독 행사" },
+                          { id: "subscribed", label: "팔로우 채널" },
                           { id: "bookmarks", label: "찜한 행사" },
                         ].map((item) => (
                           <button
@@ -1315,7 +1315,7 @@ function MapContent() {
                       <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                         {[
                           { id: "all", label: "전체" },
-                          { id: "subscribed", label: "구독 행사" },
+                          { id: "subscribed", label: "팔로우 채널" },
                           { id: "bookmarks", label: "찜한 행사" },
                         ].map((item) => (
                           <button

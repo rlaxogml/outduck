@@ -137,7 +137,7 @@ export function MiniCalendar({
               () => supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id)
             ),
             trackPerformance(
-              "미니 캘린더 구독 채널 조회 (Client)",
+              "미니 캘린더 팔로우 채널 조회 (Client)",
               "client",
               () => supabase.from("favorites").select("channel_id").eq("user_id", user.id)
             ),
@@ -402,7 +402,7 @@ export function MiniCalendar({
               )}
               disabled={!user}
             >
-              구독
+              팔로우
             </button>
             <button
               onClick={() => setActiveFilter("bookmarked")}

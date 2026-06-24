@@ -12,7 +12,7 @@ export function BottomNav() {
     { id: "home", label: "홈", path: "/", icon: House },
     { id: "calendar", label: "캘린더", path: "/calendar", icon: Calendar },
     { id: "map", label: "지도", path: "/map", icon: MapPinned },
-    { id: "subscriptions", label: "구독행사", path: "/subscriptions", icon: Star },
+    { id: "subscriptions", label: "팔로우 채널", path: "/subscriptions", icon: Star },
     { id: "bookmarks", label: "찜한행사", path: "/bookmarks", icon: Heart },
   ];
 

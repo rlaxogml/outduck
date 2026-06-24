@@ -129,12 +129,12 @@ export default async function Home() {
     try {
       const res = await promise;
       const duration = performance.now() - s;
-      const color = duration > 500 ? '\x1b[31m' : duration > 150 ? '\x1b[33m' : '\x1b[32m';
-      console.log(`${color}[Perf Server] SERVER - ${label}: ${duration.toFixed(1)}ms\x1b[0m`);
+      // const color = duration > 500 ? '\x1b[31m' : duration > 150 ? '\x1b[33m' : '\x1b[32m';
+      // console.log(`${color}[Perf Server] SERVER - ${label}: ${duration.toFixed(1)}ms\x1b[0m`);
       return { res, duration, label };
     } catch (err) {
       const duration = performance.now() - s;
-      console.log(`\x1b[31m[Perf Server Failed] SERVER - ${label}: failed after ${duration.toFixed(1)}ms\x1b[0m`);
+      // console.log(`\x1b[31m[Perf Server Failed] SERVER - ${label}: failed after ${duration.toFixed(1)}ms\x1b[0m`);
       throw err;
     }
   };

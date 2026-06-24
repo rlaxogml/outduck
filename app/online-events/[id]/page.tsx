@@ -26,8 +26,8 @@ const getOnlineEvent = cache(async (eventId: number) => {
     .maybeSingle();
 
   const duration = performance.now() - start;
-  const color = duration > 500 ? '\x1b[31m' : duration > 150 ? '\x1b[33m' : '\x1b[32m';
-  console.log(`${color}[Perf Server] SERVER - 온라인 행사 상세 조회 (Server): ${duration.toFixed(1)}ms\x1b[0m`);
+  // const color = duration > 500 ? '\x1b[31m' : duration > 150 ? '\x1b[33m' : '\x1b[32m';
+  // console.log(`${color}[Perf Server] SERVER - 온라인 행사 상세 조회 (Server): ${duration.toFixed(1)}ms\x1b[0m`);
 
   return { ...res, duration };
 });

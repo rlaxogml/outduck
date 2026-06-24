@@ -608,7 +608,7 @@ export default function SettingsPage() {
                 {/* Activity Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-4">
                   <div className="rounded-xl bg-muted/50 p-4 md:p-5 flex flex-col justify-center">
-                    <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">구독 중인 채널</div>
+                    <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">팔로우 중인 채널</div>
                     <div className="text-xl md:text-3xl font-bold text-foreground">
                       {favoritesCount.toLocaleString()}
                     </div>

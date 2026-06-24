@@ -962,7 +962,7 @@ export function Header() {
               className={getNavStyle("/subscriptions").button}
             >
               <Star className={getNavStyle("/subscriptions").icon} />
-              <span className={getNavStyle("/subscriptions").textClassName}>구독 행사</span>
+              <span className={getNavStyle("/subscriptions").textClassName}>팔로우 채널</span>
             </Link>
             <span className="text-border shrink-0 select-none">|</span>
             <Link

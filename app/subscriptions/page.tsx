@@ -343,7 +343,7 @@ export default function SubscriptionsPage() {
           {!user && !loading && (
             <div className="text-center py-20 flex flex-col items-center justify-center border border-dashed border-muted rounded-xl bg-card">
               <p className="text-lg font-semibold text-muted-foreground mb-3">로그인이 필요합니다</p>
-              <p className="text-sm text-muted-foreground mb-4">로그인하고 내가 구독한 채널들의 행사를 한눈에 모아보세요!</p>
+              <p className="text-sm text-muted-foreground mb-4">로그인하고 내가 팔로우한 채널들의 행사를 한눈에 모아보세요!</p>
             </div>
           )}
 
@@ -424,7 +424,7 @@ export default function SubscriptionsPage() {
                       <>
                         {displayedOfflineEvents.length === 0 ? (
                           <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
-                            구독한 채널의 오프라인 행사가 없습니다.
+                            팔로우한 채널의 오프라인 행사가 없습니다.
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
@@ -454,7 +454,7 @@ export default function SubscriptionsPage() {
                       <>
                         {displayedOnlineEvents.length === 0 ? (
                           <div className="text-center py-20 border border-dashed border-border rounded-2xl bg-muted/10 text-muted-foreground">
-                            구독한 채널의 온라인 행사가 없습니다.
+                            팔로우한 채널의 온라인 행사가 없습니다.
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">

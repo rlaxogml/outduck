@@ -36,7 +36,7 @@ class PerformanceTracker {
       timestamp: Date.now(),
       pathname: path
     };
-    console.log("[PerformanceTracker] Added log:", newLog);
+    // console.log("[PerformanceTracker] Added log:", newLog);
     this.logs.push(newLog);
     this.notify();
   }
@@ -73,16 +73,16 @@ export async function trackPerformance<T>(
   fn: () => PromiseLike<T>
 ): Promise<T> {
   const start = performance.now();
-  console.log(`[trackPerformance] Starting task: ${label}`);
+  // console.log(`[trackPerformance] Starting task: ${label}`);
   try {
     const result = await fn();
     const duration = performance.now() - start;
-    console.log(`[trackPerformance] Task succeeded: ${label} in ${duration.toFixed(1)}ms`);
+    // console.log(`[trackPerformance] Task succeeded: ${label} in ${duration.toFixed(1)}ms`);
     performanceTracker.addLog({ label, type, duration });
     return result;
   } catch (err) {
     const duration = performance.now() - start;
-    console.log(`[trackPerformance] Task failed: ${label} in ${duration.toFixed(1)}ms`);
+    // console.log(`[trackPerformance] Task failed: ${label} in ${duration.toFixed(1)}ms`);
     performanceTracker.addLog({ label: `${label} (Failed)`, type, duration });
     throw err;
   }

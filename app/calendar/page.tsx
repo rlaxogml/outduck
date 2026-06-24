@@ -210,7 +210,7 @@ function CalendarContent() {
               () => supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id)
             ),
             trackPerformance(
-              "캘린더 구독 채널 조회 (Client)",
+              "캘린더 팔로우 채널 조회 (Client)",
               "client",
               () => supabase.from("favorites").select("channel_id").eq("user_id", user.id)
             ),
@@ -386,7 +386,7 @@ function CalendarContent() {
         ? activeFilters.filter(f => f !== id)
         : [...activeFilters.filter(f => f !== "all"), id];
 
-      // 상호 배타적인 필터 처리 (구독행사 vs 찜한행사)
+      // 상호 배타적인 필터 처리 (팔로우 채널 vs 찜한행사)
       if (!activeFilters.includes(id)) {
         if (id === "subscribed") next = next.filter(f => f !== "bookmarks");
         if (id === "bookmarks") next = next.filter(f => f !== "subscribed");
@@ -479,7 +479,7 @@ function CalendarContent() {
                   전체
                 </button>
                 {user && [
-                  { id: "subscribed", label: "구독 행사" },
+                  { id: "subscribed", label: "팔로우 채널" },
                   { id: "bookmarks", label: "찜한 행사" },
                 ].map((item) => (
                    <button
@@ -648,7 +648,7 @@ function CalendarContent() {
                     const channelsWithProfile: any[] = [];
                     const seenChannelIds = new Set();
                     dayEvents.forEach((event: any) => {
-                      // focusEventId가 있을 때는 구독 필터 무시 — 모든 채널 표시
+                      // focusEventId가 있을 때는 팔로우 필터 무시 — 모든 채널 표시
                       const filteredChannels = (!focusEventId && activeFilters.includes("subscribed"))
                         ? event.channels.filter((ch: any) => userSubscribedChannelIds.includes(ch.id))
                         : event.channels;
@@ -746,7 +746,7 @@ function CalendarContent() {
                           {/* 1. 프로필 이미지 + 이름 */}
                           <div className="flex items-center gap-2.5 md:gap-4 w-full md:w-[220px] flex-shrink-0">
                             <div className="flex -space-x-2.5 md:-space-x-4 flex-shrink-0">
-                              {/* focusEventId가 있을 때는 구독 필터 무시 */}
+                              {/* focusEventId가 있을 때는 팔로우 필터 무시 */}
                               {((!focusEventId && activeFilters.includes("subscribed"))
                                 ? event.channels.filter((ch: any) => userSubscribedChannelIds.includes(ch.id))
                                 : event.channels
