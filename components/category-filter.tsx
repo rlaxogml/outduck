@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
 
 const categories = [
   { id: "all", label: "전체" },
@@ -40,10 +41,10 @@ export function CategoryFilter({
   }, []);
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 py-3 px-4 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-30">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 py-1.5 md:py-3 px-4 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-30">
       <div 
         ref={containerRef}
-        className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 md:pb-0"
+        className="hidden md:flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 md:pb-0"
       >
         <button
           onClick={() => setIsExpanded(!isExpanded)}
@@ -97,36 +98,41 @@ export function CategoryFilter({
         </div>
       </div>
 
-      <div className="relative flex items-center bg-muted/50 p-1 rounded-xl self-end md:self-auto w-[180px] h-9 border border-border/30 select-none">
-        {/* Sliding pill background */}
-        <div
-          className={cn(
-            "absolute top-[4px] bottom-[4px] left-[4px] w-[calc(50%-4px)] bg-background rounded-lg shadow-sm border border-border/10 transition-transform duration-300 ease-out z-0",
-            sortType === "upcoming" ? "translate-x-0" : "translate-x-full"
-          )}
-        />
-        <button
-          className={cn(
-            "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
-            sortType === "upcoming"
-              ? "text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => onSortChange("upcoming")}
-        >
-          가까운 일정
-        </button>
-        <button
-          className={cn(
-            "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
-            sortType === "recent"
-              ? "text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => onSortChange("recent")}
-        >
-          최근 등록
-        </button>
+      <div className="flex items-center justify-between w-full md:w-auto gap-2">
+        {/* Mobile Hamburger Menu Button (Visible only on mobile) */}
+        <MobileMenuButton />
+
+        <div className="relative flex items-center bg-muted/50 p-1 rounded-xl w-[180px] h-9 border border-border/30 select-none">
+          {/* Sliding pill background */}
+          <div
+            className={cn(
+              "absolute top-[4px] bottom-[4px] left-[4px] w-[calc(50%-4px)] bg-background rounded-lg shadow-sm border border-border/10 transition-transform duration-300 ease-out z-0",
+              sortType === "upcoming" ? "translate-x-0" : "translate-x-full"
+            )}
+          />
+          <button
+            className={cn(
+              "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
+              sortType === "upcoming"
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => onSortChange("upcoming")}
+          >
+            가까운 일정
+          </button>
+          <button
+            className={cn(
+              "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
+              sortType === "recent"
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => onSortChange("recent")}
+          >
+            최근 등록
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -291,6 +291,8 @@ export function HomeClient({
     // 1. Category Filter
     if (activeCategory === "always") {
       result = result.filter(e => e.isAlways);
+    } else if (activeCategory === "youtuber_vtuber") {
+      result = result.filter(e => e.category === "유튜버" || e.category === "버튜버");
     } else if (activeCategory !== "all") {
       const catMap: Record<string, string> = {
         game: "게임",
@@ -430,12 +432,14 @@ export function HomeClient({
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
 
       {/* Poster Slider */}
-      <section className="max-w-7xl mx-auto px-4 mb-4 md:mb-6 pt-2 md:pt-2">
-        <PosterSlider initialPosters={initialPosters} />
-      </section>
+      {initialPosters && initialPosters.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 mb-1.5 md:mb-6 pt-1 md:pt-2">
+          <PosterSlider initialPosters={initialPosters} />
+        </section>
+      )}
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 pt-0 pb-3 md:pt-0 md:pb-3">

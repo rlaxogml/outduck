@@ -728,6 +728,19 @@ function MapContent() {
                 infoContent.className = "relative bg-background border border-border shadow-2xl rounded-2xl p-4 w-[300px] cursor-default select-none z-50 animate-in fade-in duration-200";
                 infoContent.style.transform = `translateY(${isMobile ? -60 : -76}px)`;
 
+                // Prevent mouse/touch/wheel events from propagating to the Kakao Map to avoid closing overlay while scrolling/interacting
+                const stopProp = (e: any) => e.stopPropagation();
+                infoContent.addEventListener("mousedown", stopProp);
+                infoContent.addEventListener("mousemove", stopProp);
+                infoContent.addEventListener("mouseup", stopProp);
+                infoContent.addEventListener("click", stopProp);
+                infoContent.addEventListener("dblclick", stopProp);
+                infoContent.addEventListener("contextmenu", stopProp);
+                infoContent.addEventListener("wheel", stopProp);
+                infoContent.addEventListener("touchstart", stopProp, { passive: true });
+                infoContent.addEventListener("touchmove", stopProp, { passive: true });
+                infoContent.addEventListener("touchend", stopProp);
+
                 // Function to render a single event detail view in the custom overlay
                 const showSingleEvent = (event: any) => {
                   infoContent.innerHTML = `

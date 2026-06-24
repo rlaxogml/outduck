@@ -259,7 +259,7 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
       </div>
 
       {/* Pagination Dots */}
-      <div className="flex items-center justify-center gap-2 mt-6">
+      <div className="flex items-center justify-center gap-2 mt-2 md:mt-5">
         {scrollSnaps.map((_, index) => (
           <button
             key={index}

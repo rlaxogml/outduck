@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Header } from "@/components/header";
+import { SortingFilterBar } from "@/components/sorting-filter-bar";
 import { FavoriteChannels } from "@/components/favorite-channels";
 import { EventTabs } from "@/components/event-tabs";
 import { EventCard } from "@/components/event-card";
@@ -338,8 +339,8 @@ export default function SubscriptionsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="mx-auto max-w-6xl px-4 py-3">
-        <main className="pb-8 py-4">
+      <div className="mx-auto max-w-6xl px-4 py-0 md:py-3">
+        <main className="pb-8 pt-0 md:pt-4 md:pb-8">
           {!user && !loading && (
             <div className="text-center py-20 flex flex-col items-center justify-center border border-dashed border-muted rounded-xl bg-card">
               <p className="text-lg font-semibold text-muted-foreground mb-3">로그인이 필요합니다</p>
@@ -356,39 +357,7 @@ export default function SubscriptionsPage() {
               <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
               {/* Sorting Filter */}
-              <div className="flex justify-end px-4 py-2 bg-background/50 backdrop-blur-sm sticky top-0 z-30 border-b border-border/40">
-                <div className="relative flex items-center bg-muted/50 p-1 rounded-xl w-[180px] h-9 border border-border/30 select-none">
-                  {/* Sliding pill background */}
-                  <div
-                    className={cn(
-                      "absolute top-[4px] bottom-[4px] left-[4px] w-[calc(50%-4px)] bg-background rounded-lg shadow-sm border border-border/10 transition-transform duration-300 ease-out z-0",
-                      sortType === "recent" ? "translate-x-0" : "translate-x-full"
-                    )}
-                  />
-                  <button
-                    className={cn(
-                      "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
-                      sortType === "recent"
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => setSortType("recent")}
-                  >
-                    최근 등록
-                  </button>
-                  <button
-                    className={cn(
-                      "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
-                      sortType === "upcoming"
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => setSortType("upcoming")}
-                  >
-                    가까운 일정
-                  </button>
-                </div>
-              </div>
+              <SortingFilterBar sortType={sortType} onSortChange={setSortType} />
 
               <div className="p-4 min-h-[600px]">
                 {loading ? (

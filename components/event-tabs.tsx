@@ -9,7 +9,7 @@ interface EventTabsProps {
 
 export function EventTabs({ activeTab, onTabChange }: EventTabsProps) {
   return (
-    <div className="flex w-full border-b border-border mt-2 relative">
+    <div className="flex w-full border-b border-border mt-1 md:mt-2 relative">
       <button
         className="flex-1 relative py-3 md:py-4 text-sm md:text-base font-semibold transition-all duration-200"
         onClick={() => onTabChange("offline")}

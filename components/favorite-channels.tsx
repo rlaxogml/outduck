@@ -429,7 +429,7 @@ export function FavoriteChannels({
   const hasTooMany = channels.length > 10;
 
   return (
-    <div className="bg-white mb-4 border-y border-border">
+    <div className="bg-white mb-1.5 md:mb-4 border-y border-border">
       <Link
         href="/all-channels"
         className="flex items-center p-3 cursor-pointer border-b border-border hover:bg-muted/30 transition-colors"

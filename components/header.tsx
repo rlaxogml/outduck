@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { User } from "@supabase/supabase-js";
-import { Bell, Calendar, CheckCircle2, Heart, House, Loader2, MapPinned, Megaphone, PlusCircle, Search, Star, X } from "lucide-react";
+import { Bell, Calendar, CheckCircle2, Heart, House, Loader2, MapPinned, Megaphone, Menu, PlusCircle, Search, Star, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { CUSTOM_EVENTS } from "@/lib/constants";
 
 type ChannelType = "game" | "youtuber" | "vtuber" | "festival";
 
@@ -43,13 +44,25 @@ const sanitizeSearchText = (value: string) => {
   return value.normalize("NFC").replace(/[\u200B-\u200D\uFEFF\u3164\u115F]/g, "");
 };
 
-export function Header() {
+interface HeaderProps {
+  activeCategory?: string;
+  onCategoryChange?: (category: string) => void;
+}
+
+export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
 
   const [isMounted, setIsMounted] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   useEffect(() => {
     setIsMounted(true);
+
+    const handleOpenMenu = () => setIsDrawerOpen(true);
+    window.addEventListener(CUSTOM_EVENTS.OPEN_MOBILE_MENU, handleOpenMenu);
+    return () => {
+      window.removeEventListener(CUSTOM_EVENTS.OPEN_MOBILE_MENU, handleOpenMenu);
+    };
   }, []);
 
   const getNavStyle = (path: string) => {
@@ -577,27 +590,40 @@ export function Header() {
       <div className="border-b border-border/50">
         <div className="mx-auto max-w-7xl w-full flex items-center justify-between md:grid md:grid-cols-[1fr_auto_1fr] px-3.5 md:px-4 py-2 md:py-3">
           <div
-            className="flex items-center gap-2 md:gap-3 cursor-pointer flex-shrink-0 justify-self-start"
-            onClick={() => router.push("/")}
+            className="flex items-center gap-2 md:gap-3 flex-shrink-0 justify-self-start"
           >
-            <Image
-              src="/logo.png"
-              alt="Icon"
-              width={120}
-              height={120}
-              className="h-11 w-11 md:h-14 md:w-14 object-contain flex-shrink-0"
-              priority
-              unoptimized
-            />
-            <Image
-              src="/logo-text.png"
-              alt="Logo"
-              width={250}
-              height={100}
-              className="h-12 md:h-15 w-auto object-contain flex-shrink-0"
-              priority
-              unoptimized
-            />
+            {/* Hamburger Button (Mobile only) */}
+            <button
+              onClick={() => setIsDrawerOpen(true)}
+              className="p-2 -ml-2 rounded-full hover:bg-muted text-slate-700 dark:text-slate-300 block md:hidden transition-colors cursor-pointer"
+              aria-label="메뉴 열기"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+
+            <div
+              className="flex items-center gap-2 md:gap-3 cursor-pointer"
+              onClick={() => router.push("/")}
+            >
+              <Image
+                src="/logo.png"
+                alt="Icon"
+                width={120}
+                height={120}
+                className="h-11 w-11 md:h-14 md:w-14 object-contain flex-shrink-0"
+                priority
+                unoptimized
+              />
+              <Image
+                src="/logo-text.png"
+                alt="Logo"
+                width={250}
+                height={100}
+                className="h-12 md:h-15 w-auto object-contain flex-shrink-0"
+                priority
+                unoptimized
+              />
+            </div>
           </div>
 
           {/* Integrated Search Bar: Explicit fixed width overrides to force CSS Grid 'auto' expansion */}
@@ -986,6 +1012,97 @@ export function Header() {
               </button>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Mobile Drawer (Menu Overlay) */}
+      <div
+        className={cn(
+          "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 md:hidden",
+          isDrawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+        onClick={() => setIsDrawerOpen(false)}
+      >
+        <div
+          className={cn(
+            "fixed top-0 left-0 h-full w-[280px] sm:w-[320px] bg-background border-r border-border p-5 shadow-2xl flex flex-col transition-transform duration-300 ease-out",
+            isDrawerOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header of Drawer */}
+          <div className="flex items-center justify-between pb-4 border-b border-border/50">
+            <span className="font-extrabold text-lg text-primary">메뉴</span>
+            <button
+              onClick={() => setIsDrawerOpen(false)}
+              className="p-1 rounded-full hover:bg-muted transition-colors cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Drawer Content */}
+          <div className="flex-1 flex flex-col py-6 overflow-y-auto no-scrollbar">
+            {/* Top Section: Navigation Links */}
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">내 활동</h3>
+                <div className="flex flex-col gap-2">
+                  <Link
+                    href="/subscriptions"
+                    onClick={() => setIsDrawerOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-slate-50 dark:bg-slate-900/50 hover:bg-muted transition-all"
+                  >
+                    <Star className="h-5 w-5 text-yellow-500 shrink-0" />
+                    <span className="text-sm font-bold text-foreground">팔로우 채널</span>
+                  </Link>
+                  <Link
+                    href="/bookmarks"
+                    onClick={() => setIsDrawerOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-slate-50 dark:bg-slate-900/50 hover:bg-muted transition-all"
+                  >
+                    <Heart className="h-5 w-5 text-red-500 shrink-0" />
+                    <span className="text-sm font-bold text-foreground">찜한 행사</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Bottom Section: Category Filter */}
+              {onCategoryChange && (
+                <div>
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">필터</h3>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { id: "all", label: "전체" },
+                      { id: "game", label: "게임" },
+                      { id: "youtuber_vtuber", label: "유튜버 / 버튜버" },
+                      { id: "festival", label: "행사" },
+                      { id: "always", label: "상시 운영" }
+                    ].map((cat) => {
+                      const isActive = activeCategory === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          onClick={() => {
+                            onCategoryChange(cat.id);
+                            setIsDrawerOpen(false);
+                          }}
+                          className={cn(
+                            "w-full text-left px-4 py-3 rounded-xl border text-sm transition-all cursor-pointer",
+                            isActive
+                              ? "bg-primary/10 border-primary text-primary font-extrabold shadow-sm"
+                              : "bg-background border-border text-muted-foreground font-semibold hover:border-primary/50 hover:text-primary"
+                          )}
+                        >
+                          {cat.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
