@@ -1099,7 +1099,7 @@ function MapContent() {
           <div className="block md:hidden shrink-0 px-4 pb-3">
             {isFilterOpen ? (
               /* EXPANDED FILTER PANEL */
-              <div className="bg-gradient-to-br from-[#dbeafe] to-[#f6e4ff] dark:from-slate-900/95 dark:to-slate-800/95 border border-primary/30 rounded-2xl shadow-xl p-3.5 flex flex-col gap-3.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+              <div className="bg-indigo-50/90 dark:bg-indigo-950/70 border border-indigo-500/20 rounded-2xl shadow-xl p-3.5 flex flex-col gap-3.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
                   {/* Header Row */}
                   <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setIsFilterOpen(false)}>
                     <div className="flex items-center gap-1.5">
@@ -1110,7 +1110,7 @@ function MapContent() {
                   </div>
 
                   {/* Horizontal Sections */}
-                  <div className="space-y-3.5 pt-1.5 border-t border-primary/10">
+                  <div className="space-y-3.5 pt-1.5 border-t border-indigo-500/20">
                     {/* Section 1: 빠른 필터 */}
                     <div className="flex flex-col gap-1.5">
                       <h4 className="text-[10px] font-bold text-slate-500 tracking-tight">빠른 필터</h4>
@@ -1279,7 +1279,7 @@ function MapContent() {
                 /* CLOSED FLAT PILL */
                 <div 
                   onClick={() => setIsFilterOpen(true)}
-                  className="w-fit bg-gradient-to-br from-[#dbeafe] to-[#f6e4ff] dark:from-slate-900/90 dark:to-slate-800/90 border border-primary/30 rounded-full shadow-md px-4 py-2 flex items-center gap-2 cursor-pointer select-none backdrop-blur-md animate-in fade-in duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-fit bg-indigo-50/90 dark:bg-indigo-950/70 border border-indigo-500/20 rounded-full shadow-md px-4 py-2 flex items-center gap-2 cursor-pointer select-none backdrop-blur-md animate-in fade-in duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
                   <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span className="text-[12px] font-extrabold text-foreground tracking-tight">필터 설정</span>
@@ -1290,12 +1290,12 @@ function MapContent() {
 
             <div className={cn("relative flex-1 w-[calc(100%+32px)] md:w-full border-t md:border border-border rounded-none md:rounded-2xl bg-muted overflow-hidden shadow-none md:shadow-md md:h-[650px] mx-[-16px] md:mx-0 transition-all duration-300")}>
               {/* New Floating Panel (PC only) */}
-              <div className="hidden md:flex absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-gradient-to-br from-[#dbeafe] to-[#f6e4ff] dark:from-primary/20 dark:to-primary/20 border border-primary/30 rounded-2xl sm:rounded-[1.75rem] shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden backdrop-blur-md">
+              <div className="hidden md:flex absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-indigo-50/90 dark:bg-indigo-950/70 border border-indigo-500/20 rounded-2xl sm:rounded-[1.75rem] shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden backdrop-blur-md">
                 {/* Master Header Toggle */}
                 <div
                   className={cn(
-                    "p-2.5 sm:p-3.5 flex items-center justify-between cursor-pointer select-none hover:bg-primary/10 transition-all bg-white/20 dark:bg-black/10",
-                    isSidebarExpanded && "border-b border-primary/10"
+                    "p-2.5 sm:p-3.5 flex items-center justify-between cursor-pointer select-none hover:bg-indigo-500/10 transition-all bg-white/20 dark:bg-black/10",
+                    isSidebarExpanded && "border-b border-indigo-500/20"
                   )}
                   onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
                 >
@@ -1322,7 +1322,7 @@ function MapContent() {
                     </div>
                   )}
                   {/* 빠른 필터 Section */}
-                  <div className="p-2.5 sm:p-4 border-b border-primary/10">
+                  <div className="p-2.5 sm:p-4 border-b border-indigo-500/20">
                     <h4 className="text-[11px] sm:text-[12px] font-bold text-foreground/70 mb-2.5">빠른 필터</h4>
                     <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                       <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
@@ -1351,7 +1351,7 @@ function MapContent() {
                   </div>
 
                   {/* 장르 및 주제 Section */}
-                  <div className="p-2.5 sm:p-4 border-b border-primary/10">
+                  <div className="p-2.5 sm:p-4 border-b border-indigo-500/20">
                     <h4 className="text-[11px] sm:text-[12px] font-bold text-muted-foreground mb-2.5">장르 및 주제</h4>
                     <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                       <button
