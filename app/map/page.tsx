@@ -1089,14 +1089,14 @@ function MapContent() {
       <Header />
       <div className="map-inner-container w-full h-[calc(100vh-112px)] md:h-auto md:mx-auto md:max-w-6xl md:px-4 md:py-3 relative">
         <main className="w-full h-full md:h-auto flex flex-col md:block py-0 md:py-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 pt-3 pb-1 md:px-0 md:py-0 mb-1 md:mb-2 shrink-0">
+          <div className="hidden md:flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 pt-3 pb-1 md:px-0 md:py-0 mb-1 md:mb-2 shrink-0">
             <div className="space-y-1">
               <h1 className="text-sm md:text-3xl font-extrabold tracking-tight">🗺️ 오프라인 행사 지도</h1>
             </div>
           </div>
 
           {/* Mobile Flat Collapsible Premium Filter Widget */}
-          <div className="block md:hidden shrink-0 px-4 pb-3">
+          <div className="block md:hidden shrink-0 px-4 pt-3 pb-3">
             {isFilterOpen ? (
               /* EXPANDED FILTER PANEL */
               <div className="bg-purple-50 dark:bg-purple-950 border border-purple-500/20 rounded-2xl shadow-xl p-3.5 flex flex-col gap-3.5 animate-in fade-in zoom-in-95 duration-200">
