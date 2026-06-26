@@ -418,7 +418,7 @@ export function OrganizerSection({ user }: { user: User | null }) {
               채널 수정
             </Button>
             <Button
-              onClick={(e) => { e.stopPropagation(); router.push("/events/new"); }}
+              onClick={(e) => { e.stopPropagation(); router.push(`/events/new?channelId=${channel.id}`); }}
               className="flex-1 md:flex-none inline-flex items-center gap-1 md:gap-1.5 justify-center rounded-full h-8 sm:h-11 px-3 sm:px-5 font-bold text-[11px] sm:text-sm bg-primary/5 text-primary hover:bg-primary/10 border border-primary/60 transition-all hover:scale-105 active:scale-95 shadow-sm"
             >
               <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -465,7 +465,7 @@ export function OrganizerSection({ user }: { user: User | null }) {
           ) : (
             <div className="flex overflow-x-auto gap-4 md:gap-5 pb-2 md:pb-3 snap-x items-center [&::-webkit-scrollbar]:h-1.5 md:[&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-primary/5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary/20 hover:[&::-webkit-scrollbar-thumb]:bg-primary/40 [&::-webkit-scrollbar-thumb]:rounded-full transition-colors">
               <button 
-                onClick={() => router.push("/events/new")}
+                onClick={() => router.push(`/events/new?channelId=${channel.id}`)}
                 className="flex flex-col items-center justify-center gap-2.5 group min-w-[110px] ml-4 mr-2 pr-2 shrink-0 snap-start mt-4"
               >
                 <div className="w-16 h-16 rounded-full border-[2.5px] border-dashed border-neutral-400 dark:border-neutral-500 flex items-center justify-center group-hover:border-primary group-hover:bg-primary/5 transition-all shadow-sm">
@@ -572,7 +572,7 @@ export function OrganizerSection({ user }: { user: User | null }) {
             <p className="text-xs md:text-sm text-muted-foreground mt-1 text-center">새로운 행사를 등록하고 팬들과 만나보세요!</p>
             <div className="pt-2 md:pt-4">
               <Link
-                href="/events/new"
+                href={`/events/new?channelId=${channel.id}`}
                 className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
               >
                 새 행사 등록하러 가기

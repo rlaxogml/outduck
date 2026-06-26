@@ -480,6 +480,7 @@ export default function RichTextEditor({
         {floatingButtons.map((btn, idx) => (
           <button
             key={idx}
+            type="button"
             onClick={() => handleDeleteImageFromEditor(btn.src)}
             style={{
               position: 'absolute',

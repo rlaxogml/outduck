@@ -379,7 +379,7 @@ export function ChannelProfileClient({
                   수정
                 </button>
                 <Link
-                  href="/events/new"
+                  href={`/events/new?channelId=${channelId}`}
                   className="inline-flex items-center gap-1 justify-center rounded-full h-9 md:h-11 px-3 md:px-5 font-bold text-xs md:text-sm bg-primary/5 text-primary hover:bg-primary/10 border border-primary/60 transition-all hover:scale-105 active:scale-95 shadow-sm"
                 >
                   <Plus className="h-3 w-3 md:h-4 md:w-4" />
@@ -541,7 +541,7 @@ export function ChannelProfileClient({
                     {isOwner && (
                       <div className="pt-4 animate-in fade-in zoom-in-95 duration-200">
                         <Link
-                          href="/events/new"
+                          href={`/events/new?channelId=${channelId}`}
                           className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
                         >
                           행사 등록하러 가기
@@ -631,7 +631,7 @@ export function ChannelProfileClient({
                     {isOwner && (
                       <div className="pt-4 animate-in fade-in zoom-in-95 duration-200">
                         <Link
-                          href="/events/new"
+                          href={`/events/new?channelId=${channelId}`}
                           className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
                         >
                           행사 등록하러 가기
@@ -719,7 +719,7 @@ export function ChannelProfileClient({
                     {isOwner && (
                       <div className="pt-4 animate-in fade-in zoom-in-95 duration-200">
                         <Link
-                          href="/events/new"
+                          href={`/events/new?channelId=${channelId}`}
                           className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
                         >
                           행사 등록하러 가기

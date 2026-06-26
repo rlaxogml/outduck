@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,9 @@ type Channel = {
   type: string | null;
 };
 
-export default function NewEventPage() {
+function NewEventPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [ownedChannels, setOwnedChannels] = useState<Channel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -404,13 +405,21 @@ export default function NewEventPage() {
         router.push("/");
       } else {
         setOwnedChannels(combined);
-        setHostId(combined[0].id.toString());
+        const channelIdParam = searchParams.get("channelId");
+        const prefilledChannel = channelIdParam 
+          ? combined.find(c => c.id.toString() === channelIdParam)
+          : null;
+        if (prefilledChannel) {
+          setHostId(prefilledChannel.id.toString());
+        } else {
+          setHostId(combined[0].id.toString());
+        }
         setIsLoading(false);
       }
     };
 
     checkAuthAndFetchChannels();
-  }, [router]);
+  }, [router, searchParams]);
 
   // image upload logic is handled by useEventImageUpload hook
 
@@ -1869,5 +1878,17 @@ export default function NewEventPage() {
         </form>
       </main>
     </div>
+  );
+}
+
+export default function NewEventPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center animate-pulse">
+        <p className="text-muted-foreground text-sm font-medium">로딩 중...</p>
+      </div>
+    }>
+      <NewEventPageContent />
+    </Suspense>
   );
 }
