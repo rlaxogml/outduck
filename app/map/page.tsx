@@ -1099,7 +1099,7 @@ function MapContent() {
           <div className="block md:hidden shrink-0 px-4 pb-3">
             {isFilterOpen ? (
               /* EXPANDED FILTER PANEL */
-              <div className="bg-indigo-50/40 dark:bg-indigo-950/30 border border-indigo-500/10 rounded-2xl shadow-xl p-3.5 flex flex-col gap-3.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+              <div className="bg-indigo-50 dark:bg-[#1b1d30] border border-indigo-500/20 rounded-2xl shadow-xl p-3.5 flex flex-col gap-3.5 animate-in fade-in zoom-in-95 duration-200">
                   {/* Header Row */}
                   <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setIsFilterOpen(false)}>
                     <div className="flex items-center gap-1.5">
@@ -1279,7 +1279,7 @@ function MapContent() {
                 /* CLOSED FLAT PILL */
                 <div 
                   onClick={() => setIsFilterOpen(true)}
-                  className="w-fit bg-indigo-50/40 dark:bg-indigo-950/30 border border-indigo-500/10 rounded-full shadow-md px-4 py-2 flex items-center gap-2 cursor-pointer select-none backdrop-blur-md animate-in fade-in duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-fit bg-indigo-50 dark:bg-[#1b1d30] border border-indigo-500/20 rounded-full shadow-md px-4 py-2 flex items-center gap-2 cursor-pointer select-none animate-in fade-in duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
                   <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span className="text-[12px] font-extrabold text-foreground tracking-tight">필터 설정</span>
@@ -1290,7 +1290,7 @@ function MapContent() {
 
             <div className={cn("relative flex-1 w-[calc(100%+32px)] md:w-full border-t md:border border-border rounded-none md:rounded-2xl bg-muted overflow-hidden shadow-none md:shadow-md md:h-[650px] mx-[-16px] md:mx-0 transition-all duration-300")}>
               {/* New Floating Panel (PC only) */}
-              <div className="hidden md:flex absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-indigo-50/40 dark:bg-indigo-950/30 border border-indigo-500/10 rounded-2xl sm:rounded-[1.75rem] shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden backdrop-blur-md">
+              <div className="hidden md:flex absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-indigo-50 dark:bg-[#1b1d30] border border-indigo-500/20 rounded-2xl sm:rounded-[1.75rem] shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden">
                 {/* Master Header Toggle */}
                 <div
                   className={cn(
