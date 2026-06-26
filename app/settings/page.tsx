@@ -380,10 +380,9 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-background pb-12">
-      <Header />
       <div className="mx-auto max-w-6xl w-full px-4 py-8 md:py-12">
         {/* Mobile Header / Subheader */}
-        <div className="flex items-center gap-3.5 mb-6 md:hidden px-2">
+        <div className="flex items-center gap-3.5 pb-4 mb-6 md:hidden px-2 border-b border-border/60">
           <button
             onClick={() => setIsSidebarOpen(true)}
             className="p-1 text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
