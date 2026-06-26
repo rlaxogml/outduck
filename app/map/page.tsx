@@ -1089,28 +1089,22 @@ function MapContent() {
       <Header />
       <div className="map-inner-container w-full h-[calc(100vh-112px)] md:h-auto md:mx-auto md:max-w-6xl md:px-4 md:py-3 relative">
         <main className="w-full h-full md:h-auto flex flex-col md:block py-0 md:py-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 py-2 md:px-0 md:py-0 mb-1 md:mb-2 shrink-0">
-            <div className="space-y-1">
-              <h1 className="text-sm md:text-3xl font-extrabold tracking-tight">🗺️ 오프라인 행사 지도</h1>
-            </div>
-          </div>
-
-          {/* Mobile Flat Collapsible Premium Filter Widget */}
+                {/* Mobile Flat Collapsible Premium Filter Widget */}
           <div className="block md:hidden shrink-0 px-4 pb-3">
             {isFilterOpen ? (
               /* EXPANDED FILTER PANEL */
-              <div className="bg-indigo-50 dark:bg-[#1b1d30] border border-indigo-500/20 rounded-2xl shadow-xl p-3.5 flex flex-col gap-3.5 animate-in fade-in zoom-in-95 duration-200">
+              <div className="bg-sky-50 dark:bg-sky-950 border border-sky-500/20 rounded-2xl shadow-xl p-3.5 flex flex-col gap-3.5 animate-in fade-in zoom-in-95 duration-200">
                   {/* Header Row */}
                   <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setIsFilterOpen(false)}>
                     <div className="flex items-center gap-1.5">
-                      <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <Filter className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                       <h3 className="text-[13px] font-extrabold text-foreground tracking-tight">필터 설정</h3>
                     </div>
                     <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
                   </div>
 
                   {/* Horizontal Sections */}
-                  <div className="space-y-3.5 pt-1.5 border-t border-indigo-500/10">
+                  <div className="space-y-3.5 pt-1.5 border-t border-sky-500/10">
                     {/* Section 1: 빠른 필터 */}
                     <div className="flex flex-col gap-1.5">
                       <h4 className="text-[10px] font-bold text-slate-500 tracking-tight">빠른 필터</h4>
@@ -1136,7 +1130,7 @@ function MapContent() {
                             className={cn(
                               "flex items-center justify-center px-3.5 py-1.5 text-[10px] font-bold rounded-full border transition-all shadow-sm select-none",
                               interactionFilter === item.id
-                                ? "border-indigo-500 bg-indigo-100 text-indigo-800 font-extrabold"
+                                ? "border-sky-500 bg-sky-100 text-sky-800 font-extrabold"
                                 : "border-slate-300/80 bg-white dark:bg-slate-900 text-slate-600 hover:bg-slate-50"
                             )}
                           >
@@ -1279,9 +1273,9 @@ function MapContent() {
                 /* CLOSED FLAT PILL */
                 <div 
                   onClick={() => setIsFilterOpen(true)}
-                  className="w-fit bg-indigo-50 dark:bg-[#1b1d30] border border-indigo-500/20 rounded-full shadow-md px-4 py-2 flex items-center gap-2 cursor-pointer select-none animate-in fade-in duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-fit bg-sky-50 dark:bg-sky-950 border border-sky-500/20 rounded-full shadow-md px-4 py-2 flex items-center gap-2 cursor-pointer select-none animate-in fade-in duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <Filter className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                   <span className="text-[12px] font-extrabold text-foreground tracking-tight">필터 설정</span>
                   <ChevronDown className="w-3.5 h-3.5 text-muted-foreground ml-0.5" />
                 </div>
@@ -1290,12 +1284,12 @@ function MapContent() {
 
             <div className={cn("relative flex-1 w-[calc(100%+32px)] md:w-full border-t md:border border-border rounded-none md:rounded-2xl bg-muted overflow-hidden shadow-none md:shadow-md md:h-[650px] mx-[-16px] md:mx-0 transition-all duration-300")}>
               {/* New Floating Panel (PC only) */}
-              <div className="hidden md:flex absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-indigo-50 dark:bg-[#1b1d30] border border-indigo-500/20 rounded-2xl sm:rounded-[1.75rem] shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden">
+              <div className="hidden md:flex absolute top-2 left-2 sm:top-4 sm:left-4 z-[60] w-[135px] sm:w-[180px] bg-sky-50 dark:bg-sky-950 border border-sky-500/20 rounded-2xl sm:rounded-[1.75rem] shadow-2xl flex flex-col animate-in slide-in-from-left-4 duration-300 overflow-hidden">
                 {/* Master Header Toggle */}
                 <div
                   className={cn(
-                    "p-2.5 sm:p-3.5 flex items-center justify-between cursor-pointer select-none hover:bg-indigo-500/10 transition-all bg-white/20 dark:bg-black/10",
-                    isSidebarExpanded && "border-b border-indigo-500/10"
+                    "p-2.5 sm:p-3.5 flex items-center justify-between cursor-pointer select-none hover:bg-sky-500/10 transition-all bg-white/20 dark:bg-black/10",
+                    isSidebarExpanded && "border-b border-sky-500/10"
                   )}
                   onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
                 >
@@ -1322,7 +1316,7 @@ function MapContent() {
                     </div>
                   )}
                   {/* 빠른 필터 Section */}
-                  <div className="p-2.5 sm:p-4 border-b border-indigo-500/20">
+                  <div className="p-2.5 sm:p-4 border-b border-sky-500/20">
                     <h4 className="text-[11px] sm:text-[12px] font-bold text-foreground/70 mb-2.5">빠른 필터</h4>
                     <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                       <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
@@ -1339,7 +1333,7 @@ function MapContent() {
                               interactionFilter === item.id
                                 ? item.id === "all"
                                   ? "bg-slate-300 text-slate-950 border-2 border-slate-700 shadow-md"
-                                  : "bg-indigo-100 text-indigo-800 border-2 border-indigo-500 shadow-sm"
+                                  : "bg-sky-100 text-sky-800 border-2 border-sky-500 shadow-sm"
                                 : "bg-white border-2 border-slate-300 text-slate-600 hover:bg-slate-50"
                             )}
                           >
@@ -1351,7 +1345,7 @@ function MapContent() {
                   </div>
 
                   {/* 장르 및 주제 Section */}
-                  <div className="p-2.5 sm:p-4 border-b border-indigo-500/20">
+                  <div className="p-2.5 sm:p-4 border-b border-sky-500/20">
                     <h4 className="text-[11px] sm:text-[12px] font-bold text-muted-foreground mb-2.5">장르 및 주제</h4>
                     <div className="flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
                       <button
@@ -1534,7 +1528,7 @@ function MapContent() {
                 className="absolute bottom-6 right-8 md:bottom-4 md:right-4 z-40 flex h-10 items-center gap-2 rounded-xl border border-border bg-background/90 backdrop-blur-sm px-3.5 font-bold text-foreground shadow-xl hover:bg-accent hover:text-accent-foreground hover:border-border/80 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]"
                 title="지도를 맞추어 모든 행사 한눈에 보기"
               >
-                <Maximize2 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <Maximize2 className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
                 <span className="text-xs tracking-tight">전체 보기</span>
               </button>
             )}
