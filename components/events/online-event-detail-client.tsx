@@ -7,7 +7,7 @@ import { Header } from "@/components/header";
 import { revalidatePaths } from "@/app/actions/events";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn, linkifyHtml } from "@/lib/utils";
-import { Heart, Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLink, Link2, Info, User as UserIcon, Eye, MessageSquare } from "lucide-react";
+import { Heart, Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLink, Link2, Info, User as UserIcon, Eye, MessageSquare, X } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import ReactDOM from "react-dom";
@@ -75,6 +75,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
   const [user, setUser] = useState<User | null>(null);
   const [userCompData, setUserCompData] = useState<{name: string} | null>(null);
   const [heartAnim, setHeartAnim] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const eventId = event.id;
 
@@ -831,25 +832,30 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
       <Header />
 
       {/* 1. Hero Section Container with floating back button */}
-      <div className="mx-auto max-w-2xl md:max-w-6xl relative mt-2 md:mt-6 mb-4 md:mb-6 px-4 md:px-0">
+      <div className="mx-auto max-w-2xl md:max-w-6xl relative mt-2 md:mt-6 mb-4 md:mb-6 px-0">
         {/* Floating Back Button */}
         <button
           onClick={() => router.back()}
-          className="absolute left-4 md:-left-24 top-6 md:top-8 z-40 flex items-center justify-center w-16 h-16 rounded-full border border-border/60 bg-white/90 dark:bg-muted/90 text-foreground shadow-md backdrop-blur-sm hover:scale-105 active:scale-95 transition-all"
+          className="absolute left-6 md:-left-24 top-2 md:top-8 z-40 flex items-center justify-center w-10 h-10 md:w-16 md:h-16 rounded-full border border-border/60 bg-white/90 dark:bg-muted/90 text-foreground shadow-md backdrop-blur-sm hover:scale-105 active:scale-95 transition-all"
           aria-label="뒤로가기"
         >
-          <ChevronLeft className="w-8 h-8 stroke-[2.5]" />
+          <ChevronLeft className="w-5 h-5 md:w-8 md:h-8 stroke-[2.5]" />
         </button>
 
         {/* Hero Card content */}
-        <div className="bg-background border-x border-b border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:rounded-3xl md:border md:border-slate-200/80 overflow-hidden">
+        <div className="bg-background border-b border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:rounded-3xl md:border md:border-slate-200/80 overflow-hidden">
           {/* Top Section (Responsive Row-Reverse on Desktop) */}
           <div className="flex flex-col md:flex-row-reverse md:gap-8 md:p-8 md:items-center">
             {/* Right (Image) on Desktop, Top on Mobile */}
             <div className="w-full md:w-[55%] shrink-0 relative">
               <div className="w-full aspect-[16/9] bg-muted relative md:rounded-2xl overflow-hidden md:shadow-md">
                 {event.image_url ? (
-                  <img src={event.image_url} alt={event.title} className="w-full h-full object-cover" />
+                  <img 
+                    src={event.image_url} 
+                    alt={event.title} 
+                    className="w-full h-full object-cover cursor-pointer" 
+                    onClick={() => setSelectedImage(event.image_url)}
+                  />
                 ) : (
                    <div className="w-full h-full bg-gradient-to-br from-blue-500/80 to-cyan-600/80 flex items-center justify-center">
                       <ShoppingBag className="w-24 h-24 text-white/30" />
@@ -970,7 +976,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
       </div>
 
       {/* 2. Main Content & Tabs Container */}
-      <div className="mx-4 md:mx-auto max-w-2xl md:max-w-6xl bg-background rounded-3xl border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 overflow-hidden">
+      <div className="mx-0 md:mx-auto max-w-2xl md:max-w-6xl bg-background md:rounded-3xl border-y md:border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 overflow-hidden">
         
         {/* Tabs Header */}
         <div className="flex items-center border-b border-border/60 bg-background select-none">
@@ -1505,7 +1511,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
 
       {/* 3. Event Description Container */}
       {activeTab === 'main' && event.description && (
-        <div className="mx-4 md:mx-auto max-w-2xl md:max-w-6xl bg-background rounded-3xl p-6 md:p-10 border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 overflow-hidden animate-in fade-in duration-300">
+        <div className="mx-0 md:mx-auto max-w-2xl md:max-w-6xl bg-background md:rounded-3xl p-6 md:p-10 border-y md:border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 overflow-hidden animate-in fade-in duration-300">
           <h2 className="text-[17px] md:text-xl font-bold mb-6 text-foreground flex items-center gap-2">
             <span className="w-1.5 h-5 bg-primary rounded-full inline-block"></span>
             행사 정보
@@ -1531,7 +1537,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
 
       {/* Comments Section */}
       {activeTab === 'main' && (
-        <div className="mx-4 md:mx-auto max-w-2xl md:max-w-6xl bg-background rounded-3xl p-6 md:p-10 border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 overflow-hidden animate-in fade-in duration-300">
+        <div className="mx-0 md:mx-auto max-w-2xl md:max-w-6xl bg-background md:rounded-3xl p-6 md:p-10 border-y md:border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-12 overflow-hidden animate-in fade-in duration-300">
           <CommentsSection eventId={event.event_id} isOrganizer={isOwner} user={user} />
         </div>
       )}
@@ -1577,6 +1583,29 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
           margin-bottom: 0.5rem;
         }
       `}</style>
+
+      {/* Image Lightbox */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200"
+          onClick={() => setSelectedImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 md:top-8 md:right-8 text-white/70 hover:text-white transition-colors"
+            onClick={() => setSelectedImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <div className="relative w-full h-full flex items-center justify-center">
+            <img 
+              src={selectedImage} 
+              alt="확대 이미지" 
+              className="max-w-full max-h-full object-contain shadow-2xl animate-in zoom-in-95 duration-300"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

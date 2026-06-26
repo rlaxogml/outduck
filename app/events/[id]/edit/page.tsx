@@ -19,6 +19,7 @@ import { useKakaoAddress } from "@/hooks/use-kakao-address";
 import { useEventImageUpload } from "@/hooks/use-event-image-upload";
 import RichTextEditor from "@/components/events/rich-text-editor";
 import { revalidatePaths } from "@/app/actions/events";
+import { uploadBase64Images } from "@/lib/image-upload";
 
 type Channel = {
   id: number;
@@ -727,6 +728,7 @@ export default function EditEventPage() {
 
     setIsSubmitting(true);
     try {
+      const finalDescription = await uploadBase64Images(description);
       // 1. Update offline_events
       const linksObj: Record<string, string> = {};
       eventLinks.forEach(link => {
@@ -739,7 +741,7 @@ export default function EditEventPage() {
         .from("offline_events")
         .update({
           title,
-          description,
+          description: finalDescription,
           start_date: isAlways ? null : startDate,
           end_date: isAlways ? null : (endDate || null),
           start_time: startTime,

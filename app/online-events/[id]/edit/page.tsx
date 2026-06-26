@@ -17,6 +17,7 @@ import { DateInputTriple } from "@/components/events/date-input-triple";
 import RichTextEditor from "@/components/events/rich-text-editor";
 import { revalidatePaths } from "@/app/actions/events";
 import { useEventImageUpload } from "@/hooks/use-event-image-upload";
+import { uploadBase64Images } from "@/lib/image-upload";
 
 
 type Channel = {
@@ -300,6 +301,7 @@ export default function EditOnlineEventPage() {
 
     setIsSubmitting(true);
     try {
+      const finalDescription = await uploadBase64Images(description);
       // 1. Parse Links to Record<string, string>
       const linksObj: Record<string, string> = {};
       eventLinks.forEach(link => {
@@ -313,7 +315,7 @@ export default function EditOnlineEventPage() {
         .from("online_events")
         .update({
           title,
-          description,
+          description: finalDescription,
           start_at: startAt,
           end_at: endAt,
           image_url: imageUrl,

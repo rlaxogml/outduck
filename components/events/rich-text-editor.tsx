@@ -267,10 +267,36 @@ export default function RichTextEditor({
     };
   }, [value]);
 
-  const handleDeleteImageFromEditor = (src: string) => {
+  const deleteImageBySrc = (src: string) => {
+    const q = quillRef.current?.getEditor();
+    if (q) {
+      const QuillClass = q.constructor;
+      const images = q.container.querySelectorAll('img');
+      let deleted = false;
+      images.forEach((img: any) => {
+        if (img.getAttribute('src') === src) {
+          const blot = QuillClass.find(img);
+          if (blot) {
+            const index = q.getIndex(blot);
+            q.deleteText(index, 1);
+            deleted = true;
+          }
+        }
+      });
+      if (deleted) {
+        return true;
+      }
+    }
+    
+    // Fallback if Quill editor instance is not ready or find failed
     const escapedSrc = src.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     const regexImg = new RegExp(`<img[^>]+src=["']${escapedSrc}["'][^>]*>`, 'g');
     onChange(value.replace(regexImg, ''));
+    return false;
+  };
+
+  const handleDeleteImageFromEditor = (src: string) => {
+    deleteImageBySrc(src);
     toast.success('선택한 이미지가 공지 본문에서 제거되었습니다.');
   };
 
@@ -506,12 +532,8 @@ export default function RichTextEditor({
                 <button
                   type="button"
                   onClick={() => {
-                    // 에디터 본문에서 해당 이미지 src 태그 제거
-                    const newContent = value.replace(
-                      new RegExp(`<img[^>]+src=["']${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'g'),
-                      ''
-                    );
-                    onChange(newContent);
+                    // 에디터 본문에서 해당 이미지 제거
+                    deleteImageBySrc(url);
                     // Storage에서도 삭제 시도
                     const storageBase = supabase.storage.from('notices').getPublicUrl('').data.publicUrl.replace(/\/$/, '');
                     if (url.startsWith(storageBase)) {

@@ -19,6 +19,7 @@ import { useKakaoAddress } from "@/hooks/use-kakao-address";
 import { useEventImageUpload } from "@/hooks/use-event-image-upload";
 import RichTextEditor from "@/components/events/rich-text-editor";
 import { revalidatePaths } from "@/app/actions/events";
+import { uploadBase64Images } from "@/lib/image-upload";
 
 type Channel = {
   id: number;
@@ -553,6 +554,7 @@ function NewEventPageContent() {
 
     setIsSubmitting(true);
     try {
+      const finalDescription = await uploadBase64Images(description);
       const tzOffset = (() => {
         const tzo = -new Date().getTimezoneOffset();
         const dif = tzo >= 0 ? '+' : '-';
@@ -614,7 +616,7 @@ function NewEventPageContent() {
           .insert({
             event_id: baseEvent.id,
             title,
-            description,
+            description: finalDescription,
             start_date: isAlways ? null : startDate,
             end_date: isAlways ? null : (endDate || null),
             start_time: startTime,
@@ -797,7 +799,7 @@ function NewEventPageContent() {
           .insert({
             event_id: baseEvent.id,
             title,
-            description,
+            description: finalDescription,
             start_at: onlineStartsAt,
             end_at: onlineEndsAt,
             image_url: imageUrl,
