@@ -175,6 +175,29 @@ export function EventCard({
     <Card
       onClick={() => {
         setIsNavigating(true);
+
+        // Log viewed channels locally for recommendation algorithm
+        if (channels && channels.length > 0) {
+          try {
+            const viewedStr = window.localStorage.getItem("outduck-recent-viewed-channels");
+            let viewed = viewedStr ? JSON.parse(viewedStr) : [];
+            channels.forEach((ch) => {
+              const existingIdx = viewed.findIndex((item: any) => item.id === ch.id);
+              if (existingIdx > -1) {
+                viewed[existingIdx].count += 1;
+                viewed[existingIdx].timestamp = Date.now();
+              } else {
+                viewed.push({ id: ch.id, name: ch.name, count: 1, timestamp: Date.now() });
+              }
+            });
+            viewed.sort((a: any, b: any) => b.timestamp - a.timestamp);
+            viewed = viewed.slice(0, 15);
+            window.localStorage.setItem("outduck-recent-viewed-channels", JSON.stringify(viewed));
+          } catch (e) {
+            console.warn("Failed to record recent channel view:", e);
+          }
+        }
+
         router.push(eventType === "online" ? `/online-events/${id}` : `/events/${id}`);
       }}
       className="relative overflow-visible hover:shadow-md transition-shadow cursor-pointer pt-0 -mx-4 sm:mx-0 border-x-0 sm:border rounded-none sm:rounded-2xl bg-background shadow-none sm:shadow-sm gap-0 sm:gap-6 pb-3"

@@ -17,8 +17,8 @@ const categories = [
 interface CategoryFilterProps {
   activeCategory: string;
   onCategoryChange: (category: string) => void;
-  sortType: "recent" | "upcoming";
-  onSortChange: (sort: "recent" | "upcoming") => void;
+  sortType: "recommended" | "recent" | "upcoming";
+  onSortChange: (sort: "recommended" | "recent" | "upcoming") => void;
 }
 
 export function CategoryFilter({
@@ -102,17 +102,34 @@ export function CategoryFilter({
         {/* Mobile Hamburger Menu Button (Visible only on mobile) */}
         <MobileMenuButton />
 
-        <div className="relative flex items-center bg-muted/50 p-1 rounded-xl w-[180px] h-9 border border-border/30 select-none">
+        <div className="relative flex items-center bg-muted/50 p-1 rounded-xl w-[255px] h-9 border border-border/30 select-none">
           {/* Sliding pill background */}
           <div
-            className={cn(
-              "absolute top-[4px] bottom-[4px] left-[4px] w-[calc(50%-4px)] bg-background rounded-lg shadow-sm border border-border/10 transition-transform duration-300 ease-out z-0",
-              sortType === "upcoming" ? "translate-x-0" : "translate-x-full"
-            )}
+            className="absolute top-[4px] bottom-[4px] left-[4px] w-[calc(33.333%-4px)] bg-background rounded-lg shadow-sm border border-border/10 transition-transform duration-300 ease-out z-0"
+            style={{
+              transform: `translateX(${
+                sortType === "recommended"
+                  ? "0%"
+                  : sortType === "upcoming"
+                    ? "calc(100% + 2px)"
+                    : "calc(200% + 4px)"
+              })`
+            }}
           />
           <button
             className={cn(
-              "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
+              "flex-1 text-center text-[11px] md:text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
+              sortType === "recommended"
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => onSortChange("recommended")}
+          >
+            추천순
+          </button>
+          <button
+            className={cn(
+              "flex-1 text-center text-[11px] md:text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
               sortType === "upcoming"
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -123,7 +140,7 @@ export function CategoryFilter({
           </button>
           <button
             className={cn(
-              "flex-1 text-center text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
+              "flex-1 text-center text-[11px] md:text-[12px] font-bold transition-colors duration-300 relative z-10 cursor-pointer",
               sortType === "recent"
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"

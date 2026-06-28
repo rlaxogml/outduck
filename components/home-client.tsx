@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
 import { EventTabs } from "@/components/event-tabs";
@@ -32,6 +32,12 @@ type Event = {
   endDateValue: string | null;
 };
 
+function seededRandom(seed: number) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+
 interface HomeClientProps {
   initialOfflineEvents: Event[];
   initialOnlineEvents: Event[];
@@ -46,19 +52,238 @@ export function HomeClient({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [sortType, setSortType] = useState<"recent" | "upcoming">("upcoming");
+  const [sortType, setSortType] = useState<"recommended" | "recent" | "upcoming">("recommended");
 
   const [offlineEvents, setOfflineEvents] = useState<Event[]>(initialOfflineEvents);
   const [onlineEvents, setOnlineEvents] = useState<Event[]>(initialOnlineEvents);
-  const [user, setUser] = useState<User | null>(null);
-  const [isCompanyUser, setIsCompanyUser] = useState(false);
-  const [isHostUser, setIsHostUser] = useState(false);
-  const [userBookmarks, setUserBookmarks] = useState<number[]>([]);
-  const [userFavorites, setUserFavorites] = useState<any[] | null>(null);
+
+  // Synchronous state initialization from cached session and metadata to prevent hydration flickers and layout shifts
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const projectId = projectUrl ? new URL(projectUrl).hostname.split('.')[0] : null;
+        const sessionKey = projectId ? `sb-${projectId}-auth-token` : null;
+        const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
+        if (sessionData) {
+          const parsed = JSON.parse(sessionData);
+          return parsed?.currentSession?.user ?? null;
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const [isCompanyUser, setIsCompanyUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const projectId = projectUrl ? new URL(projectUrl).hostname.split('.')[0] : null;
+        const sessionKey = projectId ? `sb-${projectId}-auth-token` : null;
+        const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
+        if (sessionData) {
+          const parsed = JSON.parse(sessionData);
+          const currentUser = parsed?.currentSession?.user;
+          if (currentUser) {
+            const metaKey = `outduck-user-meta-${currentUser.id}`;
+            const cachedMeta = localStorage.getItem(metaKey);
+            if (cachedMeta) {
+              const { isCompany } = JSON.parse(cachedMeta);
+              return !!isCompany;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return false;
+  });
+
+  const [isHostUser, setIsHostUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const projectId = projectUrl ? new URL(projectUrl).hostname.split('.')[0] : null;
+        const sessionKey = projectId ? `sb-${projectId}-auth-token` : null;
+        const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
+        if (sessionData) {
+          const parsed = JSON.parse(sessionData);
+          const currentUser = parsed?.currentSession?.user;
+          if (currentUser) {
+            const metaKey = `outduck-user-meta-${currentUser.id}`;
+            const cachedMeta = localStorage.getItem(metaKey);
+            if (cachedMeta) {
+              const { isHost } = JSON.parse(cachedMeta);
+              return !!isHost;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return false;
+  });
+
+  const [userBookmarks, setUserBookmarks] = useState<number[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const projectId = projectUrl ? new URL(projectUrl).hostname.split('.')[0] : null;
+        const sessionKey = projectId ? `sb-${projectId}-auth-token` : null;
+        const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
+        if (sessionData) {
+          const parsed = JSON.parse(sessionData);
+          const currentUser = parsed?.currentSession?.user;
+          if (currentUser) {
+            const metaKey = `outduck-user-meta-${currentUser.id}`;
+            const cachedMeta = localStorage.getItem(metaKey);
+            if (cachedMeta) {
+              const { bookmarks } = JSON.parse(cachedMeta);
+              if (Array.isArray(bookmarks)) return bookmarks;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const [userFavorites, setUserFavorites] = useState<any[] | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const projectId = projectUrl ? new URL(projectUrl).hostname.split('.')[0] : null;
+        const sessionKey = projectId ? `sb-${projectId}-auth-token` : null;
+        const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
+        if (sessionData) {
+          const parsed = JSON.parse(sessionData);
+          const currentUser = parsed?.currentSession?.user;
+          if (currentUser) {
+            const metaKey = `outduck-user-meta-${currentUser.id}`;
+            const cachedMeta = localStorage.getItem(metaKey);
+            if (cachedMeta) {
+              const { favorites } = JSON.parse(cachedMeta);
+              if (Array.isArray(favorites)) return favorites;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+
   const [visibleCount, setVisibleCount] = useState(10);
 
-  // Reset visible count when filters change
+  const [decayCache, setDecayCache] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cachedDecay = localStorage.getItem("outduck-seen-decay-cache");
+        return cachedDecay ? JSON.parse(cachedDecay) : [];
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const [shuffleToken, setShuffleToken] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const token = sessionStorage.getItem("outduck-home-shuffle-token");
+        if (token) return Number(token);
+      } catch (e) {}
+    }
+    return Math.floor(Math.random() * 10000);
+  });
+
+  // Client-side initialization flag. Initialized to true on client-side routing transitions
+  // to immediately render the recommendations without an intermediate chronological fallback screen.
+  const [isMounted, setIsMounted] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !!(window as any).__outduck_initialized;
+    }
+    return false;
+  });
+  const isFirstRender = useRef(true);
+
+  // Load and update decay cache & shuffle token on mount
   useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        // Determine if this is a hard reload/first load or a client-side navigation
+        // window.__outduck_initialized is only undefined on hard reload or first page load.
+        const isReload = !(window as any).__outduck_initialized;
+        console.log("=== [HomeClient Mount] ===", {
+          isReload,
+          sessionStorageToken: sessionStorage.getItem("outduck-home-shuffle-token"),
+          windowInitialized: (window as any).__outduck_initialized
+        });
+        (window as any).__outduck_initialized = true;
+
+        // 1. Handle Shuffle Token
+        let token = sessionStorage.getItem("outduck-home-shuffle-token");
+        if (!token || isReload) {
+          // Generate new token on reload or first visit
+          token = String(Math.floor(Math.random() * 10000));
+          sessionStorage.setItem("outduck-home-shuffle-token", token);
+          console.log("=== Generated New Shuffle Token ===", token);
+          setShuffleToken(Number(token));
+        } else {
+          console.log("=== Reusing Existing Shuffle Token ===", token);
+          setShuffleToken((prev) => {
+            const numToken = Number(token);
+            return prev === numToken ? prev : numToken;
+          });
+        }
+
+        // 2. Handle Decay Cache
+        const cachedDecay = localStorage.getItem("outduck-seen-decay-cache");
+        let currentDecay = cachedDecay ? JSON.parse(cachedDecay) : [];
+
+        if (isReload) {
+          // Only process decay cache (decay stacks & penalize previous views) on actual page reload
+          currentDecay = currentDecay
+            .map((item: any) => ({ ...item, stack: item.stack - 1 }))
+            .filter((item: any) => item.stack > 0);
+
+          const cachedLastVisible = localStorage.getItem("outduck-last-visible-ids");
+          const lastVisibleIds = cachedLastVisible ? JSON.parse(cachedLastVisible) : [];
+
+          if (Array.isArray(lastVisibleIds) && lastVisibleIds.length > 0) {
+            lastVisibleIds.forEach((id: number) => {
+              const existingIdx = currentDecay.findIndex((item: any) => item.id === id);
+              if (existingIdx > -1) {
+                currentDecay[existingIdx].stack = 3;
+              } else {
+                currentDecay.push({ id, stack: 3 });
+              }
+            });
+          }
+          localStorage.setItem("outduck-seen-decay-cache", JSON.stringify(currentDecay));
+          localStorage.removeItem("outduck-last-visible-ids"); // Clear so we don't repeat
+          setDecayCache(currentDecay);
+        } else {
+          setDecayCache((prev) => {
+            if (prev.length === currentDecay.length) return prev;
+            return currentDecay;
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("HomeClient: Failed to initialize decay cache/shuffle token:", e);
+    } finally {
+      setIsMounted(true);
+    }
+  }, []);
+
+  // Reset visible count and shuffle token when filters change
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    // Only shuffle when user explicitly changes filters/tabs
+    const newToken = Math.floor(Math.random() * 10000);
+    setShuffleToken(newToken);
+    try {
+      sessionStorage.setItem("outduck-home-shuffle-token", String(newToken));
+    } catch (e) {}
     setVisibleCount(10);
   }, [activeTab, activeCategory, sortType]);
 
@@ -76,7 +301,7 @@ export function HomeClient({
       if (sessionData) {
         const parsed = JSON.parse(sessionData);
         const currentUser = parsed?.currentSession?.user;
-        if (currentUser && isMounted) {
+        if (currentUser && isMounted && (!user || user.id !== currentUser.id)) {
           setUser(currentUser);
           console.log("HomeClient: Restored cached user session from localStorage:", currentUser.id);
           
@@ -123,7 +348,6 @@ export function HomeClient({
         setUser(prev => prev?.id === currentUser?.id ? prev : currentUser);
       }
     });
-
     return () => {
       console.log("HomeClient: Cleaning up session synchronization useEffect.");
       isMounted = false;
@@ -313,6 +537,187 @@ export function HomeClient({
       result = [...result].sort((a, b) => {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
+    } else if (sortType === "recommended") {
+      const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+      const todayMs = new Date(today).getTime();
+
+      if (!isMounted) {
+        // Fallback sorting during SSR and hydration to prevent Hydration Mismatch
+        // We match exactly what "upcoming" sorting does.
+        const isOngoing = (ev: Event) => {
+          if (ev.isAlways) return false;
+          if (!ev.startDateValue) return false;
+          
+          const startOnly = ev.startDateValue.split("T")[0];
+          const startMs = new Date(startOnly).getTime();
+          if (startMs > todayMs) return false;
+
+          if (ev.endDateValue) {
+            const endOnly = ev.endDateValue.split("T")[0];
+            const endMs = new Date(endOnly).getTime();
+            if (endMs < todayMs) return false;
+          }
+          return true;
+        };
+
+        result = [...result].sort((a, b) => {
+          if (a.isAlways && !b.isAlways) return 1;
+          if (!a.isAlways && b.isAlways) return -1;
+          if (a.isAlways && b.isAlways) return 0;
+
+          const isOngoingA = isOngoing(a);
+          const isOngoingB = isOngoing(b);
+
+          if (isOngoingA && !isOngoingB) return -1;
+          if (!isOngoingA && isOngoingB) return 1;
+
+          if (isOngoingA && isOngoingB) {
+            if (a.endDateValue && b.endDateValue) {
+              const timeA = new Date(a.endDateValue.split("T")[0]).getTime();
+              const timeB = new Date(b.endDateValue.split("T")[0]).getTime();
+              if (timeA !== timeB) return timeA - timeB;
+            } else if (a.endDateValue && !b.endDateValue) {
+              return -1;
+            } else if (!a.endDateValue && b.endDateValue) {
+              return 1;
+            }
+            const startA = a.startDateValue ? new Date(a.startDateValue.split("T")[0]).getTime() : 0;
+            const startB = b.startDateValue ? new Date(b.startDateValue.split("T")[0]).getTime() : 0;
+            return startA - startB;
+          } else {
+            const startA = a.startDateValue ? new Date(a.startDateValue.split("T")[0]).getTime() : 0;
+            const startB = b.startDateValue ? new Date(b.startDateValue.split("T")[0]).getTime() : 0;
+            return startA - startB;
+          }
+        });
+      } else {
+        // PERSONAL RECOMMENDATION ALGORITHM ACTIVE CLIENT-SIDE ONLY AFTER HYDRATION
+        // Read user interests dynamically from localStorage
+        let userInterests: string[] = [];
+        try {
+          const storedInterests = localStorage.getItem("outduck-interests");
+          if (storedInterests) {
+            userInterests = JSON.parse(storedInterests);
+          }
+        } catch (e) {}
+
+        // Read recently viewed channels from localStorage for click history bonus
+        let recentViewed: { id: number; count: number }[] = [];
+        try {
+          const storedViewed = localStorage.getItem("outduck-recent-viewed-channels");
+          if (storedViewed) {
+            recentViewed = JSON.parse(storedViewed);
+          }
+        } catch (e) {}
+
+        // Read recent searches from localStorage for search match bonus
+        let recentSearches: string[] = [];
+        try {
+          const storedSearches = localStorage.getItem("outduck-recent-searches");
+          if (storedSearches) {
+            recentSearches = JSON.parse(storedSearches);
+          }
+        } catch (e) {}
+
+        // Calculate keys and sort
+
+        const scoredEvents = result.map((event) => {
+          let score = 0;
+
+          // A. Time / Schedule Urgency Score
+          if (event.isAlways) {
+            score += 5;
+          } else if (event.startDateValue) {
+            const eventStartOnly = event.startDateValue.split("T")[0];
+            const eventStartMs = new Date(eventStartOnly).getTime();
+            const diffDays = Math.ceil((eventStartMs - todayMs) / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) {
+              score += 50; // Ongoing
+            } else if (diffDays === 0) {
+              score += 50; // Starts today
+            } else if (diffDays === 1) {
+              score += 40; // Starts tomorrow
+            } else if (diffDays <= 3) {
+              score += 30; // Within 3 days
+            } else if (diffDays <= 7) {
+              score += 10; // Within a week
+            } else {
+              score += 2; // Further away
+            }
+          } else {
+            score += 5;
+          }
+
+          // B. Preference Score: Followed Channel (+50 points)
+          const isFollowedChannel = event.channels?.some(ch => 
+            userFavorites?.some(fav => fav.channel_id === ch.id)
+          );
+          if (isFollowedChannel) {
+            score += 50;
+          }
+
+          // C. Preference Score: Interest Category (+30 points)
+          const isInterestCategory = userInterests.includes(event.category) || 
+            (event.category === "유튜버" && userInterests.includes("youtuber")) ||
+            (event.category === "게임" && userInterests.includes("game")) ||
+            (event.category === "버튜버" && userInterests.includes("vtuber")) ||
+            (event.category === "축제" && userInterests.includes("festival"));
+
+          if (isInterestCategory) {
+            score += 30;
+          }
+
+          // D. View History Bonus (최근 자주 찾아본 채널 매칭: 최대 +30점)
+          if (recentViewed.length > 0 && event.channels && event.channels.length > 0) {
+            const matchedView = recentViewed.find(v => event.channels.some(ch => ch.id === v.id));
+            if (matchedView) {
+              score += Math.min(10 + matchedView.count * 2, 30);
+            }
+          }
+
+          // E. Search Match Bonus (최근 검색어 키워드 매칭: 최대 +30점)
+          if (recentSearches.length > 0) {
+            const titleLower = event.title.toLowerCase();
+            const catLower = event.category.toLowerCase();
+            const locLower = (event.location || "").toLowerCase();
+            
+            const searchMatchCount = recentSearches.filter(keyword => {
+              const kw = keyword.toLowerCase().trim();
+              return kw.length > 1 && (titleLower.includes(kw) || catLower.includes(kw) || locLower.includes(kw));
+            }).length;
+            
+            if (searchMatchCount > 0) {
+              score += Math.min(searchMatchCount * 15, 30);
+            }
+          }
+
+          score = Math.max(score, 1);
+
+          // D. Apply Local Decay Penalty (stack: 1 => 0.65, stack: 2 => 0.35, stack: 3 => 0.05)
+          const decayItem = decayCache.find((item: any) => item.id === event.id);
+          if (decayItem) {
+            const penaltyFactor = 1 - (decayItem.stack / 3) * 0.95;
+            score = score * penaltyFactor;
+          }
+
+          score = Math.max(score, 1);
+
+          // E. Weight conversion using Square Root Scaling (1번 방법)
+          const weight = Math.sqrt(score);
+
+          // F. Seeded Random Key (Efraimidis & Spirakis / Exponential Keys Trick)
+          // seededRandom is in range [0, 1). Math.log(u) requires u in (0, 1].
+          const u = seededRandom(event.id + shuffleToken) || 0.00001;
+          const sortKey = Math.log(u) / weight;
+
+          return { event, sortKey, score };
+        });
+
+        // Sort by key descending (closest to 0 is highest)
+        scoredEvents.sort((a, b) => b.sortKey - a.sortKey);
+        result = scoredEvents.map(se => se.event);
+      }
     } else {
       // Upcoming sort: Ongoing first (sorted by earliest end date), then Future (sorted by earliest start date), then Always at the bottom.
       const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
@@ -371,6 +776,14 @@ export function HomeClient({
 
     return result;
   })();
+
+  // Save current visible IDs for the next reload (to apply 3-stack decay penalty)
+  useEffect(() => {
+    if (filteredEvents.length > 0 && sortType === "recommended") {
+      const visibleIds = filteredEvents.slice(0, visibleCount).map(e => e.id);
+      localStorage.setItem("outduck-last-visible-ids", JSON.stringify(visibleIds));
+    }
+  }, [filteredEvents, visibleCount, sortType]);
 
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasMoreOffline, setHasMoreOffline] = useState(initialOfflineEvents.length === 30);

@@ -544,6 +544,25 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
   const handleChannelSelect = (channel: ChannelSearchItem) => {
     saveRecentChannel(channel);
     setIsSearchFocused(false);
+
+    // Log viewed channels locally for recommendation algorithm
+    try {
+      const viewedStr = window.localStorage.getItem("outduck-recent-viewed-channels");
+      let viewed = viewedStr ? JSON.parse(viewedStr) : [];
+      const existingIdx = viewed.findIndex((item: any) => item.id === channel.id);
+      if (existingIdx > -1) {
+        viewed[existingIdx].count += 1;
+        viewed[existingIdx].timestamp = Date.now();
+      } else {
+        viewed.push({ id: channel.id, name: channel.name, count: 1, timestamp: Date.now() });
+      }
+      viewed.sort((a: any, b: any) => b.timestamp - a.timestamp);
+      viewed = viewed.slice(0, 15);
+      window.localStorage.setItem("outduck-recent-viewed-channels", JSON.stringify(viewed));
+    } catch (e) {
+      console.warn("Failed to record recent channel view:", e);
+    }
+
     router.push(`/channels/${channel.id}`);
   };
 
@@ -557,6 +576,16 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
     const trimmedSearchText = querySearchText;
     if (!trimmedSearchText) {
       return;
+    }
+
+    // Log searched keywords locally for recommendation algorithm
+    try {
+      const savedSearches = window.localStorage.getItem("outduck-recent-searches");
+      let searchesList = savedSearches ? JSON.parse(savedSearches) : [];
+      searchesList = [trimmedSearchText, ...searchesList.filter((s: string) => s !== trimmedSearchText)].slice(0, 5);
+      window.localStorage.setItem("outduck-recent-searches", JSON.stringify(searchesList));
+    } catch (e) {
+      console.warn("Failed to record recent search:", e);
     }
 
     if (searchResults.length === 1) {

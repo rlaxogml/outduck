@@ -80,6 +80,22 @@ function MapContent() {
   const initialEventId = searchParams.get("eventId");
   const [focusedEventId, setFocusedEventId] = useState<string | null>(initialEventId);
 
+  // Disable pull-to-refresh gesture on mobile browsers
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const originalBodyOverscroll = document.body.style.overscrollBehaviorY;
+    const originalHtmlOverscroll = document.documentElement.style.overscrollBehaviorY;
+    
+    document.body.style.overscrollBehaviorY = "none";
+    document.documentElement.style.overscrollBehaviorY = "none";
+    
+    return () => {
+      document.body.style.overscrollBehaviorY = originalBodyOverscroll;
+      document.documentElement.style.overscrollBehaviorY = originalHtmlOverscroll;
+    };
+  }, []);
+
   const [isScriptLoaded, setIsScriptLoaded] = useState(() => {
     return typeof window !== "undefined" && !!window.kakao && !!window.kakao.maps;
   });
@@ -1516,13 +1532,18 @@ function MapContent() {
                 scrollbar-width: none;
               }
               @media (max-width: 767px) {
+                body, html {
+                  overscroll-behavior-y: none;
+                }
                 .map-outer-container {
                   height: calc(100vh - env(safe-area-inset-bottom, 0px) - 56px) !important;
                   overflow: hidden !important;
+                  overscroll-behavior-y: none;
                 }
                 .map-inner-container {
                   height: calc(100vh - env(safe-area-inset-bottom, 0px) - 112px) !important;
                   overflow: hidden !important;
+                  overscroll-behavior-y: none;
                 }
               }
             `}</style>

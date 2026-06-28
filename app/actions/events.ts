@@ -120,6 +120,7 @@ export async function fetchMoreEvents(
           `)
           .or(`end_date.gte.${todayStr},end_date.is.null`)
           .order("start_date", { ascending: true })
+          .order("id", { ascending: true })
           .range(offset, offset + limit - 1)
       );
 
@@ -171,6 +172,7 @@ export async function fetchMoreEvents(
           `)
           .or(`end_at.gte.${todayStr},end_at.is.null`)
           .order("start_at", { ascending: true })
+          .order("id", { ascending: true })
           .range(offset, offset + limit - 1)
       );
 

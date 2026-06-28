@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { User } from "@supabase/supabase-js";
-import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, Menu, X, MessageSquare } from "lucide-react";
+import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, Menu, X, MessageSquare, Pencil } from "lucide-react";
 import { Header } from "@/components/header";
 import { toast } from "sonner"; // Assuming sonner is available, or use alert
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,6 +38,7 @@ export default function SettingsPage() {
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [bookmarksCount, setBookmarksCount] = useState(0);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Notification state
@@ -204,23 +205,26 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateProfile = async () => {
+  const handleUpdateProfile = async (updatedName?: string, updatedAvatarUrl?: string) => {
     if (!user) return;
     setIsUpdatingProfile(true);
     
+    const targetName = updatedName !== undefined ? updatedName : name;
+    const targetAvatarUrl = updatedAvatarUrl !== undefined ? updatedAvatarUrl : avatarUrl;
+
     try {
       const { error } = await supabase.auth.updateUser({
         data: {
-          name,
-          avatar_url: avatarUrl,
+          name: targetName,
+          avatar_url: targetAvatarUrl,
         }
       });
 
       if (error) throw error;
-      alert("프로필이 성공적으로 업데이트되었습니다.");
+      toast.success("프로필이 성공적으로 업데이트되었습니다.");
       window.location.reload(); // To update header
     } catch (error: any) {
-      alert("프로필 업데이트에 실패했습니다: " + error.message);
+      toast.error("프로필 업데이트에 실패했습니다: " + error.message);
     } finally {
       setIsUpdatingProfile(false);
     }
@@ -247,8 +251,11 @@ export default function SettingsPage() {
         .getPublicUrl(filePath);
 
       setAvatarUrl(data.publicUrl);
+      
+      // Save profile immediately with the new avatar url
+      await handleUpdateProfile(name, data.publicUrl);
     } catch (error: any) {
-      alert("이미지 업로드에 실패했습니다: " + error.message);
+      toast.error("이미지 업로드에 실패했습니다: " + error.message);
     } finally {
       setIsUpdatingProfile(false);
       if (fileInputRef.current) {
@@ -563,14 +570,14 @@ export default function SettingsPage() {
 
               <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-4 md:p-6 bg-card shadow-sm space-y-6 md:space-y-8">
                 {/* Profile Image & Name */}
-                <div className="flex flex-col sm:flex-row gap-4 md:gap-6 items-center sm:items-center">
-                  <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                    <Avatar className="h-16 w-16 md:h-24 md:w-24 border-2 border-border/50">
+                <div className="flex flex-row gap-4 md:gap-6 items-center">
+                  <div className="relative group cursor-pointer shrink-0" onClick={() => fileInputRef.current?.click()}>
+                    <Avatar className="h-16 w-16 md:h-20 md:w-20 border-2 border-border/50">
                       <AvatarImage src={avatarUrl} className="object-cover" />
                       <AvatarFallback className="text-xl md:text-2xl">{avatarFallbackText}</AvatarFallback>
                     </Avatar>
-                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Camera className="h-4 w-4 md:h-6 md:w-6 text-white" />
+                    <div className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1 rounded-full shadow-md border-2 border-background flex items-center justify-center hover:scale-110 transition-transform">
+                      <Camera className="h-3 w-3 md:h-3.5 w-3.5 animate-in zoom-in duration-300" />
                     </div>
                     <input 
                       type="file" 
@@ -580,25 +587,27 @@ export default function SettingsPage() {
                       onChange={handleImageUpload}
                     />
                   </div>
-                  <div className="space-y-4 flex-1 w-full text-center sm:text-left">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="name" className="text-sm md:text-base font-medium">이름 (닉네임)</Label>
-                      <Input 
-                        id="name" 
-                        value={name} 
-                        onChange={(e) => setName(e.target.value)} 
-                        className="max-w-md h-10 md:h-11 text-center sm:text-left mx-auto sm:mx-0"
-                        placeholder="이름을 입력해주세요"
-                      />
-                    </div>
-                    <Button 
-                      onClick={handleUpdateProfile} 
-                      disabled={isUpdatingProfile}
-                      className="w-full sm:w-auto h-10 px-6 font-semibold"
-                    >
-                      {isUpdatingProfile ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                      프로필 저장
-                    </Button>
+                  <div className="flex-1 min-w-0 max-w-md relative">
+                    <Input 
+                      id="name" 
+                      value={name} 
+                      onChange={(e) => setName(e.target.value)} 
+                      onBlur={() => {
+                        if (name.trim() !== "" && name.trim() !== (user?.user_metadata?.name || "")) {
+                          handleUpdateProfile(name);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          if (name.trim() !== "" && name.trim() !== (user?.user_metadata?.name || "")) {
+                            handleUpdateProfile(name);
+                          }
+                        }
+                      }}
+                      className="h-10 md:h-11 bg-background pr-10"
+                      placeholder="이름을 입력해주세요"
+                    />
+                    <Pencil className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   </div>
                 </div>
 
