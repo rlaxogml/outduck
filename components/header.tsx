@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { User } from "@supabase/supabase-js";
-import { Bell, Calendar, CheckCircle2, Heart, House, Loader2, MapPinned, Megaphone, Menu, PlusCircle, Search, Star, X } from "lucide-react";
+import { Bell, Calendar, CheckCircle2, Heart, House, Loader2, MapPinned, Megaphone, Menu, PlusCircle, Search, Star, User as UserIcon, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -1021,11 +1021,11 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
             </Link>
             <span className="text-border shrink-0 select-none">|</span>
             <Link
-              href="/bookmarks"
-              className={getNavStyle("/bookmarks").button}
+              href="/settings"
+              className={getNavStyle("/settings").button}
             >
-              <Heart className={getNavStyle("/bookmarks").icon} />
-              <span className={getNavStyle("/bookmarks").textClassName}>찜한 행사</span>
+              <UserIcon className={getNavStyle("/settings").icon} />
+              <span className={cn(getNavStyle("/settings").textClassName, "text-[12.5px] sm:text-[14.5px]")}>MY</span>
             </Link>
           </nav>
 
@@ -1086,12 +1086,12 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
                     <span className="text-sm font-bold text-foreground">팔로우 채널</span>
                   </Link>
                   <Link
-                    href="/bookmarks"
+                    href="/settings"
                     onClick={() => setIsDrawerOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-slate-50 dark:bg-slate-900/50 hover:bg-muted transition-all"
                   >
-                    <Heart className="h-5 w-5 text-red-500 shrink-0" />
-                    <span className="text-sm font-bold text-foreground">찜한 행사</span>
+                    <UserIcon className="h-5 w-5 text-blue-500 shrink-0" />
+                    <span className="text-base font-bold text-foreground">MY</span>
                   </Link>
                 </div>
               </div>

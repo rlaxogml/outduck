@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { House, Calendar, MapPinned, Star, Heart } from "lucide-react";
+import { House, Calendar, MapPinned, Star, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
@@ -13,7 +13,7 @@ export function BottomNav() {
     { id: "calendar", label: "캘린더", path: "/calendar", icon: Calendar },
     { id: "map", label: "지도", path: "/map", icon: MapPinned },
     { id: "subscriptions", label: "팔로우 채널", path: "/subscriptions", icon: Star },
-    { id: "bookmarks", label: "찜한행사", path: "/bookmarks", icon: Heart },
+    { id: "settings", label: "MY", path: "/settings", icon: User },
   ];
 
   return (
@@ -51,7 +51,8 @@ export function BottomNav() {
             />
             <span
               className={cn(
-                "text-[10px] font-bold tracking-tight transition-colors duration-200 mt-1",
+                item.id === "settings" ? "text-[12px]" : "text-[10px]",
+                "font-bold tracking-tight transition-colors duration-200 mt-1",
                 isActive
                   ? "bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 font-extrabold"
                   : "text-slate-500 dark:text-slate-400"

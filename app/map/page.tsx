@@ -1520,6 +1520,7 @@ function MapContent() {
 
             <div
               id="map-container"
+              style={{ touchAction: "none" }}
               className={cn("absolute inset-0 bg-muted transition-opacity duration-700", isMapReady ? "opacity-100" : "opacity-0")}
             />
 
@@ -1530,6 +1531,9 @@ function MapContent() {
               .scrollbar-none {
                 -ms-overflow-style: none;
                 scrollbar-width: none;
+              }
+              #map-container {
+                touch-action: none !important;
               }
               @media (max-width: 767px) {
                 body, html {
