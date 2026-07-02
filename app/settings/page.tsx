@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { User } from "@supabase/supabase-js";
-import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, Menu, X, MessageSquare, Pencil, Smartphone, Megaphone } from "lucide-react";
+import { Camera, Save, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, MessageSquare, Pencil, Smartphone, Megaphone } from "lucide-react";
 import { Header } from "@/components/header";
 import { toast } from "sonner"; // Assuming sonner is available, or use alert
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -23,14 +23,40 @@ import { CompanyAffiliation, isAffiliationSupported } from "@/components/company
 import { sendCustomerInquiry } from "@/app/actions/email";
 import { Textarea } from "@/components/ui/textarea";
 
-type Tab = "account" | "notifications" | "advanced" | "inquiry";
+type Tab = "notifications" | "advanced" | "inquiry";
+
+const TAB_LABELS: Record<Tab, string> = {
+  notifications: "알림",
+  advanced: "주최자 설정",
+  inquiry: "고객 문의",
+};
+
+function SettingsMenuRow({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 py-3.5 text-sm font-semibold hover:bg-muted/50 transition-colors"
+    >
+      <Icon className="h-5 w-5 text-muted-foreground" />
+      <span className="flex-1 text-left">{label}</span>
+      <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-180" />
+    </button>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>("account");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab | null>(null);
   const [isAppWebView, setIsAppWebView] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -111,7 +137,7 @@ export default function SettingsPage() {
     if (typeof window !== "undefined") {
       const searchParams = new URLSearchParams(window.location.search);
       const tab = searchParams.get("tab");
-      if (tab === "account" || tab === "advanced") {
+      if (tab === "advanced" || tab === "notifications" || tab === "inquiry") {
         setActiveTab(tab as Tab);
       }
       setIsAppWebView(!!(window as any).ReactNativeWebView);
@@ -427,117 +453,18 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-6xl w-full px-4 py-8 md:py-12">
         {/* Mobile Header / Subheader */}
         <div className="flex items-center gap-3.5 pb-4 mb-6 md:hidden px-2 border-b border-border/60">
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-1 text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
-            title="설정 메뉴"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-          <h2 className="text-xl font-bold tracking-tight">설정</h2>
-        </div>
-
-        {/* Mobile Drawer Sidebar */}
-        {/* Backdrop */}
-        <div 
-          className={cn(
-            "fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity duration-300",
-            isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          )}
-          onClick={() => setIsSidebarOpen(false)}
-        />
-        
-        {/* Drawer Content */}
-        <div 
-          className={cn(
-            "fixed inset-y-0 left-0 w-72 bg-background border-r border-border p-6 z-50 md:hidden flex flex-col transition-transform duration-300 ease-in-out",
-            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          )}
-        >
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xl font-bold tracking-tight">설정 메뉴</h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsSidebarOpen(false)}
-              className="h-10 w-10 rounded-full hover:bg-muted"
-            >
-              <X className="h-6 w-6" />
-            </Button>
-          </div>
-          
-          <div className="space-y-1">
+          {activeTab !== null ? (
             <button
-              onClick={() => {
-                setActiveTab("account");
-                setIsSidebarOpen(false);
-              }}
-              className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === "account" 
-                  ? "bg-primary/10 text-primary" 
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
+              onClick={() => setActiveTab(null)}
+              className="p-1 -ml-1 text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
+              title="뒤로 가기"
             >
-              <UserIcon className="h-5 w-5" />
-              계정
+              <ChevronLeft className="h-6 w-6" />
             </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab("notifications");
-                setIsSidebarOpen(false);
-              }}
-              className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === "notifications" 
-                  ? "bg-primary/10 text-primary" 
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Bell className="h-5 w-5" />
-              알림
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab("advanced");
-                setIsSidebarOpen(false);
-              }}
-              className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === "advanced" 
-                  ? "bg-primary/10 text-primary" 
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Settings2 className="h-5 w-5" />
-              주최자 설정
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab("inquiry");
-                setIsSidebarOpen(false);
-              }}
-              className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === "inquiry"
-                  ? "bg-primary/10 text-primary"
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <MessageSquare className="h-5 w-5" />
-              고객 문의
-            </button>
-
-            <button
-              onClick={() => {
-                setIsSidebarOpen(false);
-                router.push("/suggest");
-              }}
-              className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-            >
-              <Megaphone className="h-5 w-5" />
-              제보하기
-            </button>
-          </div>
+          ) : null}
+          <h2 className="text-xl font-bold tracking-tight">
+            {activeTab === null ? "설정" : TAB_LABELS[activeTab]}
+          </h2>
         </div>
 
         <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -558,41 +485,37 @@ export default function SettingsPage() {
               </div>
               
               <button
-                onClick={() => setActiveTab("account")}
-                className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === "account" 
-                    ? "bg-primary/10 text-primary" 
-                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <UserIcon className="h-5 w-5" />
-                계정
-              </button>
-              
-              <button
                 onClick={() => setActiveTab("notifications")}
                 className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === "notifications" 
-                    ? "bg-primary/10 text-primary" 
+                  activeTab === "notifications"
+                    ? "bg-primary/10 text-primary"
                     : "hover:bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Bell className="h-5 w-5" />
                 알림
               </button>
-              
+
+              <button
+                onClick={() => router.push("/suggest")}
+                className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+              >
+                <Megaphone className="h-5 w-5" />
+                제보하기
+              </button>
+
               <button
                 onClick={() => setActiveTab("advanced")}
                 className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === "advanced" 
-                    ? "bg-primary/10 text-primary" 
+                  activeTab === "advanced"
+                    ? "bg-primary/10 text-primary"
                     : "hover:bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Settings2 className="h-5 w-5" />
                 주최자 설정
               </button>
-              
+
               <button
                 onClick={() => setActiveTab("inquiry")}
                 className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
@@ -604,27 +527,19 @@ export default function SettingsPage() {
                 <MessageSquare className="h-5 w-5" />
                 고객 문의
               </button>
-
-              <button
-                onClick={() => router.push("/suggest")}
-                className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-              >
-                <Megaphone className="h-5 w-5" />
-                제보하기
-              </button>
             </div>
           </aside>
 
           {/* Content */}
           <main className="flex-1 w-full min-w-0">
-          {activeTab === "account" && (
+          {activeTab === null && (
             <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
                 <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-1">계정 설정</h3>
                 <p className="text-muted-foreground text-xs md:text-sm">프로필 정보와 활동 내역을 확인합니다.</p>
               </div>
 
-              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-4 md:p-6 bg-card shadow-sm space-y-6 md:space-y-8">
+              <div className="md:border md:border-slate-300 dark:md:border-slate-700 md:rounded-2xl md:bg-card md:shadow-sm p-0 md:p-6 space-y-6 md:space-y-8">
                 {/* Profile Image & Name */}
                 <div className="flex flex-row gap-4 md:gap-6 items-center">
                   <div className="relative group cursor-pointer shrink-0" onClick={() => fileInputRef.current?.click()}>
@@ -689,14 +604,14 @@ export default function SettingsPage() {
               {/* Danger Zone */}
               <div className="border border-red-200 dark:border-red-900/30 rounded-2xl p-4 md:p-6 bg-red-50/30 dark:bg-red-950/10 shadow-sm space-y-4 md:space-y-6 mt-8 md:mt-12">
                 <div>
-                  <h4 className="text-lg md:text-xl font-bold tracking-tight mb-1 flex items-center gap-2 text-red-600 dark:text-red-500 justify-center sm:justify-start">
+                  <h4 className="text-lg md:text-xl font-bold tracking-tight mb-1 flex items-center gap-2 text-red-600 dark:text-red-500">
                     <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" /> 계정 탈퇴
                   </h4>
-                  <p className="text-xs md:text-sm text-red-600/80 dark:text-red-400/80 text-center sm:text-left">
+                  <p className="text-xs md:text-sm text-red-600/80 dark:text-red-400/80">
                     계정을 탈퇴하면 모든 데이터가 즉시 삭제되며 복구할 수 없습니다.
                   </p>
                 </div>
-                <div className="pt-2 flex justify-center sm:justify-start">
+                <div className="pt-2 flex">
                   <Button
                     variant="destructive"
                     onClick={() => {
@@ -708,6 +623,14 @@ export default function SettingsPage() {
                     계정 영구 삭제
                   </Button>
                 </div>
+              </div>
+
+              {/* Mobile-only menu list (Galaxy Settings / YouTube "내 페이지" style) */}
+              <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 pt-2">
+                <SettingsMenuRow icon={Bell} label="알림" onClick={() => setActiveTab("notifications")} />
+                <SettingsMenuRow icon={Megaphone} label="제보하기" onClick={() => router.push("/suggest")} />
+                <SettingsMenuRow icon={Settings2} label="주최자 설정" onClick={() => setActiveTab("advanced")} />
+                <SettingsMenuRow icon={MessageSquare} label="고객 문의" onClick={() => setActiveTab("inquiry")} />
               </div>
             </div>
           )}
