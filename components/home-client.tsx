@@ -37,6 +37,8 @@ function seededRandom(seed: number) {
   return x - Math.floor(x);
 }
 
+const HOME_SCROLL_STORAGE_KEY = "outduck-home-scroll-state";
+
 
 interface HomeClientProps {
   initialOfflineEvents: Event[];
@@ -866,6 +868,108 @@ export function HomeClient({
       }
     };
   }, [visibleCount, filteredEvents.length, activeTab, isFetchingMore, hasMoreOffline, hasMoreOnline, offlineEvents.length, onlineEvents.length]);
+
+  // 5. Restore scroll position (and the content that was loaded) when coming back to this page
+  const hasRestoredScrollRef = useRef(false);
+  const isRestoringScrollRef = useRef(false);
+
+  useEffect(() => {
+    if (hasRestoredScrollRef.current) return;
+    hasRestoredScrollRef.current = true;
+
+    const raw = sessionStorage.getItem(HOME_SCROLL_STORAGE_KEY);
+    if (!raw) return;
+
+    let saved: {
+      scrollY: number;
+      visibleCount: number;
+      activeTab: "offline" | "online";
+      offlineCount: number;
+      onlineCount: number;
+    };
+    try {
+      saved = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    isRestoringScrollRef.current = true;
+
+    const ensureLoaded = async (type: "offline" | "online", targetCount: number) => {
+      let current = type === "offline" ? offlineEvents.length : onlineEvents.length;
+      let more = type === "offline" ? hasMoreOffline : hasMoreOnline;
+      while (current < targetCount && more) {
+        const { data } = await fetchMoreEvents(type, current, 30);
+        if (!data || data.length === 0) {
+          if (type === "offline") setHasMoreOffline(false); else setHasMoreOnline(false);
+          break;
+        }
+        if (type === "offline") {
+          setOfflineEvents(prev => [...prev, ...data as any]);
+        } else {
+          setOnlineEvents(prev => [...prev, ...data as any]);
+        }
+        current += data.length;
+        if (data.length < 30) {
+          more = false;
+          if (type === "offline") setHasMoreOffline(false); else setHasMoreOnline(false);
+        }
+      }
+    };
+
+    (async () => {
+      if (saved.activeTab && saved.activeTab !== activeTab) {
+        setActiveTab(saved.activeTab);
+      }
+
+      await Promise.all([
+        ensureLoaded("offline", saved.offlineCount),
+        ensureLoaded("online", saved.onlineCount),
+      ]);
+
+      setVisibleCount(prev => Math.max(prev, saved.visibleCount));
+
+      let attempts = 0;
+      const tryScroll = () => {
+        attempts += 1;
+        window.scrollTo(0, saved.scrollY);
+        const reachedBottom = document.documentElement.scrollHeight - window.innerHeight <= saved.scrollY;
+        const closeEnough = Math.abs(window.scrollY - saved.scrollY) < 4;
+        if (!closeEnough && !reachedBottom && attempts < 40) {
+          // Keep retrying for a couple seconds: images/cards can keep growing the
+          // page height well after the initial paint, past a few animation frames.
+          setTimeout(() => requestAnimationFrame(tryScroll), 50);
+        } else {
+          isRestoringScrollRef.current = false;
+        }
+      };
+      requestAnimationFrame(tryScroll);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let ticking = false;
+    const save = () => {
+      ticking = false;
+      if (isRestoringScrollRef.current) return;
+      sessionStorage.setItem(HOME_SCROLL_STORAGE_KEY, JSON.stringify({
+        scrollY: window.scrollY,
+        visibleCount,
+        activeTab,
+        offlineCount: offlineEvents.length,
+        onlineCount: onlineEvents.length,
+      }));
+    };
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(save);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [visibleCount, activeTab, offlineEvents.length, onlineEvents.length]);
 
   return (
     <div className="min-h-screen bg-background">
