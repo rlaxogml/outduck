@@ -878,35 +878,37 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
       </div>
 
       {/* Mobile Search Bar Row (Collapsible/Slide-down) */}
-      <div
-        className={cn(
-          "border-b border-border/50 bg-transparent px-3.5 block md:hidden overflow-hidden transition-all duration-300 ease-in-out",
-          isMobileSearchOpen 
-            ? "max-h-[60px] opacity-100 py-2 border-b border-border/50" 
-            : "max-h-0 opacity-0 py-0 border-b-0 pointer-events-none"
-        )}
-      >
+      <div className="bg-transparent px-3.5 block md:hidden">
         <div className="relative w-full max-w-lg mx-auto">
-          <div className="relative flex w-full items-center">
-            <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
-            <input
-              ref={mobileSearchInputRef}
-              type="text"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              onKeyDown={handleSearchInputKeyDown}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => {
-                window.setTimeout(() => {
-                  setIsSearchFocused(false);
-                }, 120);
-              }}
-              placeholder="채널명을 검색해보세요"
-              className="h-10 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
-            />
+          <div
+            className={cn(
+              "overflow-hidden transition-all duration-300 ease-in-out",
+              isMobileSearchOpen
+                ? "max-h-[60px] opacity-100 py-2 border-b border-border/50"
+                : "max-h-0 opacity-0 py-0 border-b-0 pointer-events-none"
+            )}
+          >
+            <div className="relative flex w-full items-center">
+              <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
+              <input
+                ref={mobileSearchInputRef}
+                type="text"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                onKeyDown={handleSearchInputKeyDown}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setIsSearchFocused(false);
+                  }, 120);
+                }}
+                placeholder="채널명을 검색해보세요"
+                className="h-10 w-full rounded-full border border-transparent bg-muted pl-11 pr-5 text-sm outline-none transition-all placeholder:text-muted-foreground focus:border-foreground focus:bg-background focus:shadow-sm"
+              />
+            </div>
           </div>
 
-          {isSearchFocused && (
+          {isMobileSearchOpen && isSearchFocused && (
             <div className="absolute top-[48px] left-0 right-0 z-[100] w-full rounded-2xl border border-border bg-background p-2 shadow-xl">
               {displayedChannels.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
@@ -1086,12 +1088,12 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
                     <span className="text-sm font-bold text-foreground">팔로우 채널</span>
                   </Link>
                   <Link
-                    href="/settings"
+                    href="/bookmarks"
                     onClick={() => setIsDrawerOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-slate-50 dark:bg-slate-900/50 hover:bg-muted transition-all"
                   >
-                    <UserIcon className="h-5 w-5 text-blue-500 shrink-0" />
-                    <span className="text-base font-bold text-foreground">MY</span>
+                    <Heart className="h-5 w-5 text-red-500 shrink-0" />
+                    <span className="text-base font-bold text-foreground">찜한 행사</span>
                   </Link>
                 </div>
               </div>
