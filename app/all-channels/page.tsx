@@ -18,6 +18,7 @@ const FILTERS = [
   { id: "all", label: "전체" },
   { id: "game", label: "게임" },
   { id: "youtuber", label: "유튜버" },
+  { id: "vtuber", label: "버튜버" },
   { id: "festival", label: "축제" },
 ];
 
@@ -31,13 +32,19 @@ export default function AllChannelsPage() {
     const fetchChannels = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from("channels")
-          .select("id, name, type, image_url")
-          .order("name", { ascending: true });
+        const [{ data, error }, { data: companies, error: companiesError }] = await Promise.all([
+          supabase
+            .from("channels")
+            .select("id, name, type, image_url")
+            .order("name", { ascending: true }),
+          supabase.from("companies").select("name"),
+        ]);
 
         if (error) throw error;
-        setChannels(data || []);
+        if (companiesError) throw companiesError;
+
+        const companyNames = new Set((companies || []).map((c) => c.name));
+        setChannels((data || []).filter((channel) => !companyNames.has(channel.name)));
       } catch (err) {
         console.error("Failed to fetch channels:", err);
       } finally {

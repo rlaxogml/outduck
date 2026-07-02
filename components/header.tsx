@@ -290,6 +290,7 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
     }
   }, [isMobileSearchOpen]);
   const noResultsTimerRef = useRef<number | null>(null);
+  const companyNamesRef = useRef<Set<string>>(new Set());
   const querySearchText = sanitizeSearchText(searchText)
     .replace(/\s+/g, " ")
     .trim();
@@ -385,6 +386,14 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
   }, []);
 
   useEffect(() => {
+    const loadCompanyNames = async () => {
+      const { data } = await supabase.from("companies").select("name");
+      companyNamesRef.current = new Set((data ?? []).map((c) => c.name));
+    };
+    loadCompanyNames();
+  }, []);
+
+  useEffect(() => {
     if (!querySearchText) {
       setSearchResults([]);
       setLastValidResults([]);
@@ -427,7 +436,9 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
         return;
       }
 
-      const nextResults = (data ?? []) as ChannelSearchItem[];
+      const nextResults = ((data ?? []) as ChannelSearchItem[]).filter(
+        (channel) => !companyNamesRef.current.has(channel.name)
+      );
 
       if (nextResults.length > 0) {
         setSearchResults(nextResults);

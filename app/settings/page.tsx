@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { User } from "@supabase/supabase-js";
-import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, Menu, X, MessageSquare, Pencil } from "lucide-react";
+import { Camera, Save, User as UserIcon, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, Menu, X, MessageSquare, Pencil, Smartphone, Megaphone } from "lucide-react";
 import { Header } from "@/components/header";
 import { toast } from "sonner"; // Assuming sonner is available, or use alert
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,6 +31,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("account");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isAppWebView, setIsAppWebView] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Account state
   const [name, setName] = useState("");
@@ -112,6 +114,7 @@ export default function SettingsPage() {
       if (tab === "account" || tab === "advanced") {
         setActiveTab(tab as Tab);
       }
+      setIsAppWebView(!!(window as any).ReactNativeWebView);
     }
   }, []);
 
@@ -121,9 +124,11 @@ export default function SettingsPage() {
     const checkAuthAndFetchData = async () => {
       try {
         const { data: { session }, error: authError } = await supabase.auth.getSession();
-        
+
         if (authError || !session?.user) {
-          router.replace("/");
+          if (isMounted) {
+            setLoading(false);
+          }
           return;
         }
 
@@ -375,10 +380,42 @@ export default function SettingsPage() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setIsLoggingIn(true);
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+    } catch (error) {
+      console.error("Login redirect failed:", error);
+      setIsLoggingIn(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[60vh] w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-background flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-lg font-semibold text-muted-foreground">로그인이 필요합니다</p>
+        <p className="text-sm text-muted-foreground max-w-xs">로그인하고 내 정보와 활동 내역을 확인해보세요!</p>
+        <Button
+          onClick={handleGoogleLogin}
+          disabled={isLoggingIn}
+          className="mt-2 h-11 px-6 font-semibold rounded-xl"
+        >
+          {isLoggingIn && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+          로그인 하러가기
+        </Button>
       </div>
     );
   }
@@ -481,13 +518,24 @@ export default function SettingsPage() {
                 setIsSidebarOpen(false);
               }}
               className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                activeTab === "inquiry" 
-                  ? "bg-primary/10 text-primary" 
+                activeTab === "inquiry"
+                  ? "bg-primary/10 text-primary"
                   : "hover:bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
               <MessageSquare className="h-5 w-5" />
               고객 문의
+            </button>
+
+            <button
+              onClick={() => {
+                setIsSidebarOpen(false);
+                router.push("/suggest");
+              }}
+              className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+            >
+              <Megaphone className="h-5 w-5" />
+              제보하기
             </button>
           </div>
         </div>
@@ -548,13 +596,21 @@ export default function SettingsPage() {
               <button
                 onClick={() => setActiveTab("inquiry")}
                 className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === "inquiry" 
-                    ? "bg-primary/10 text-primary" 
+                  activeTab === "inquiry"
+                    ? "bg-primary/10 text-primary"
                     : "hover:bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <MessageSquare className="h-5 w-5" />
                 고객 문의
+              </button>
+
+              <button
+                onClick={() => router.push("/suggest")}
+                className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+              >
+                <Megaphone className="h-5 w-5" />
+                제보하기
               </button>
             </div>
           </aside>
@@ -663,31 +719,43 @@ export default function SettingsPage() {
                 <p className="text-muted-foreground text-xs md:text-sm">중요한 알림을 받을지 설정합니다.</p>
               </div>
 
-              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-4 md:p-6 bg-card shadow-sm space-y-4 md:space-y-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm md:text-base font-semibold">새 행사 알림</Label>
-                    <p className="text-xs md:text-sm text-muted-foreground">새로운 행사가 등록될 때 알림을 받습니다.</p>
+              {isAppWebView ? (
+                <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-4 md:p-6 bg-card shadow-sm space-y-4 md:space-y-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm md:text-base font-semibold">새 행사 알림</Label>
+                      <p className="text-xs md:text-sm text-muted-foreground">새로운 행사가 등록될 때 알림을 받습니다.</p>
+                    </div>
+                    <Switch
+                      checked={notifyNewEvent}
+                      onCheckedChange={handleToggleNotifyNewEvent}
+                    />
                   </div>
-                  <Switch 
-                    checked={notifyNewEvent} 
-                    onCheckedChange={handleToggleNotifyNewEvent} 
-                  />
-                </div>
-                
-                <div className="h-px w-full bg-border" />
-                
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm md:text-base font-semibold">찜한 행사 공지 알림</Label>
-                    <p className="text-xs md:text-sm text-muted-foreground">내가 찜한 행사의 새로운 공지사항 알림을 받습니다.</p>
+
+                  <div className="h-px w-full bg-border" />
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm md:text-base font-semibold">찜한 행사 공지 알림</Label>
+                      <p className="text-xs md:text-sm text-muted-foreground">내가 찜한 행사의 새로운 공지사항 알림을 받습니다.</p>
+                    </div>
+                    <Switch
+                      checked={notifyBookmarkNotice}
+                      onCheckedChange={handleToggleNotifyBookmarkNotice}
+                    />
                   </div>
-                  <Switch 
-                    checked={notifyBookmarkNotice} 
-                    onCheckedChange={handleToggleNotifyBookmarkNotice} 
-                  />
                 </div>
-              </div>
+              ) : (
+                <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-8 md:p-10 bg-card shadow-sm flex flex-col items-center text-center gap-3">
+                  <div className="p-3 bg-muted rounded-full text-muted-foreground">
+                    <Smartphone className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm md:text-base font-semibold text-foreground">모바일 앱 환경에서만 가능합니다</p>
+                  <p className="text-xs md:text-sm text-muted-foreground max-w-xs">
+                    알림 설정은 아웃덕 앱에서만 변경할 수 있어요. 앱을 설치한 후 다시 시도해 주세요.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

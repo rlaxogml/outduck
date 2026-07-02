@@ -201,6 +201,7 @@ export function HomeClient({
     return false;
   });
   const isFirstRender = useRef(true);
+  const isFirstTabPersist = useRef(true);
 
   // Load and update decay cache & shuffle token on mount
   useEffect(() => {
@@ -286,6 +287,29 @@ export function HomeClient({
     } catch (e) {}
     setVisibleCount(10);
   }, [activeTab, activeCategory, sortType]);
+
+  // Restore the previously selected event tab after mount (avoids SSR hydration mismatch)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("outduck-active-event-tab");
+      if ((saved === "offline" || saved === "online") && saved !== activeTab) {
+        setActiveTab(saved);
+      }
+    } catch (e) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist selected event tab so a refresh keeps the same screen.
+  // Skip the very first run so it doesn't clobber the saved value before the restore effect applies it.
+  useEffect(() => {
+    if (isFirstTabPersist.current) {
+      isFirstTabPersist.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem("outduck-active-event-tab", activeTab);
+    } catch (e) {}
+  }, [activeTab]);
 
   useEffect(() => {
     console.log("HomeClient: Component mounted and session check starting...");
