@@ -289,10 +289,12 @@ export function HomeClient({
     setVisibleCount(10);
   }, [activeTab, activeCategory, sortType]);
 
-  // Restore the previously selected event tab after mount (avoids SSR hydration mismatch)
+  // Restore the previously selected event tab after mount (avoids SSR hydration mismatch).
+  // Uses sessionStorage so it survives in-session navigation/refresh but resets on a full
+  // app cold start (close & reopen) back to the default "offline" tab.
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("outduck-active-event-tab");
+      const saved = sessionStorage.getItem("outduck-active-event-tab");
       if ((saved === "offline" || saved === "online") && saved !== activeTab) {
         setActiveTab(saved);
       }
@@ -300,7 +302,8 @@ export function HomeClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist selected event tab so a refresh keeps the same screen.
+  // Persist selected event tab in sessionStorage so navigation/refresh keep the same tab,
+  // while a full app cold start resets to the default (offline) tab.
   // Skip the very first run so it doesn't clobber the saved value before the restore effect applies it.
   useEffect(() => {
     if (isFirstTabPersist.current) {
@@ -308,15 +311,15 @@ export function HomeClient({
       return;
     }
     try {
-      localStorage.setItem("outduck-active-event-tab", activeTab);
+      sessionStorage.setItem("outduck-active-event-tab", activeTab);
     } catch (e) {}
   }, [activeTab]);
 
   // Restore the previously selected sort order after mount (avoids SSR hydration mismatch).
-  // Without this, navigating away and back resets the sort back to "recommended".
+  // sessionStorage: survives in-session navigation/refresh, resets to "recommended" on cold start.
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("outduck-home-sort-type");
+      const saved = sessionStorage.getItem("outduck-home-sort-type");
       if ((saved === "recommended" || saved === "recent" || saved === "upcoming") && saved !== sortType) {
         setSortType(saved);
       }
@@ -324,7 +327,8 @@ export function HomeClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist selected sort order so navigating away and back keeps the same order.
+  // Persist selected sort order in sessionStorage so navigation/refresh keep the same order,
+  // while a full app cold start resets to the default (recommended) order.
   // Skip the very first run so it doesn't clobber the saved value before the restore effect applies it.
   useEffect(() => {
     if (isFirstSortPersist.current) {
@@ -332,7 +336,7 @@ export function HomeClient({
       return;
     }
     try {
-      localStorage.setItem("outduck-home-sort-type", sortType);
+      sessionStorage.setItem("outduck-home-sort-type", sortType);
     } catch (e) {}
   }, [sortType]);
 
