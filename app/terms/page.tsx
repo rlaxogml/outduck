@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+
+// 이용약관도 URL 접근은 유지하되 검색 결과에는 노출하지 않는다.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default function TermsPage() {
   return (
     <main className="min-h-screen bg-white py-16 px-4">

@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+// 개인정보처리방침은 URL로는 접근 가능해야 하지만(플레이 스토어 요건),
+// 검색 결과에는 노출되지 않도록 noindex 처리한다.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-white py-16 px-4">
