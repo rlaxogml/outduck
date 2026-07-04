@@ -72,10 +72,15 @@ export function EventCard({
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [heartAnim, setHeartAnim] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isClientReady, setIsClientReady] = useState(false);
   const router = useRouter();
   const popupRef = useRef<HTMLDivElement>(null);
 
   const [resolvedBaseEventId, setResolvedBaseEventId] = useState<number | null>(baseEventId || null);
+
+  useEffect(() => {
+    setIsClientReady(true);
+  }, []);
 
   useEffect(() => {
     if (baseEventId) {
@@ -225,8 +230,8 @@ export function EventCard({
             </div>
           )}
 
-          {/* 하트 버튼 - 로그인한 경우만 표시 */}
-          {user && (
+          {/* 하트 버튼 - hydration 후 로그인 상태일 때만 표시 */}
+          {isClientReady && user && (
             <button
               onClick={handleBookmark}
               className={`absolute top-2 right-2 h-7 w-7 md:h-8 md:w-8 rounded-full flex items-center justify-center transition-all duration-200 z-10

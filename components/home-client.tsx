@@ -69,7 +69,7 @@ export function HomeClient({
         const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
         if (sessionData) {
           const parsed = JSON.parse(sessionData);
-          return parsed?.currentSession?.user ?? null;
+          return parsed?.user ?? null;
         }
       } catch (e) {}
     }
@@ -85,7 +85,7 @@ export function HomeClient({
         const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
         if (sessionData) {
           const parsed = JSON.parse(sessionData);
-          const currentUser = parsed?.currentSession?.user;
+          const currentUser = parsed?.user;
           if (currentUser) {
             const metaKey = `outduck-user-meta-${currentUser.id}`;
             const cachedMeta = localStorage.getItem(metaKey);
@@ -109,7 +109,7 @@ export function HomeClient({
         const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
         if (sessionData) {
           const parsed = JSON.parse(sessionData);
-          const currentUser = parsed?.currentSession?.user;
+          const currentUser = parsed?.user;
           if (currentUser) {
             const metaKey = `outduck-user-meta-${currentUser.id}`;
             const cachedMeta = localStorage.getItem(metaKey);
@@ -133,7 +133,7 @@ export function HomeClient({
         const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
         if (sessionData) {
           const parsed = JSON.parse(sessionData);
-          const currentUser = parsed?.currentSession?.user;
+          const currentUser = parsed?.user;
           if (currentUser) {
             const metaKey = `outduck-user-meta-${currentUser.id}`;
             const cachedMeta = localStorage.getItem(metaKey);
@@ -157,7 +157,7 @@ export function HomeClient({
         const sessionData = sessionKey ? localStorage.getItem(sessionKey) : null;
         if (sessionData) {
           const parsed = JSON.parse(sessionData);
-          const currentUser = parsed?.currentSession?.user;
+          const currentUser = parsed?.user;
           if (currentUser) {
             const metaKey = `outduck-user-meta-${currentUser.id}`;
             const cachedMeta = localStorage.getItem(metaKey);
@@ -173,6 +173,7 @@ export function HomeClient({
   });
 
   const [visibleCount, setVisibleCount] = useState(10);
+  const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
   const [decayCache, setDecayCache] = useState<any[]>(() => {
     if (typeof window !== "undefined") {
@@ -275,18 +276,15 @@ export function HomeClient({
     }
   }, []);
 
-  // Reset visible count and shuffle token when filters change
+  // Reset visible count when the user changes tab/category/sort (show the filtered list from the top).
+  // NOTE: The recommendation shuffle token is intentionally NOT regenerated here. The order only
+  // changes on a new session or a hard refresh (handled by the mount effect above) — never on
+  // client-side navigation, tab restore, or filter changes.
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
-    // Only shuffle when user explicitly changes filters/tabs
-    const newToken = Math.floor(Math.random() * 10000);
-    setShuffleToken(newToken);
-    try {
-      sessionStorage.setItem("outduck-home-shuffle-token", String(newToken));
-    } catch (e) {}
     setVisibleCount(10);
   }, [activeTab, activeCategory, sortType]);
 
@@ -326,7 +324,7 @@ export function HomeClient({
       
       if (sessionData) {
         const parsed = JSON.parse(sessionData);
-        const currentUser = parsed?.currentSession?.user;
+        const currentUser = parsed?.user;
         if (currentUser && isMounted && (!user || user.id !== currentUser.id)) {
           setUser(currentUser);
           console.log("HomeClient: Restored cached user session from localStorage:", currentUser.id);
@@ -526,6 +524,20 @@ export function HomeClient({
           setUserFavorites(prev => prev || []); // 캐시된 값이 없을 때만 빈 배열로 스켈레톤 해제
         }
       });
+
+      // 5. 선호 장르 동기화 (추천순 정렬에 반영되도록 localStorage로 캐싱)
+      supabase
+        .from("profiles")
+        .select("favorite_topic")
+        .eq("id", userId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!isMounted || !data) return;
+          const topics = Array.isArray(data.favorite_topic) ? data.favorite_topic : [];
+          try {
+            localStorage.setItem("outduck-interests", JSON.stringify(topics));
+          } catch (e) {}
+        });
     };
 
     loadUserData(user.id);
@@ -869,7 +881,10 @@ export function HomeClient({
     };
   }, [visibleCount, filteredEvents.length, activeTab, isFetchingMore, hasMoreOffline, hasMoreOnline, offlineEvents.length, onlineEvents.length]);
 
-  // 5. Restore scroll position (and the content that was loaded) when coming back to this page
+  // 5. Restore scroll position when coming back to this page.
+  // Anchored to the tabs/filter bar (always present, right below the banners
+  // and favorite-channels strip) instead of a raw page-top pixel offset, so
+  // that async banners resizing above it don't throw the restored position off.
   const hasRestoredScrollRef = useRef(false);
   const isRestoringScrollRef = useRef(false);
 
@@ -881,7 +896,7 @@ export function HomeClient({
     if (!raw) return;
 
     let saved: {
-      scrollY: number;
+      anchorDelta: number;
       visibleCount: number;
       activeTab: "offline" | "online";
       offlineCount: number;
@@ -892,6 +907,11 @@ export function HomeClient({
     } catch {
       return;
     }
+
+    // Was still above the tabs (inside the banner/favorite-channels zone) when
+    // leaving. That content isn't reproducible - banners can appear, disappear,
+    // or change size - so there's no meaningful position to restore into it.
+    if (typeof saved.anchorDelta !== "number" || saved.anchorDelta <= 0) return;
 
     isRestoringScrollRef.current = true;
 
@@ -932,12 +952,18 @@ export function HomeClient({
       let attempts = 0;
       const tryScroll = () => {
         attempts += 1;
-        window.scrollTo(0, saved.scrollY);
-        const reachedBottom = document.documentElement.scrollHeight - window.innerHeight <= saved.scrollY;
-        const closeEnough = Math.abs(window.scrollY - saved.scrollY) < 4;
+        const anchorEl = scrollAnchorRef.current;
+        if (anchorEl) {
+          const targetY = anchorEl.getBoundingClientRect().top + window.scrollY + saved.anchorDelta;
+          window.scrollTo(0, targetY);
+        }
+        const currentDelta = anchorEl ? -anchorEl.getBoundingClientRect().top : 0;
+        const closeEnough = Math.abs(currentDelta - saved.anchorDelta) < 4;
+        const reachedBottom = document.documentElement.scrollHeight - window.innerHeight <= window.scrollY;
         if (!closeEnough && !reachedBottom && attempts < 40) {
-          // Keep retrying for a couple seconds: images/cards can keep growing the
-          // page height well after the initial paint, past a few animation frames.
+          // Keep retrying for a couple seconds: banners/images can keep shifting
+          // the layout well after the initial paint, past a few animation frames.
+          // Re-measuring the anchor live each time keeps this correct regardless.
           setTimeout(() => requestAnimationFrame(tryScroll), 50);
         } else {
           isRestoringScrollRef.current = false;
@@ -953,8 +979,10 @@ export function HomeClient({
     const save = () => {
       ticking = false;
       if (isRestoringScrollRef.current) return;
+      const anchorEl = scrollAnchorRef.current;
+      if (!anchorEl) return;
       sessionStorage.setItem(HOME_SCROLL_STORAGE_KEY, JSON.stringify({
-        scrollY: window.scrollY,
+        anchorDelta: -anchorEl.getBoundingClientRect().top,
         visibleCount,
         activeTab,
         offlineCount: offlineEvents.length,
@@ -986,7 +1014,7 @@ export function HomeClient({
       <div className="mx-auto max-w-7xl px-4 pt-0 pb-3 md:pt-0 md:pb-3">
         <main className="pb-8">
           {/* Company Owner Banner */}
-          {isCompanyUser && (
+          {isMounted && isCompanyUser && (
             <div className="mb-6 p-4 md:p-5 bg-gradient-to-r from-orange-500/10 to-amber-500/5 border border-orange-500/20 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-2 fade-in duration-300">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-orange-500 text-white rounded-2xl shrink-0">
@@ -1007,7 +1035,7 @@ export function HomeClient({
           )}
 
           {/* Host Owner Banner */}
-          {isHostUser && (
+          {isMounted && isHostUser && (
             <div className="mb-6 p-4 md:p-5 bg-gradient-to-r from-indigo-500/15 to-purple-500/10 border border-indigo-500/20 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-2 fade-in duration-300">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-indigo-500 text-white rounded-2xl shrink-0">
@@ -1033,8 +1061,11 @@ export function HomeClient({
             initialFavorites={userFavorites}
           />
 
-          {/* Tabs */}
-          <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />
+          {/* Tabs - also serves as the scroll-restoration anchor point, since it's
+              always rendered right after the banners/favorite-channels zone */}
+          <div ref={scrollAnchorRef}>
+            <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />
+          </div>
 
           {/* Category Filter */}
           <CategoryFilter

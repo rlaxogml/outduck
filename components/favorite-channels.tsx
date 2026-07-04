@@ -30,6 +30,29 @@ function getChannelTypeText(type: string | null) {
 
 let cachedChannels: Channel[] | null = null;
 
+function FavoriteChannelsSkeleton() {
+  return (
+    <div className="bg-white mb-4 border-y border-border animate-pulse">
+      <div className="flex items-center p-3 border-b border-border">
+        <div className="h-4 bg-muted-foreground/30 rounded w-24" />
+      </div>
+      <div className="px-3.5 py-3 md:p-4 flex gap-4 overflow-x-auto no-scrollbar">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex flex-col items-center gap-2 min-w-[56px] md:min-w-[80px]">
+            <div className="relative w-14 h-14 md:w-20 md:h-20">
+              <div className="w-full h-full rounded-full bg-muted-foreground/30 shrink-0" />
+            </div>
+            <div className="flex flex-col items-center gap-1.5 mt-0.5">
+              <div className="h-3 bg-muted-foreground/20 rounded w-12 md:w-16" />
+              <div className="hidden md:block h-2.5 bg-muted-foreground/20 rounded w-8 md:w-10 mt-0.5" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function FavoriteChannels({
   user,
   initialFavorites,
@@ -56,20 +79,6 @@ export function FavoriteChannels({
         };
       }).filter(c => c.id !== undefined);
     }
-    
-    // Direct localStorage load in constructor if running on client (for user-favorites)
-    if (typeof window !== "undefined" && user) {
-      try {
-        const cacheKey = `outduck-favorites-${user.id}`;
-        const cachedData = localStorage.getItem(cacheKey);
-        if (cachedData) {
-          const parsed = JSON.parse(cachedData);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map((c: any) => ({ ...c, activeEventCount: undefined }));
-          }
-        }
-      } catch (e) {}
-    }
     return [];
   });
 
@@ -81,7 +90,7 @@ export function FavoriteChannels({
     if (initialFavorites === undefined) return true;
     return false;
   });
-  const [mounted, setMounted] = useState(false);
+  const [isClientReady, setIsClientReady] = useState(false);
   const [hasTimedOut, setHasTimedOut] = useState(false);
 
   // Sync state from props during render if initialFavorites changes (React state-from-prop sync pattern)
@@ -116,13 +125,12 @@ export function FavoriteChannels({
   }
 
   useEffect(() => {
-    console.log("FavoriteChannels: Component mounted.");
-    setMounted(true);
+    setIsClientReady(true);
   }, []);
 
   useEffect(() => {
-    console.log("FavoriteChannels: Auth changed or mounted.", { hasUser: !!user, mounted });
-    // Run cache loading instantly even if not fully mounted in React state to avoid delays
+    if (!isClientReady) return;
+
     let isMounted = true;
     setHasTimedOut(false);
 
@@ -399,32 +407,14 @@ export function FavoriteChannels({
       isMounted = false;
       clearTimeout(safetyTimeout);
     };
-  }, [user, mounted, initialFavorites]);
+  }, [user, isClientReady, initialFavorites]);
+
+  // SSR과 첫 클라이언트 렌더를 동일한 스켈레톤으로 맞춰 hydration mismatch 방지
+  if (!isClientReady || isLoading) {
+    return <FavoriteChannelsSkeleton />;
+  }
 
   if (!user) return null;
-
-  if (!mounted || isLoading) {
-    return (
-      <div className="bg-white mb-4 border-y border-border animate-pulse">
-        <div className="flex items-center p-3 border-b border-border">
-          <div className="h-4 bg-muted-foreground/30 rounded w-24" />
-        </div>
-        <div className="px-3.5 py-3 md:p-4 flex gap-4 overflow-x-auto no-scrollbar">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex flex-col items-center gap-2 min-w-[56px] md:min-w-[80px]">
-              <div className="relative w-14 h-14 md:w-20 md:h-20">
-                <div className="w-full h-full rounded-full bg-muted-foreground/30 shrink-0" />
-              </div>
-              <div className="flex flex-col items-center gap-1.5 mt-0.5">
-                <div className="h-3 bg-muted-foreground/20 rounded w-12 md:w-16" />
-                <div className="hidden md:block h-2.5 bg-muted-foreground/20 rounded w-8 md:w-10 mt-0.5" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   const hasTooMany = channels.length > 10;
 

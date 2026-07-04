@@ -31,6 +31,13 @@ const TAB_LABELS: Record<Tab, string> = {
   inquiry: "고객 문의",
 };
 
+const TOPIC_OPTIONS: { id: string; label: string }[] = [
+  { id: "game", label: "게임" },
+  { id: "youtuber", label: "유튜버" },
+  { id: "vtuber", label: "버튜버" },
+  { id: "festival", label: "축제" },
+];
+
 function SettingsMenuRow({
   icon: Icon,
   label,
@@ -73,6 +80,10 @@ export default function SettingsPage() {
   const [notifyNewEvent, setNotifyNewEvent] = useState(true);
   const [notifyBookmarkNotice, setNotifyBookmarkNotice] = useState(true);
   const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
+
+  // Favorite topic (preferred genres) state
+  const [favoriteTopics, setFavoriteTopics] = useState<string[]>([]);
+  const [isUpdatingTopics, setIsUpdatingTopics] = useState(false);
 
   // Advanced state
   const [ownerCode, setOwnerCode] = useState("");
@@ -184,16 +195,21 @@ export default function SettingsPage() {
           setBookmarksCount(bookmarksRes.count || 0);
         }
 
-        // Fetch notifications settings
+        // Fetch notifications settings & favorite topics
         const { data: notifData } = await supabase
           .from("profiles")
-          .select("notify_new_event, notify_bookmark_notice")
+          .select("notify_new_event, notify_bookmark_notice, favorite_topic")
           .eq("id", currentUser.id)
           .maybeSingle();
 
         if (isMounted && notifData) {
           setNotifyNewEvent(notifData.notify_new_event ?? true);
           setNotifyBookmarkNotice(notifData.notify_bookmark_notice ?? true);
+          const topics = Array.isArray(notifData.favorite_topic) ? notifData.favorite_topic : [];
+          setFavoriteTopics(topics);
+          try {
+            localStorage.setItem("outduck-interests", JSON.stringify(topics));
+          } catch (e) {}
         }
       } catch (error) {
         console.error("Error fetching settings data:", error);
@@ -326,6 +342,31 @@ export default function SettingsPage() {
       toast.success("공지 알림 설정이 업데이트되었습니다.");
     } catch (error: any) {
       toast.error("알림 설정 저장에 실패했습니다: " + error.message);
+    }
+  };
+
+  const handleToggleTopic = async (topicId: string) => {
+    if (!user) return;
+    const next = favoriteTopics.includes(topicId)
+      ? favoriteTopics.filter((t) => t !== topicId)
+      : [...favoriteTopics, topicId];
+
+    // Optimistic UI + immediately sync localStorage so the home recommendation picks it up
+    setFavoriteTopics(next);
+    try {
+      localStorage.setItem("outduck-interests", JSON.stringify(next));
+    } catch (e) {}
+
+    setIsUpdatingTopics(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .upsert({ id: user.id, favorite_topic: next }, { onConflict: "id" });
+      if (error) throw error;
+    } catch (error: any) {
+      toast.error("선호 장르 저장에 실패했습니다: " + error.message);
+    } finally {
+      setIsUpdatingTopics(false);
     }
   };
 
@@ -598,6 +639,39 @@ export default function SettingsPage() {
                       {bookmarksCount.toLocaleString()}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Favorite Topics (Preferred Genres) */}
+              <div className="border border-slate-300 dark:border-slate-700 rounded-2xl p-4 md:p-6 bg-card shadow-sm space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-base md:text-lg font-bold tracking-tight mb-0.5">선호 장르</h4>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      관심 있는 장르를 선택하면 추천순 정렬에 반영돼요.
+                    </p>
+                  </div>
+                  {isUpdatingTopics && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {TOPIC_OPTIONS.map((topic) => {
+                    const selected = favoriteTopics.includes(topic.id);
+                    return (
+                      <button
+                        key={topic.id}
+                        type="button"
+                        onClick={() => handleToggleTopic(topic.id)}
+                        className={cn(
+                          "px-4 py-2 rounded-full text-sm font-semibold border transition-all",
+                          selected
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                            : "bg-background border-border text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        {topic.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
