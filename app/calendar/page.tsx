@@ -9,6 +9,8 @@ import type { User } from "@supabase/supabase-js";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trackPerformance } from "@/lib/performance";
+import { useQuery } from "@tanstack/react-query";
+import { imageColors, formatEventDate, formatOnlineEventDate, extractChannels, getCategory } from "@/lib/event-format";
 
 const categoryLabelMap: Record<string, string> = {
   game: "게임",
@@ -16,15 +18,6 @@ const categoryLabelMap: Record<string, string> = {
   festival: "축제",
   vtuber: "버튜버",
 };
-
-const imageColors = [
-  "bg-gradient-to-br from-indigo-400 to-indigo-600",
-  "bg-gradient-to-br from-pink-400 to-pink-600",
-  "bg-gradient-to-br from-green-400 to-green-600",
-  "bg-gradient-to-br from-orange-400 to-orange-600",
-  "bg-gradient-to-br from-purple-400 to-purple-600",
-  "bg-gradient-to-br from-red-400 to-red-600",
-];
 
 type Event = {
   id: number;
@@ -87,10 +80,6 @@ function CalendarContent() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [user, setUser] = useState<User | null>(null);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>([]);
-  const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -121,261 +110,146 @@ function CalendarContent() {
     }
   }, [user]);
 
-  useEffect(() => {
-    let ignore = false;
+  // 월 단위로 이벤트 + (로그인 시) 북마크/팔로우를 조회. queryKey에 월을 넣어 월별로 캐시된다.
+  // 다른 화면 갔다 돌아오면 같은 달은 재요청 없이 즉시 재사용.
+  const { data: calendarData, isLoading } = useQuery({
+    queryKey: ["calendar-data", user?.id, `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`],
+    queryFn: async () => {
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      const startDateLimit = new Date(year, month - 1, 20).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+      const endDateLimit = new Date(year, month + 1, 10).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 
-    const fetchEventsAndUserData = async () => {
-      try {
-        setLoading(true);
-
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const startDateLimit = new Date(year, month - 1, 20).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
-        const endDateLimit = new Date(year, month + 1, 10).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
-
-        const offlineQuery = supabase
-          .from("offline_events")
-          .select(`
-            id,
-            event_id,
-            title,
-            start_date,
-            end_date,
-            image_url,
-            reservation_type,
-            created_at,
-            events(
-              event_channels(
-                channels(
-                  id,
-                  name,
-                  type,
-                  image_url
-                )
-              ),
-              event_schedules(
-                date,
-                day_of_week,
-                reservation_type
-              )
+      const offlineQuery = supabase
+        .from("offline_events")
+        .select(`
+          id,
+          event_id,
+          title,
+          start_date,
+          end_date,
+          image_url,
+          reservation_type,
+          created_at,
+          events(
+            event_channels(
+              channels(id, name, type, image_url)
             ),
-            offline_event_locations (
-              location
-            )
-          `)
-          .not("start_date", "is", null)
-          .lte("start_date", endDateLimit)
-          .or(`end_date.gte.${startDateLimit},end_date.is.null`);
+            event_schedules(date, day_of_week, reservation_type)
+          ),
+          offline_event_locations (location)
+        `)
+        .not("start_date", "is", null)
+        .lte("start_date", endDateLimit)
+        .or(`end_date.gte.${startDateLimit},end_date.is.null`);
 
-        const onlineQuery = supabase
-          .from("online_events")
-          .select(`
-            id,
-            event_id,
-            title,
-            start_at,
-            end_at,
-            image_url,
-            created_at,
-            events(
-              event_channels(
-                channels(
-                  id,
-                  name,
-                  type,
-                  image_url
-                )
-              )
+      const onlineQuery = supabase
+        .from("online_events")
+        .select(`
+          id,
+          event_id,
+          title,
+          start_at,
+          end_at,
+          image_url,
+          created_at,
+          events(
+            event_channels(
+              channels(id, name, type, image_url)
             )
-          `)
-          .not("start_at", "is", null)
-          .lte("start_at", endDateLimit)
-          .or(`end_at.gte.${startDateLimit},end_at.is.null`);
+          )
+        `)
+        .not("start_at", "is", null)
+        .lte("start_at", endDateLimit)
+        .or(`end_at.gte.${startDateLimit},end_at.is.null`);
 
-        const [{ data: offlineEventsData }, { data: onlineEventsData }] = await Promise.all([
-          trackPerformance("캘린더 오프라인 행사 조회 (Client)", "client", () => offlineQuery),
-          trackPerformance("캘린더 온라인 행사 조회 (Client)", "client", () => onlineQuery)
+      const [{ data: offlineEventsData }, { data: onlineEventsData }] = await Promise.all([
+        trackPerformance("캘린더 오프라인 행사 조회 (Client)", "client", () => offlineQuery),
+        trackPerformance("캘린더 온라인 행사 조회 (Client)", "client", () => onlineQuery),
+      ]);
+
+      let bookmarkedIds: number[] = [];
+      let subscribedChannelIds: number[] = [];
+
+      if (user) {
+        const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
+          trackPerformance("캘린더 북마크 조회 (Client)", "client", () => supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id)),
+          trackPerformance("캘린더 팔로우 채널 조회 (Client)", "client", () => supabase.from("favorites").select("channel_id").eq("user_id", user.id)),
         ]);
-
-        if (ignore) return;
-
-        let bookmarks: number[] = [];
-        let subscriptions: number[] = [];
-
-        if (user) {
-          const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
-            trackPerformance(
-              "캘린더 북마크 조회 (Client)",
-              "client",
-              () => supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id)
-            ),
-            trackPerformance(
-              "캘린더 팔로우 채널 조회 (Client)",
-              "client",
-              () => supabase.from("favorites").select("channel_id").eq("user_id", user.id)
-            ),
-          ]);
-
-          if (ignore) return;
-
-          if (bookmarksData) {
-            bookmarks = bookmarksData
-              .map(b => b.event_id)
-              .filter(Boolean) as number[];
-          }
-          if (favoritesData) {
-            subscriptions = favoritesData.map(f => f.channel_id).filter(Boolean);
-          }
-        }
-
-        if (!ignore) {
-          setUserBookmarkedEventIds(bookmarks);
-          setUserSubscribedChannelIds(subscriptions);
-        }
-
-        const extractChannels = (eventChannels: any[]) => {
-          return (eventChannels || [])
-            .map((ec: any) => ec.channels)
-            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
-        };
-
-        const getCategory = (type?: string) => {
-          if (!type) return "기타";
-          const t = type.trim().toLowerCase();
-          if (t === "game") return "게임";
-          if (t === "youtuber") return "유튜버";
-          if (t === "vtuber") return "버튜버";
-          if (t === "festival") return "축제";
-          return "기타";
-        };
-
-        const formatOfflineEventDate = (start: string, end: string | null) => {
-          if (!start) return "상시";
-          const startPt = start.replaceAll("-", ".").split("T")[0];
-          const endPt = end ? end.replaceAll("-", ".").split("T")[0] : null;
-          if (startPt === endPt || !endPt) {
-            const parts = startPt.split(".");
-            if (parts.length === 3) {
-              const month = parseInt(parts[1], 10);
-              const day = parseInt(parts[2], 10);
-              return `${month}월 ${day}일`;
-            }
-            return startPt;
-          }
-          return `${startPt} - ${endPt}`;
-        };
-
-        const formatOnlineEventDate = (start: string | null, end: string | null) => {
-          if (!start) return "상시";
-          const formatDate = (dateStr: string) => {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return "";
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${month}.${day}`;
-          };
-
-          const startFormatted = formatDate(start);
-          if (!end) {
-            const d = new Date(start);
-            if (!isNaN(d.getTime())) {
-              return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-            }
-            return startFormatted;
-          }
-          const endFormatted = formatDate(end);
-          if (startFormatted === endFormatted) {
-            const d = new Date(start);
-            if (!isNaN(d.getTime())) {
-              return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-            }
-            return startFormatted;
-          }
-          return `${startFormatted} ~ ${endFormatted}`;
-        };
-
-        const formattedOffline: Event[] = (offlineEventsData || []).map((event, index) => {
-          const channels = extractChannels((event.events as any)?.event_channels);
-          const schedules = (event.events as any)?.event_schedules || [];
-          return {
-            id: event.id,
-            baseEventId: event.event_id,
-            title: event.title,
-            date: formatOfflineEventDate(event.start_date, event.end_date),
-            location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
-            category: getCategory(channels[0]?.type),
-            imageColor: imageColors[index % imageColors.length],
-            imageUrl: event.image_url ?? undefined,
-            reservationType: event.reservation_type as any,
-            channels: channels.map(c => ({ id: c.id, name: c.name, type: c.type ?? "", image_url: c.image_url || "" })),
-            isAlways: !event.start_date,
-            createdAt: event.created_at,
-            startDateValue: event.start_date,
-            endDateValue: event.end_date,
-            eventType: "offline",
-            schedules
-          };
-        });
-
-        const formattedOnline: Event[] = (onlineEventsData || []).map((event, index) => {
-          const channels = extractChannels((event.events as any)?.event_channels);
-          return {
-            id: event.id,
-            baseEventId: event.event_id,
-            title: event.title,
-            date: formatOnlineEventDate(event.start_at, event.end_at),
-            location: "온라인",
-            category: getCategory(channels[0]?.type),
-            imageColor: imageColors[index % imageColors.length],
-            imageUrl: event.image_url ?? undefined,
-            reservationType: undefined,
-            channels: channels.map(c => ({ id: c.id, name: c.name, type: c.type ?? "", image_url: c.image_url || "" })),
-            isAlways: !event.start_at,
-            createdAt: event.created_at,
-            startDateValue: event.start_at,
-            endDateValue: event.end_at,
-            eventType: "online"
-          };
-        });
-
-        const combined = [...formattedOffline, ...formattedOnline];
-        
-        if (!ignore) {
-          setEvents(combined);
-
-          // If highlight param is passed, set selectedDate to that event's startDate
-          if (highlightId) {
-            const highlightEvent = combined.find(e => e.id === highlightId);
-            if (highlightEvent && highlightEvent.startDateValue) {
-              const targetDate = new Date(highlightEvent.startDateValue);
-              setSelectedDate((prev) => {
-                if (prev.getTime() !== targetDate.getTime()) {
-                  return targetDate;
-                }
-                return prev;
-              });
-              setCurrentMonth((prev) => {
-                if (prev.getFullYear() !== targetDate.getFullYear() || prev.getMonth() !== targetDate.getMonth()) {
-                  return targetDate;
-                }
-                return prev;
-              });
-            }
-          }
-        }
-      } catch (error) {
-        if (!ignore) console.error("캘린더 데이터를 불러오는 중 오류 발생:", error);
-      } finally {
-        if (!ignore) setLoading(false);
+        bookmarkedIds = (bookmarksData || []).map((b) => b.event_id).filter(Boolean) as number[];
+        subscribedChannelIds = (favoritesData || []).map((f) => f.channel_id).filter(Boolean);
       }
-    };
 
-    fetchEventsAndUserData();
+      const formattedOffline: Event[] = (offlineEventsData || []).map((event, index) => {
+        const channels = extractChannels((event.events as any)?.event_channels);
+        const schedules = (event.events as any)?.event_schedules || [];
+        return {
+          id: event.id,
+          baseEventId: event.event_id,
+          title: event.title,
+          date: formatEventDate(event.start_date, event.end_date),
+          location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
+          category: getCategory(channels[0]?.type),
+          imageColor: imageColors[index % imageColors.length],
+          imageUrl: event.image_url ?? undefined,
+          reservationType: event.reservation_type as any,
+          channels: channels.map((c) => ({ id: c.id, name: c.name, type: c.type ?? "", image_url: c.image_url || "" })),
+          isAlways: !event.start_date,
+          createdAt: event.created_at,
+          startDateValue: event.start_date,
+          endDateValue: event.end_date,
+          eventType: "offline",
+          schedules,
+        };
+      });
 
-    return () => {
-      ignore = true;
-    };
-  }, [user, highlightId, currentMonth]);
+      const formattedOnline: Event[] = (onlineEventsData || []).map((event, index) => {
+        const channels = extractChannels((event.events as any)?.event_channels);
+        return {
+          id: event.id,
+          baseEventId: event.event_id,
+          title: event.title,
+          date: formatOnlineEventDate(event.start_at, event.end_at),
+          location: "온라인",
+          category: getCategory(channels[0]?.type),
+          imageColor: imageColors[index % imageColors.length],
+          imageUrl: event.image_url ?? undefined,
+          reservationType: undefined,
+          channels: channels.map((c) => ({ id: c.id, name: c.name, type: c.type ?? "", image_url: c.image_url || "" })),
+          isAlways: !event.start_at,
+          createdAt: event.created_at,
+          startDateValue: event.start_at,
+          endDateValue: event.end_at,
+          eventType: "online",
+        };
+      });
+
+      return {
+        events: [...formattedOffline, ...formattedOnline],
+        bookmarkedIds,
+        subscribedChannelIds,
+      };
+    },
+  });
+
+  const events = calendarData?.events ?? [];
+  const userBookmarkedEventIds = calendarData?.bookmarkedIds ?? [];
+  const userSubscribedChannelIds = calendarData?.subscribedChannelIds ?? [];
+  const loading = isLoading;
+
+  // highlight 파라미터가 있으면 데이터 로드 후 해당 행사 날짜로 선택/이동 (1회성 부수효과)
+  useEffect(() => {
+    if (!highlightId || events.length === 0) return;
+    const highlightEvent = events.find((e) => e.id === highlightId);
+    if (highlightEvent && highlightEvent.startDateValue) {
+      const targetDate = new Date(highlightEvent.startDateValue);
+      setSelectedDate((prev) => (prev.getTime() !== targetDate.getTime() ? targetDate : prev));
+      setCurrentMonth((prev) =>
+        prev.getFullYear() !== targetDate.getFullYear() || prev.getMonth() !== targetDate.getMonth() ? targetDate : prev,
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, highlightId]);
 
   const toggleFilter = (id: string) => {
     setFocusEventId(null); // Clear special event focus when any filter is interacted with
