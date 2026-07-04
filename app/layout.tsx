@@ -9,6 +9,7 @@ import { ScrollToTop } from "@/components/ui/scroll-to-top"
 import { InAppBrowserBarrier } from "@/components/in-app-browser-barrier"
 import { Footer } from "@/components/footer"
 import { PushNotificationListener } from "@/components/push-notification-listener"
+import { QueryProvider } from "@/components/providers/query-provider"
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -51,10 +52,12 @@ export default function RootLayout({
         `}} />
         <InAppBrowserBarrier />
         <PushNotificationListener />
-        {children}
-        <Footer />
-        <BottomNav />
-        <ScrollToTop />
+        <QueryProvider>
+          {children}
+          <Footer />
+          <BottomNav />
+          <ScrollToTop />
+        </QueryProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
         <Toaster />
         {process.env.NEXT_PUBLIC_KAKAO_MAP_KEY && (

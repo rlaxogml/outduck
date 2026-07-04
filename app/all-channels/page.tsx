@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
 import Link from "next/link";
@@ -23,37 +24,28 @@ const FILTERS = [
 ];
 
 export default function AllChannelsPage() {
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
-  useEffect(() => {
-    const fetchChannels = async () => {
-      try {
-        setIsLoading(true);
-        const [{ data, error }, { data: companies, error: companiesError }] = await Promise.all([
-          supabase
-            .from("channels")
-            .select("id, name, type, image_url")
-            .order("name", { ascending: true }),
-          supabase.from("companies").select("name"),
-        ]);
+  // in-memory 캐시로 조회. 다른 화면 갔다 돌아와도 재요청 없이 즉시 재사용됨.
+  const { data: channels = [], isLoading } = useQuery({
+    queryKey: ["all-channels"],
+    queryFn: async (): Promise<Channel[]> => {
+      const [{ data, error }, { data: companies, error: companiesError }] = await Promise.all([
+        supabase
+          .from("channels")
+          .select("id, name, type, image_url")
+          .order("name", { ascending: true }),
+        supabase.from("companies").select("name"),
+      ]);
 
-        if (error) throw error;
-        if (companiesError) throw companiesError;
+      if (error) throw error;
+      if (companiesError) throw companiesError;
 
-        const companyNames = new Set((companies || []).map((c) => c.name));
-        setChannels((data || []).filter((channel) => !companyNames.has(channel.name)));
-      } catch (err) {
-        console.error("Failed to fetch channels:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchChannels();
-  }, []);
+      const companyNames = new Set((companies || []).map((c) => c.name));
+      return (data || []).filter((channel) => !companyNames.has(channel.name));
+    },
+  });
 
   const filteredChannels = channels.filter((channel) => {
     // 1. 텍스트 검색 필터
