@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/header";
 import { SortingFilterBar } from "@/components/sorting-filter-bar";
 import { FavoriteChannels } from "@/components/favorite-channels";
@@ -9,17 +10,192 @@ import { EventCard } from "@/components/event-card";
 import { supabase } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import type { User } from "@supabase/supabase-js";
-import { cn } from "@/lib/utils";
+
+const imageColors = [
+  "bg-gradient-to-br from-indigo-400 to-indigo-600",
+  "bg-gradient-to-br from-pink-400 to-pink-600",
+  "bg-gradient-to-br from-green-400 to-green-600",
+  "bg-gradient-to-br from-orange-400 to-orange-600",
+  "bg-gradient-to-br from-purple-400 to-purple-600",
+  "bg-gradient-to-br from-red-400 to-red-600",
+];
+
+const formatEventDate = (start: string, end: string | null) => {
+  if (!start) return "상시";
+  const startPt = start.replaceAll("-", ".").split("T")[0];
+  const endPt = end ? end.replaceAll("-", ".").split("T")[0] : null;
+  if (startPt === endPt || !endPt) {
+    const parts = startPt.split(".");
+    if (parts.length === 3) {
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+      return `${month}월 ${day}일`;
+    }
+    return startPt;
+  }
+  return `${startPt} - ${endPt}`;
+};
+
+const formatOnlineEventDate = (start: string | null, end: string | null) => {
+  if (!start) return "상시";
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${month}.${day}`;
+  };
+
+  const startFormatted = formatDate(start);
+  if (!end) {
+    const d = new Date(start);
+    if (!isNaN(d.getTime())) return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+    return startFormatted;
+  }
+  const endFormatted = formatDate(end);
+  if (startFormatted === endFormatted) {
+    const d = new Date(start);
+    if (!isNaN(d.getTime())) return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+    return startFormatted;
+  }
+  return `${startFormatted} ~ ${endFormatted}`;
+};
+
+const extractChannels = (eventChannels: any[]) => {
+  return (eventChannels || [])
+    .map((ec: any) => ec.channels)
+    .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
+};
+
+const getCategory = (type?: string) => {
+  if (!type) return "기타";
+  const t = type.trim().toLowerCase();
+  if (t === "game") return "게임";
+  if (t === "youtuber") return "유튜버";
+  if (t === "vtuber") return "버튜버";
+  if (t === "festival") return "축제";
+  return "기타";
+};
+
+const dedupeById = (rows: any[]) => {
+  const seen = new Set<number>();
+  const out: any[] = [];
+  for (const ev of rows) {
+    if (ev && !seen.has(ev.id)) {
+      seen.add(ev.id);
+      out.push(ev);
+    }
+  }
+  return out;
+};
 
 export default function SubscriptionsPage() {
   const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [offlineEvents, setOfflineEvents] = useState<any[]>([]);
-  const [onlineEvents, setOnlineEvents] = useState<any[]>([]);
   const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
 
-  // 1. Cache the reference timestamp for "today" to avoid endless new Date() instantiations inside loops
+  // 팔로우한 채널의 행사 목록 — in-memory 캐시로 조회.
+  // 다른 화면 갔다 돌아와도 재요청 없이 캐시를 즉시 재사용한다.
+  const { data: subscribedEvents, isPending } = useQuery({
+    queryKey: ["subscriptions-events", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      // 1. 내가 팔로우한 채널 id
+      const { data: favs } = await supabase
+        .from("favorites")
+        .select("channel_id")
+        .eq("user_id", user!.id);
+
+      const channelIds = (favs || []).map((f) => f.channel_id).filter(Boolean);
+      if (channelIds.length === 0) {
+        return { offlineEvents: [] as any[], onlineEvents: [] as any[] };
+      }
+
+      // 2. 해당 채널들의 오프라인/온라인 행사 병렬 조회
+      const [{ data: offlineData }, { data: onlineData }] = await Promise.all([
+        supabase
+          .from("event_channels")
+          .select(`
+            events!inner(
+              event_channels(
+                channels(id, name, type, image_url)
+              ),
+              offline_events!inner(
+                id, title, start_date, end_date,
+                offline_event_locations(location),
+                image_url, reservation_type, created_at
+              )
+            )
+          `)
+          .in("channel_id", channelIds),
+        supabase
+          .from("event_channels")
+          .select(`
+            events!inner(
+              event_channels(
+                channels(id, name, type, image_url)
+              ),
+              online_events!inner(
+                id, title, start_at, end_at, image_url, created_at
+              )
+            )
+          `)
+          .in("channel_id", channelIds),
+      ]);
+
+      const offlineEvents = dedupeById(
+        (offlineData as any[] | null || []).flatMap((item: any) => {
+          const baseEv = item.events;
+          const extracted = extractChannels(baseEv?.event_channels || []);
+          return (baseEv?.offline_events || []).map((ev: any) => ({ ...ev, extractedChannels: extracted }));
+        }),
+      ).map((event: any, index: number) => ({
+        id: event.id,
+        title: event.title,
+        date: formatEventDate(event.start_date, event.end_date),
+        location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
+        category: getCategory(event.extractedChannels[0]?.type),
+        imageColor: imageColors[index % imageColors.length],
+        imageUrl: event.image_url,
+        reservationType: event.reservation_type,
+        channels: event.extractedChannels.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+        isAlways: !event.start_date,
+        createdAt: event.created_at,
+        startDateValue: event.start_date,
+        endDateValue: event.end_date,
+      }));
+
+      const onlineEvents = dedupeById(
+        (onlineData as any[] | null || []).flatMap((item: any) => {
+          const baseEv = item.events;
+          const extracted = extractChannels(baseEv?.event_channels || []);
+          return (baseEv?.online_events || []).map((ev: any) => ({ ...ev, extractedChannels: extracted }));
+        }),
+      ).map((event: any, index: number) => ({
+        id: event.id,
+        title: event.title,
+        date: formatOnlineEventDate(event.start_at, event.end_at),
+        location: "온라인",
+        category: getCategory(event.extractedChannels[0]?.type),
+        imageColor: imageColors[index % imageColors.length],
+        imageUrl: event.image_url,
+        reservationType: undefined,
+        channels: event.extractedChannels.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+        isAlways: !event.start_at,
+        createdAt: event.created_at,
+        startDateValue: event.start_at,
+        endDateValue: event.end_at,
+      }));
+
+      return { offlineEvents, onlineEvents };
+    },
+  });
+
+  const offlineEvents = subscribedEvents?.offlineEvents ?? [];
+  const onlineEvents = subscribedEvents?.onlineEvents ?? [];
+  const loading = !!user && isPending;
+
+  // "오늘" 기준 타임스탬프를 한 번만 계산
   const todayTimestamp = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -42,299 +218,48 @@ export default function SubscriptionsPage() {
     };
   }, [todayTimestamp]);
 
-  // 2. Memoize event partitions to completely skip filtering iterations during unrelated UI renders
-  const activeOfflineEvents = useMemo(() => offlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)), [offlineEvents, isPastEvent]);
-  const activeOnlineEvents = useMemo(() => onlineEvents.filter(e => !isPastEvent(e.endDateValue, e.startDateValue)), [onlineEvents, isPastEvent]);
+  const activeOfflineEvents = useMemo(() => offlineEvents.filter((e) => !isPastEvent(e.endDateValue, e.startDateValue)), [offlineEvents, isPastEvent]);
+  const activeOnlineEvents = useMemo(() => onlineEvents.filter((e) => !isPastEvent(e.endDateValue, e.startDateValue)), [onlineEvents, isPastEvent]);
 
-  // 3. Cache sorting and list mapping displays
   const displayedOfflineEvents = useMemo(() => {
-    let result = [...activeOfflineEvents];
+    const result = [...activeOfflineEvents];
     if (sortType === "upcoming") {
       return result
-        .filter(e => !e.isAlways)
+        .filter((e) => !e.isAlways)
         .sort((a, b) => {
           if (!a.startDateValue || !b.startDateValue) return 0;
           return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
         });
-    } else {
-      return result.sort((a, b) => {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
     }
+    return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [activeOfflineEvents, sortType]);
 
   const displayedOnlineEvents = useMemo(() => {
-    let result = [...activeOnlineEvents];
+    const result = [...activeOnlineEvents];
     if (sortType === "upcoming") {
       return result
-        .filter(e => !e.isAlways)
+        .filter((e) => !e.isAlways)
         .sort((a, b) => {
           if (!a.startDateValue || !b.startDateValue) return 0;
           return new Date(a.startDateValue).getTime() - new Date(b.startDateValue).getTime();
         });
-    } else {
-      return result.sort((a, b) => {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
     }
+    return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [activeOnlineEvents, sortType]);
-
-  const imageColors = [
-    "bg-gradient-to-br from-indigo-400 to-indigo-600",
-    "bg-gradient-to-br from-pink-400 to-pink-600",
-    "bg-gradient-to-br from-green-400 to-green-600",
-    "bg-gradient-to-br from-orange-400 to-orange-600",
-    "bg-gradient-to-br from-purple-400 to-purple-600",
-    "bg-gradient-to-br from-red-400 to-red-600",
-  ];
 
   useEffect(() => {
     const syncSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
-      if (!session?.user) {
-        setLoading(false);
-      }
+      setUser((prev) => (prev?.id === session?.user?.id ? prev : session?.user ?? null));
     };
     syncSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(prev => prev?.id === session?.user?.id ? prev : (session?.user ?? null));
-      if (!session?.user) {
-        setLoading(false);
-      }
+      setUser((prev) => (prev?.id === session?.user?.id ? prev : session?.user ?? null));
     });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchSubscribedEvents = async () => {
-      try {
-        setLoading(true);
-
-        // 1. Fetch current user's favorite channels
-        const { data: favs } = await supabase
-          .from("favorites")
-          .select("channel_id")
-          .eq("user_id", user.id);
-
-        const channelIds = (favs || []).map(f => f.channel_id).filter(Boolean);
-
-        if (channelIds.length === 0) {
-          setOfflineEvents([]);
-          setOnlineEvents([]);
-          setLoading(false);
-          return;
-        }
-
-        // 2. Fetch all offline events for these channels
-        const { data: offlineData } = await supabase
-          .from("event_channels")
-          .select(`
-            events!inner(
-              event_channels(
-                channels(
-                  id,
-                  name,
-                  type,
-                  image_url
-                )
-              ),
-              offline_events!inner(
-                id,
-                title,
-                start_date,
-                end_date,
-                offline_event_locations(
-                  location
-                ),
-                image_url,
-                reservation_type,
-                created_at
-              )
-            )
-          `)
-          .in("channel_id", channelIds);
-
-        // 3. Fetch all online events for these channels
-        const { data: onlineData } = await supabase
-          .from("event_channels")
-          .select(`
-            events!inner(
-              event_channels(
-                channels(
-                  id,
-                  name,
-                  type,
-                  image_url
-                )
-              ),
-              online_events!inner(
-                id,
-                title,
-                start_at,
-                end_at,
-                image_url,
-                created_at
-              )
-            )
-          `)
-          .in("channel_id", channelIds);
-
-        const formatEventDate = (start: string, end: string | null) => {
-          if (!start) return "상시";
-          const startPt = start.replaceAll("-", ".").split("T")[0];
-          const endPt = end ? end.replaceAll("-", ".").split("T")[0] : null;
-          if (startPt === endPt || !endPt) {
-            const parts = startPt.split(".");
-            if (parts.length === 3) {
-              const month = parseInt(parts[1], 10);
-              const day = parseInt(parts[2], 10);
-              return `${month}월 ${day}일`;
-            }
-            return startPt;
-          }
-          return `${startPt} - ${endPt}`;
-        };
-
-        const formatOnlineEventDate = (start: string | null, end: string | null) => {
-          if (!start) return "상시";
-          const formatDate = (dateStr: string) => {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return "";
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${month}.${day}`;
-          };
-
-          const startFormatted = formatDate(start);
-          if (!end) {
-            const d = new Date(start);
-            if (!isNaN(d.getTime())) {
-              return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-            }
-            return startFormatted;
-          }
-          const endFormatted = formatDate(end);
-          if (startFormatted === endFormatted) {
-            const d = new Date(start);
-            if (!isNaN(d.getTime())) {
-              return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-            }
-            return startFormatted;
-          }
-          return `${startFormatted} ~ ${endFormatted}`;
-        };
-
-        const extractChannels = (eventChannels: any[]) => {
-          return (eventChannels || [])
-            .map((ec: any) => ec.channels)
-            .filter(Boolean) as { id: number; name: string; type: string; image_url: string }[];
-        };
-
-        const getCategory = (type?: string) => {
-          if (!type) return "기타";
-          const t = type.trim().toLowerCase();
-          if (t === "game") return "게임";
-          if (t === "youtuber") return "유튜버";
-          if (t === "vtuber") return "버튜버";
-          if (t === "festival") return "축제";
-          return "기타";
-        };
-
-        if (offlineData) {
-          const raw = (offlineData as any[]).flatMap((item: any) => {
-             const baseEv = item.events;
-             const rawCh = baseEv?.event_channels || [];
-             const extracted = extractChannels(rawCh);
-             return (baseEv?.offline_events || []).map((ev: any) => ({
-                ...ev,
-                extractedChannels: extracted
-             }));
-          }).filter(Boolean);
- 
-          // Deduplicate
-          const seenIds = new Set();
-          const deduplicated: any[] = [];
-          raw.forEach((event: any) => {
-            if (event && !seenIds.has(event.id)) {
-              seenIds.add(event.id);
-              deduplicated.push(event);
-            }
-          });
- 
-          const formatted = deduplicated.map((event: any, index: number) => {
-            return {
-              id: event.id,
-              title: event.title,
-              date: formatEventDate(event.start_date, event.end_date),
-              location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
-              category: getCategory(event.extractedChannels[0]?.type),
-              imageColor: imageColors[index % imageColors.length],
-              imageUrl: event.image_url,
-              reservationType: event.reservation_type,
-              channels: event.extractedChannels.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
-              isAlways: !event.start_date,
-              createdAt: event.created_at,
-              startDateValue: event.start_date,
-              endDateValue: event.end_date,
-            };
-          });
-          setOfflineEvents(formatted);
-        }
-
-        if (onlineData) {
-          const raw = (onlineData as any[]).flatMap((item: any) => {
-             const baseEv = item.events;
-             const rawCh = baseEv?.event_channels || [];
-             const extracted = extractChannels(rawCh);
-             return (baseEv?.online_events || []).map((ev: any) => ({
-                ...ev,
-                extractedChannels: extracted
-             }));
-          }).filter(Boolean);
- 
-          // Deduplicate
-          const seenIds = new Set();
-          const deduplicated: any[] = [];
-          raw.forEach((event: any) => {
-            if (event && !seenIds.has(event.id)) {
-              seenIds.add(event.id);
-              deduplicated.push(event);
-            }
-          });
- 
-          const formatted = deduplicated.map((event: any, index: number) => {
-            return {
-              id: event.id,
-              title: event.title,
-              date: formatOnlineEventDate(event.start_at, event.end_at),
-              location: "온라인",
-              category: getCategory(event.extractedChannels[0]?.type),
-              imageColor: imageColors[index % imageColors.length],
-              imageUrl: event.image_url,
-              reservationType: undefined,
-              channels: event.extractedChannels.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
-              isAlways: !event.start_at,
-              createdAt: event.created_at,
-              startDateValue: event.start_at,
-              endDateValue: event.end_at,
-            };
-          });
-          setOnlineEvents(formatted);
-        }
-      } catch (error) {
-        console.error("Failed to fetch subscribed events:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSubscribedEvents();
-  }, [user]);
 
   return (
     <div className="min-h-screen bg-background">
