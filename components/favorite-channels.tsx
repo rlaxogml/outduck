@@ -145,7 +145,13 @@ export function FavoriteChannels({
     const checkAuthAndProgressiveFetch = async () => {
       try {
         const currentUser = user;
-        if (!currentUser) return;
+        if (!currentUser) {
+          // 비로그인 사용자는 스켈레톤을 즉시 해제 (렌더에서 null 처리됨).
+          // 이 처리가 없으면 15초 안전 타임아웃까지 스켈레톤이 남아있음.
+          if (isMounted) setIsLoading(false);
+          clearTimeout(safetyTimeout);
+          return;
+        }
 
         let initialChannels: (Channel & { team_id?: number | null; is_team?: boolean; relatedChannelIds?: number[] })[] = [];
         const cacheKey = `outduck-favorites-${currentUser.id}`;

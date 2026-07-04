@@ -83,16 +83,48 @@ function MapContent() {
   // Disable pull-to-refresh gesture on mobile browsers
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
+
+    // 1. overscroll-behavior handles Android Chrome (ignored by iOS Safari)
     const originalBodyOverscroll = document.body.style.overscrollBehaviorY;
     const originalHtmlOverscroll = document.documentElement.style.overscrollBehaviorY;
-    
+
     document.body.style.overscrollBehaviorY = "none";
     document.documentElement.style.overscrollBehaviorY = "none";
-    
+
+    // 2. iOS Safari doesn't support overscroll-behavior, so we must
+    //    manually block the pull-to-refresh gesture via a non-passive
+    //    touchmove listener. We allow the Kakao map to handle its own
+    //    gestures, and let any genuinely scrollable inner area scroll.
+    const preventPullToRefresh = (e: TouchEvent) => {
+      const target = e.target;
+      if (!(target instanceof Element)) {
+        e.preventDefault();
+        return;
+      }
+
+      // Kakao map manages its own touch panning/zooming
+      if (target.closest("#map-container")) return;
+
+      // Allow real scroll containers (e.g. the filter list) to scroll
+      let el: Element | null = target;
+      while (el && el !== document.body) {
+        const style = window.getComputedStyle(el);
+        const overflowY = style.overflowY;
+        if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight) {
+          return;
+        }
+        el = el.parentElement;
+      }
+
+      e.preventDefault();
+    };
+
+    document.addEventListener("touchmove", preventPullToRefresh, { passive: false });
+
     return () => {
       document.body.style.overscrollBehaviorY = originalBodyOverscroll;
       document.documentElement.style.overscrollBehaviorY = originalHtmlOverscroll;
+      document.removeEventListener("touchmove", preventPullToRefresh);
     };
   }, []);
 

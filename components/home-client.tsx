@@ -205,6 +205,7 @@ export function HomeClient({
   });
   const isFirstRender = useRef(true);
   const isFirstTabPersist = useRef(true);
+  const isFirstSortPersist = useRef(true);
 
   // Load and update decay cache & shuffle token on mount
   useEffect(() => {
@@ -310,6 +311,30 @@ export function HomeClient({
       localStorage.setItem("outduck-active-event-tab", activeTab);
     } catch (e) {}
   }, [activeTab]);
+
+  // Restore the previously selected sort order after mount (avoids SSR hydration mismatch).
+  // Without this, navigating away and back resets the sort back to "recommended".
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("outduck-home-sort-type");
+      if ((saved === "recommended" || saved === "recent" || saved === "upcoming") && saved !== sortType) {
+        setSortType(saved);
+      }
+    } catch (e) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist selected sort order so navigating away and back keeps the same order.
+  // Skip the very first run so it doesn't clobber the saved value before the restore effect applies it.
+  useEffect(() => {
+    if (isFirstSortPersist.current) {
+      isFirstSortPersist.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem("outduck-home-sort-type", sortType);
+    } catch (e) {}
+  }, [sortType]);
 
   useEffect(() => {
     console.log("HomeClient: Component mounted and session check starting...");
