@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
@@ -72,7 +72,7 @@ const isEventOnDate = (event: any, targetDate: Date) => {
 
 // 캘린더 화면 상태(보던 월·선택 날짜·필터)를 메모리에 보관 → SPA 이동 후 돌아오면 그 화면으로 복원.
 // 하드 리로드/콜드 스타트엔 사라져 오늘 날짜로 초기화된다.
-let cachedCalendarView: { currentMonth: Date; selectedDate: Date; activeFilters: string[] } | null = null;
+let cachedCalendarView: { currentMonth: Date; selectedDate: Date; activeFilters: string[]; scrollY: number } | null = null;
 
 function CalendarContent() {
   const searchParams = useSearchParams();
@@ -115,10 +115,44 @@ function CalendarContent() {
     }
   }, [user]);
 
-  // 화면 상태(월/날짜/필터)를 메모리 캐시에 반영 (SPA 이동 후 복원용)
+  // 화면 상태(월/날짜/필터)를 메모리 캐시에 반영 (SPA 이동 후 복원용). 스크롤 위치는 별도 유지.
   useEffect(() => {
-    cachedCalendarView = { currentMonth, selectedDate, activeFilters };
+    cachedCalendarView = { currentMonth, selectedDate, activeFilters, scrollY: cachedCalendarView?.scrollY ?? 0 };
   }, [currentMonth, selectedDate, activeFilters]);
+
+  // 스크롤 위치 저장/복원 — 일정 목록까지 내려본 뒤 다른 화면 갔다 와도 그 위치 유지.
+  const scrollRestoredRef = useRef(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (!scrollRestoredRef.current) return; // 복원 중엔 저장하지 않음
+      if (cachedCalendarView) cachedCalendarView.scrollY = window.scrollY;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const y = cachedCalendarView?.scrollY ?? 0;
+    if (y <= 0) {
+      scrollRestoredRef.current = true;
+      return;
+    }
+    // 캐시된 데이터/레이아웃이 준비될 때까지 몇 프레임에 걸쳐 재시도
+    let n = 0;
+    const id = setInterval(() => {
+      window.scrollTo(0, y);
+      n += 1;
+      if (n >= 8) {
+        clearInterval(id);
+        scrollRestoredRef.current = true;
+      }
+    }, 70);
+    return () => {
+      clearInterval(id);
+      scrollRestoredRef.current = true;
+    };
+  }, []);
 
   // 월 단위로 이벤트 + (로그인 시) 북마크/팔로우를 조회. queryKey에 월을 넣어 월별로 캐시된다.
   // 다른 화면 갔다 돌아오면 같은 달은 재요청 없이 즉시 재사용.

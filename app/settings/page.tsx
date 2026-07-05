@@ -675,7 +675,15 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Danger Zone */}
+              {/* Mobile-only menu list (Galaxy Settings / YouTube "내 페이지" style) */}
+              <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 pt-2">
+                <SettingsMenuRow icon={Bell} label="알림" onClick={() => setActiveTab("notifications")} />
+                <SettingsMenuRow icon={Megaphone} label="제보하기" onClick={() => router.push("/suggest")} />
+                <SettingsMenuRow icon={Settings2} label="주최자 설정" onClick={() => setActiveTab("advanced")} />
+                <SettingsMenuRow icon={MessageSquare} label="고객 문의" onClick={() => setActiveTab("inquiry")} />
+              </div>
+
+              {/* Danger Zone — 계정 탈퇴는 항상 맨 아래(고객 문의 밑)에 배치 */}
               <div className="border border-red-200 dark:border-red-900/30 rounded-2xl p-4 md:p-6 bg-red-50/30 dark:bg-red-950/10 shadow-sm space-y-4 md:space-y-6 mt-8 md:mt-12">
                 <div>
                   <h4 className="text-lg md:text-xl font-bold tracking-tight mb-1 flex items-center gap-2 text-red-600 dark:text-red-500">
@@ -697,14 +705,6 @@ export default function SettingsPage() {
                     계정 영구 삭제
                   </Button>
                 </div>
-              </div>
-
-              {/* Mobile-only menu list (Galaxy Settings / YouTube "내 페이지" style) */}
-              <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 pt-2">
-                <SettingsMenuRow icon={Bell} label="알림" onClick={() => setActiveTab("notifications")} />
-                <SettingsMenuRow icon={Megaphone} label="제보하기" onClick={() => router.push("/suggest")} />
-                <SettingsMenuRow icon={Settings2} label="주최자 설정" onClick={() => setActiveTab("advanced")} />
-                <SettingsMenuRow icon={MessageSquare} label="고객 문의" onClick={() => setActiveTab("inquiry")} />
               </div>
             </div>
           )}
