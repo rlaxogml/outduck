@@ -70,15 +70,19 @@ const isEventOnDate = (event: any, targetDate: Date) => {
   return true;
 };
 
+// 캘린더 화면 상태(보던 월·선택 날짜·필터)를 메모리에 보관 → SPA 이동 후 돌아오면 그 화면으로 복원.
+// 하드 리로드/콜드 스타트엔 사라져 오늘 날짜로 초기화된다.
+let cachedCalendarView: { currentMonth: Date; selectedDate: Date; activeFilters: string[] } | null = null;
+
 function CalendarContent() {
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("event") ? Number(searchParams.get("event")) : null;
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [focusEventId, setFocusEventId] = useState<number | null>(highlightId);
-  const [activeFilters, setActiveFilters] = useState<string[]>(["all"]);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [activeFilters, setActiveFilters] = useState<string[]>(() => cachedCalendarView?.activeFilters ?? ["all"]);
+  const [selectedDate, setSelectedDate] = useState<Date>(() => cachedCalendarView?.selectedDate ?? new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(() => cachedCalendarView?.currentMonth ?? new Date());
   const [user, setUser] = useState<User | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -105,10 +109,16 @@ function CalendarContent() {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    // 복원된 화면 상태가 있으면 기본 필터(subscribed)로 덮어쓰지 않는다.
+    if (user && !cachedCalendarView) {
       setActiveFilters(["subscribed"]);
     }
   }, [user]);
+
+  // 화면 상태(월/날짜/필터)를 메모리 캐시에 반영 (SPA 이동 후 복원용)
+  useEffect(() => {
+    cachedCalendarView = { currentMonth, selectedDate, activeFilters };
+  }, [currentMonth, selectedDate, activeFilters]);
 
   // 월 단위로 이벤트 + (로그인 시) 북마크/팔로우를 조회. queryKey에 월을 넣어 월별로 캐시된다.
   // 다른 화면 갔다 돌아오면 같은 달은 재요청 없이 즉시 재사용.
