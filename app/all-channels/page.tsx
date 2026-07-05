@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
@@ -23,9 +23,16 @@ const FILTERS = [
   { id: "festival", label: "축제" },
 ];
 
+// 화면 상태(검색어·필터)를 메모리에 보관 → SPA 이동 후 복원, 콜드 스타트엔 초기화.
+let cachedChannelsView: { searchText: string; activeFilter: string } | null = null;
+
 export default function AllChannelsPage() {
-  const [searchText, setSearchText] = useState("");
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [searchText, setSearchText] = useState(() => cachedChannelsView?.searchText ?? "");
+  const [activeFilter, setActiveFilter] = useState(() => cachedChannelsView?.activeFilter ?? "all");
+
+  useEffect(() => {
+    cachedChannelsView = { searchText, activeFilter };
+  }, [searchText, activeFilter]);
 
   // in-memory 캐시로 조회. 다른 화면 갔다 돌아와도 재요청 없이 즉시 재사용됨.
   const { data: channels = [], isLoading } = useQuery({

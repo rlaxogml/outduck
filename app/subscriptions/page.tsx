@@ -12,10 +12,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { User } from "@supabase/supabase-js";
 import { imageColors, formatEventDate, formatOnlineEventDate, extractChannels, getCategory, dedupeById } from "@/lib/event-format";
 
+// 화면 상태(탭·정렬)를 메모리에 보관 → SPA 이동 후 복원, 콜드 스타트엔 초기화.
+let cachedSubsView: { activeTab: "offline" | "online"; sortType: "recent" | "upcoming" } | null = null;
+
 export default function SubscriptionsPage() {
-  const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
+  const [activeTab, setActiveTab] = useState<"offline" | "online">(() => cachedSubsView?.activeTab ?? "offline");
   const [user, setUser] = useState<User | null>(null);
-  const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
+  const [sortType, setSortType] = useState<"recent" | "upcoming">(() => cachedSubsView?.sortType ?? "recent");
+
+  useEffect(() => {
+    cachedSubsView = { activeTab, sortType };
+  }, [activeTab, sortType]);
 
   // 팔로우한 채널의 행사 목록 — in-memory 캐시로 조회.
   // 다른 화면 갔다 돌아와도 재요청 없이 캐시를 즉시 재사용한다.

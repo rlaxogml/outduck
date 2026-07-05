@@ -13,11 +13,18 @@ import type { User } from "@supabase/supabase-js";
 import { SortingFilterBar } from "@/components/sorting-filter-bar";
 import { imageColors, formatEventDate, formatOnlineEventDate, extractChannels, getCategory } from "@/lib/event-format";
 
+// 화면 상태(탭·정렬·지난행사 펼침)를 메모리에 보관 → SPA 이동 후 복원, 콜드 스타트엔 초기화.
+let cachedBookmarksView: { activeTab: "offline" | "online"; sortType: "recent" | "upcoming"; showPastEvents: boolean } | null = null;
+
 export default function BookmarksPage() {
-  const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
+  const [activeTab, setActiveTab] = useState<"offline" | "online">(() => cachedBookmarksView?.activeTab ?? "offline");
   const [user, setUser] = useState<User | null>(null);
-  const [showPastEvents, setShowPastEvents] = useState(true);
-  const [sortType, setSortType] = useState<"recent" | "upcoming">("recent");
+  const [showPastEvents, setShowPastEvents] = useState(() => cachedBookmarksView?.showPastEvents ?? true);
+  const [sortType, setSortType] = useState<"recent" | "upcoming">(() => cachedBookmarksView?.sortType ?? "recent");
+
+  useEffect(() => {
+    cachedBookmarksView = { activeTab, sortType, showPastEvents };
+  }, [activeTab, sortType, showPastEvents]);
 
   // 찜한 행사 목록 — in-memory 캐시로 조회. 재방문 시 재요청 없이 즉시 재사용.
   const { data: bookmarkedEvents, isPending } = useQuery({
