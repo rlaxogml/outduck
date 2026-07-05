@@ -1129,10 +1129,7 @@ export function HomeClient({
 
           {/* Event Grid */}
           <section className="p-4 min-h-[650px]">
-            <div
-              key={`${activeTab}-${activeCategory}-${sortType}`}
-              className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out"
-            >
+            <div key={`${activeTab}-${activeCategory}-${sortType}`}>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 {filteredEvents.slice(0, visibleCount).map((event, index) => (
                   <EventCard

@@ -229,10 +229,7 @@ export default function BookmarksPage() {
                     ))}
                   </div>
                 ) : (
-                  <div
-                    key={`${activeTab}-${sortType}`}
-                    className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out"
-                  >
+                  <div key={`${activeTab}-${sortType}`}>
                     {activeTab === "offline" && (
                       <>
                         {displayedOfflineEvents.length === 0 ? (
