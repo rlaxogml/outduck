@@ -10,7 +10,7 @@ export const imageColors = [
   "bg-gradient-to-br from-red-400 to-red-600",
 ];
 
-export const formatEventDate = (start: string, end: string | null) => {
+export const formatEventDate = (start: string | null, end: string | null) => {
   if (!start) return "상시";
   const startPt = start.replaceAll("-", ".").split("T")[0];
   const endPt = end ? end.replaceAll("-", ".").split("T")[0] : null;
