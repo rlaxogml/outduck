@@ -18,6 +18,7 @@ import { trackPerformance } from "@/lib/performance";
 
 type Event = {
   id: number;
+  baseEventId?: number;
   title: string;
   date: string;
   location: string;
@@ -39,6 +40,17 @@ function seededRandom(seed: number) {
 
 const HOME_SCROLL_STORAGE_KEY = "outduck-home-scroll-state";
 
+// 홈에서 로딩한 이벤트 + 페이지네이션 상태를 메모리에 보관.
+// SPA 이동엔 살아남아 돌아왔을 때 재요청·재페이지네이션 없이 즉시 복원되고,
+// 하드 리로드/앱 콜드 스타트엔 모듈이 새로 로드되며 사라진다(= 그때만 새로 받음).
+let cachedHomeState: {
+  offline: Event[];
+  online: Event[];
+  visibleCount: number;
+  hasMoreOffline: boolean;
+  hasMoreOnline: boolean;
+} | null = null;
+
 
 interface HomeClientProps {
   initialOfflineEvents: Event[];
@@ -56,8 +68,8 @@ export function HomeClient({
   const [activeCategory, setActiveCategory] = useState("all");
   const [sortType, setSortType] = useState<"recommended" | "recent" | "upcoming">("recommended");
 
-  const [offlineEvents, setOfflineEvents] = useState<Event[]>(initialOfflineEvents);
-  const [onlineEvents, setOnlineEvents] = useState<Event[]>(initialOnlineEvents);
+  const [offlineEvents, setOfflineEvents] = useState<Event[]>(() => cachedHomeState?.offline ?? initialOfflineEvents);
+  const [onlineEvents, setOnlineEvents] = useState<Event[]>(() => cachedHomeState?.online ?? initialOnlineEvents);
 
   // Synchronous state initialization from cached session and metadata to prevent hydration flickers and layout shifts
   const [user, setUser] = useState<User | null>(() => {
@@ -172,7 +184,7 @@ export function HomeClient({
     return null;
   });
 
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [visibleCount, setVisibleCount] = useState(() => cachedHomeState?.visibleCount ?? 10);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
   const [decayCache, setDecayCache] = useState<any[]>(() => {
@@ -853,8 +865,19 @@ export function HomeClient({
   }, [filteredEvents, visibleCount, sortType]);
 
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [hasMoreOffline, setHasMoreOffline] = useState(initialOfflineEvents.length === 30);
-  const [hasMoreOnline, setHasMoreOnline] = useState(initialOnlineEvents.length === 30);
+  const [hasMoreOffline, setHasMoreOffline] = useState(() => cachedHomeState?.hasMoreOffline ?? (initialOfflineEvents.length === 30));
+  const [hasMoreOnline, setHasMoreOnline] = useState(() => cachedHomeState?.hasMoreOnline ?? (initialOnlineEvents.length === 30));
+
+  // 로딩된 이벤트/페이지네이션 상태를 메모리 캐시에 반영 (SPA 이동 후 복원용)
+  useEffect(() => {
+    cachedHomeState = {
+      offline: offlineEvents,
+      online: onlineEvents,
+      visibleCount,
+      hasMoreOffline,
+      hasMoreOnline,
+    };
+  }, [offlineEvents, onlineEvents, visibleCount, hasMoreOffline, hasMoreOnline]);
 
   // 4. Infinite Scroll Observer to seamlessly load additional events as the user scrolls
   useEffect(() => {
@@ -1125,6 +1148,8 @@ export function HomeClient({
                     channels={event.channels}
                     user={user}
                     eventType={activeTab}
+                    baseEventId={event.baseEventId}
+                    bookmarkedIds={userBookmarks}
                     isRightCard={index % 2 === 1}
                     isPriority={index < 4}
                   />

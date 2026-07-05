@@ -5,6 +5,7 @@ export const revalidate = 60; // ISR cache revalidation every 60 seconds
 
 type Event = {
   id: number;
+  baseEventId?: number;
   title: string;
   date: string;
   location: string;
@@ -71,6 +72,7 @@ export default async function Home() {
     .from("offline_events")
     .select(`
       id,
+      event_id,
       title,
       start_date,
       end_date,
@@ -100,6 +102,7 @@ export default async function Home() {
     .from("online_events")
     .select(`
       id,
+      event_id,
       title,
       start_at,
       end_at,
@@ -232,6 +235,7 @@ export default async function Home() {
       const channels = extractChannels((event.events as any)?.event_channels);
       return {
         id: event.id,
+        baseEventId: event.event_id,
         title: event.title,
         date: formatEventDate(event.start_date, event.end_date),
         location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
@@ -260,6 +264,7 @@ export default async function Home() {
       const channels = extractChannels((event.events as any)?.event_channels);
       return {
         id: event.id,
+        baseEventId: event.event_id,
         title: event.title,
         date: formatOnlineEventDate(event.start_at, event.end_at),
         location: "온라인",

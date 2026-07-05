@@ -26,6 +26,7 @@ interface EventCardProps {
   user: User | null;
   eventType: "offline" | "online";
   baseEventId?: number;
+  bookmarkedIds?: number[];
   isRightCard?: boolean;
   isPriority?: boolean;
   showEventTypeBadge?: boolean;
@@ -64,6 +65,7 @@ export function EventCard({
   user,
   eventType,
   baseEventId,
+  bookmarkedIds,
   isRightCard,
   isPriority,
   showEventTypeBadge = false,
@@ -90,6 +92,15 @@ export function EventCard({
 
   useEffect(() => {
     if (!user) return;
+
+    // 부모가 북마크한 행사 id 목록을 내려주면, 카드마다 개별 조회하지 않고 그 목록으로 판단한다.
+    // (홈처럼 카드가 수십 개일 때 카드당 1건씩 나가던 event_bookmarks 조회를 0건으로)
+    if (bookmarkedIds) {
+      if (baseEventId != null) setIsBookmarked(bookmarkedIds.includes(baseEventId));
+      return;
+    }
+
+    // 목록을 못 받은 경우에만 개별 조회로 폴백
     const loadAndCheckBookmark = async () => {
       let curBaseId = resolvedBaseEventId;
       if (!curBaseId) {
@@ -115,7 +126,7 @@ export function EventCard({
       setIsBookmarked(!!data);
     };
     loadAndCheckBookmark();
-  }, [user, id, eventType]);
+  }, [user, id, eventType, bookmarkedIds, baseEventId]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

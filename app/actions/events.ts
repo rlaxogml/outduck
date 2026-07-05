@@ -98,6 +98,7 @@ export async function fetchMoreEvents(
           .from("offline_events")
           .select(`
             id,
+            event_id,
             title,
             start_date,
             end_date,
@@ -130,6 +131,7 @@ export async function fetchMoreEvents(
         const channels = extractChannels((event.events as any)?.event_channels);
         return {
           id: event.id,
+          baseEventId: event.event_id,
           title: event.title,
           date: formatEventDate(event.start_date, event.end_date),
           location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
@@ -154,6 +156,7 @@ export async function fetchMoreEvents(
           .from("online_events")
           .select(`
             id,
+            event_id,
             title,
             start_at,
             end_at,
@@ -182,6 +185,7 @@ export async function fetchMoreEvents(
         const channels = extractChannels((event.events as any)?.event_channels);
         return {
           id: event.id,
+          baseEventId: event.event_id,
           title: event.title,
           date: formatOnlineEventDate(event.start_at, event.end_at),
           location: "온라인",
