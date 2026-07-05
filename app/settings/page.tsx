@@ -59,30 +59,43 @@ function SettingsMenuRow({
   );
 }
 
+// settings 데이터를 메모리에 보관 → 재방문 시 스피너 없이 즉시 렌더(캐시값 표시 후 백그라운드 갱신).
+// 클라이언트 이펙트에서만 기록하므로 SSR엔 반영되지 않아 hydration 안전. 콜드 스타트엔 초기화.
+let settingsCache: {
+  user: User | null;
+  name: string;
+  avatarUrl: string;
+  favoritesCount: number;
+  bookmarksCount: number;
+  notifyNewEvent: boolean;
+  notifyBookmarkNotice: boolean;
+  favoriteTopics: string[];
+} | null = null;
+
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => settingsCache?.user ?? null);
+  const [loading, setLoading] = useState(() => (settingsCache ? false : true));
   const [activeTab, setActiveTab] = useState<Tab | null>(null);
   const [isAppWebView, setIsAppWebView] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Account state
-  const [name, setName] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [favoritesCount, setFavoritesCount] = useState(0);
-  const [bookmarksCount, setBookmarksCount] = useState(0);
+  const [name, setName] = useState(() => settingsCache?.name ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(() => settingsCache?.avatarUrl ?? "");
+  const [favoritesCount, setFavoritesCount] = useState(() => settingsCache?.favoritesCount ?? 0);
+  const [bookmarksCount, setBookmarksCount] = useState(() => settingsCache?.bookmarksCount ?? 0);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Notification state
-  const [notifyNewEvent, setNotifyNewEvent] = useState(true);
-  const [notifyBookmarkNotice, setNotifyBookmarkNotice] = useState(true);
+  const [notifyNewEvent, setNotifyNewEvent] = useState(() => settingsCache?.notifyNewEvent ?? true);
+  const [notifyBookmarkNotice, setNotifyBookmarkNotice] = useState(() => settingsCache?.notifyBookmarkNotice ?? true);
   const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
 
   // Favorite topic (preferred genres) state
-  const [favoriteTopics, setFavoriteTopics] = useState<string[]>([]);
+  const [favoriteTopics, setFavoriteTopics] = useState<string[]>(() => settingsCache?.favoriteTopics ?? []);
   const [isUpdatingTopics, setIsUpdatingTopics] = useState(false);
 
   // Advanced state
@@ -226,6 +239,21 @@ export default function SettingsPage() {
       isMounted = false;
     };
   }, [router]);
+
+  // 조회/수정된 값을 메모리 캐시에 동기화 (재방문 시 스피너 없이 즉시 복원용)
+  useEffect(() => {
+    if (!user) return;
+    settingsCache = {
+      user,
+      name,
+      avatarUrl,
+      favoritesCount,
+      bookmarksCount,
+      notifyNewEvent,
+      notifyBookmarkNotice,
+      favoriteTopics,
+    };
+  }, [user, name, avatarUrl, favoritesCount, bookmarksCount, notifyNewEvent, notifyBookmarkNotice, favoriteTopics]);
 
   const handleAccountDelete = async () => {
     if (!user) return;
