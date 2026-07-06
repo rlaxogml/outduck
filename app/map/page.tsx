@@ -75,6 +75,10 @@ export default function MapPage() {
   );
 }
 
+// 지도 이벤트(마커 캔버스 이미지 포함)를 메모리에 보관 → 재방문 시 재조회·캔버스 재생성 없이 즉시 복원.
+// 클라이언트에서만 기록해 SSR 미반영(hydration 안전), 콜드 스타트엔 초기화.
+let cachedMapEvents: any[] | null = null;
+
 function MapContent() {
   const searchParams = useSearchParams();
   const initialEventId = searchParams.get("eventId");
@@ -131,8 +135,8 @@ function MapContent() {
   const [isScriptLoaded, setIsScriptLoaded] = useState(() => {
     return typeof window !== "undefined" && !!window.kakao && !!window.kakao.maps;
   });
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState<any[]>(() => cachedMapEvents ?? []);
+  const [loading, setLoading] = useState(() => cachedMapEvents ? false : true);
   const [user, setUser] = useState<any>(null);
   const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>([]);
   const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
@@ -268,6 +272,9 @@ function MapContent() {
 
   // 2. Fetch events from Supabase and pre-generate marker base64 images
   useEffect(() => {
+    // 캐시된 이벤트가 있으면 재조회·캔버스 재생성을 건너뛴다 (재방문 시 즉시 복원).
+    if (cachedMapEvents) return;
+
     const abortController = new AbortController();
 
     const fetchEvents = async () => {
@@ -437,6 +444,7 @@ function MapContent() {
           );
 
           setEvents(eventsWithMarkerImages);
+          cachedMapEvents = eventsWithMarkerImages;
         }
       } catch (err: any) {
         if (!err?.message?.includes("AbortError")) {
