@@ -75,6 +75,14 @@ export default function MapPage() {
   );
 }
 
+// 지도 필터(카테고리·상호작용·주 수)를 메모리에 보관 → SPA 이동 후 복원, 콜드 스타트엔 초기화.
+// (이벤트/지도 초기화와 무관한 필터 상태만 다루므로 안전.)
+let cachedMapFilters: {
+  selectedCategories: string[];
+  interactionFilter: "all" | "subscribed" | "bookmarks" | "ongoing" | "within_weeks";
+  weeksThreshold: number;
+} | null = null;
+
 function MapContent() {
   const searchParams = useSearchParams();
   const initialEventId = searchParams.get("eventId");
@@ -136,13 +144,18 @@ function MapContent() {
   const [user, setUser] = useState<any>(null);
   const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>([]);
   const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing" | "within_weeks">("all");
-  const [weeksThreshold, setWeeksThreshold] = useState<number>(2);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(() => cachedMapFilters?.selectedCategories ?? []);
+  const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing" | "within_weeks">(() => cachedMapFilters?.interactionFilter ?? "all");
+  const [weeksThreshold, setWeeksThreshold] = useState<number>(() => cachedMapFilters?.weeksThreshold ?? 2);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [drawnMarkersCount, setDrawnMarkersCount] = useState(0);
   const [isMapReady, setIsMapReady] = useState(false);
+
+  // 필터 선택을 메모리 캐시에 동기화 (SPA 이동 후 복원용)
+  useEffect(() => {
+    cachedMapFilters = { selectedCategories, interactionFilter, weeksThreshold };
+  }, [selectedCategories, interactionFilter, weeksThreshold]);
 
   const mapRef = useRef<any>(null);
   const isMapInitialized = useRef(false);
@@ -183,7 +196,8 @@ function MapContent() {
       setUser(currentUser);
 
       if (currentUser) {
-        setInteractionFilter("subscribed");
+        // 복원된 필터가 있으면 기본값(팔로우 채널)으로 덮어쓰지 않는다.
+        if (!cachedMapFilters) setInteractionFilter("subscribed");
         try {
           const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
             trackPerformance(
