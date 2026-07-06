@@ -4,9 +4,19 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { House, Calendar, MapPinned, Star, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 export function BottomNav() {
   const pathname = usePathname();
+
+  // 탭을 누르는 즉시 하이라이트를 옮겨 "반응이 빠른" 느낌을 준다 (실제 페이지 전환은 뒤이어).
+  // Link를 유지하므로 prefetch 이점은 그대로. 실제 경로가 도달하면 낙관적 상태 해제.
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const activePath = pendingPath ?? pathname;
+
+  useEffect(() => {
+    setPendingPath(null);
+  }, [pathname]);
 
   const navItems = [
     { id: "home", label: "홈", path: "/", icon: House },
@@ -29,13 +39,14 @@ export function BottomNav() {
       <div className="absolute top-full left-0 right-0 h-[50vh] bg-background -z-10" />
 
       {navItems.map((item) => {
-        const isActive = pathname === item.path;
+        const isActive = activePath === item.path;
         const Icon = item.icon;
 
         return (
           <Link
             key={item.id}
             href={item.path}
+            onClick={() => setPendingPath(item.path)}
             className={cn(
               "flex flex-col items-center justify-center flex-1 h-full py-1.5 transition-all duration-200 cursor-pointer relative rounded-2xl mx-1",
               isActive ? "bg-slate-100 dark:bg-slate-800/60" : "bg-transparent hover:bg-slate-50 dark:hover:bg-slate-900/30"
