@@ -1511,8 +1511,8 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
 
       {/* 3. Event Description Container */}
       {activeTab === 'main' && event.description && (
-        <div className="mx-0 md:mx-auto max-w-2xl md:max-w-6xl bg-background md:rounded-3xl p-6 md:p-10 border-y md:border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 overflow-hidden animate-in fade-in duration-300">
-          <h2 className="text-[17px] md:text-xl font-bold mb-6 text-foreground flex items-center gap-2">
+        <div className="mx-0 md:mx-auto max-w-2xl md:max-w-6xl bg-background md:rounded-3xl px-0 py-6 md:p-10 border-y md:border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 overflow-hidden animate-in fade-in duration-300">
+          <h2 className="text-[17px] md:text-xl font-bold mb-6 px-4 md:px-0 text-foreground flex items-center gap-2">
             <span className="w-1.5 h-5 bg-primary rounded-full inline-block"></span>
             행사 정보
           </h2>
@@ -1520,14 +1520,14 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
             const isHtml = /<[a-z][\s\S]*>/i.test(event.description);
             if (isHtml) {
               return (
-                <div 
+                <div
                   className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 leading-relaxed break-words ql-editor ql-editor-display"
                   dangerouslySetInnerHTML={{ __html: linkifyHtml(event.description) }}
                 />
               );
             }
             return (
-              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-slate-700 dark:text-slate-300 font-medium select-text">
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed text-slate-700 dark:text-slate-300 font-medium select-text px-4 md:px-0">
                 {descriptionWithLinks}
               </div>
             );
@@ -1570,6 +1570,28 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
           margin-top: 1rem;
           margin-bottom: 1rem;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        /* 모바일: 컨테이너 풀폭 + 모든 블록에 좌우 여백(텍스트는 항상 들여쓰기 유지).
+           이미지는 텍스트와 한 문단에 인라인으로 섞여 있어, 자기 문단의 1rem 패딩만 상쇄해 화면 폭까지 확장.
+           (.ql-editor.ql-editor-display 이중 클래스로 Quill 기본 .ql-editor p 패딩을 특이도로 이김) */
+        @media (max-width: 767px) {
+          .ql-editor-display.ql-editor {
+            padding-left: 0;
+            padding-right: 0;
+          }
+          .ql-editor-display.ql-editor > * {
+            padding-left: 1rem;
+            padding-right: 1rem;
+          }
+          .ql-editor-display img {
+            display: block;
+            width: calc(100% + 2rem);
+            max-width: calc(100% + 2rem);
+            margin-left: -1rem;
+            margin-right: -1rem;
+            border-radius: 0;
+            box-shadow: none;
+          }
         }
         .ql-editor-display a {
           color: #3b82f6 !important;

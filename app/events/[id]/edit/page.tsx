@@ -18,7 +18,7 @@ import { DateInputTriple } from "@/components/events/date-input-triple";
 import { useKakaoAddress } from "@/hooks/use-kakao-address";
 import { useEventImageUpload } from "@/hooks/use-event-image-upload";
 import RichTextEditor from "@/components/events/rich-text-editor";
-import { revalidatePaths } from "@/app/actions/events";
+import { revalidatePaths, revalidateEventDetail } from "@/app/actions/events";
 import { uploadBase64Images } from "@/lib/image-upload";
 
 type Channel = {
@@ -905,6 +905,7 @@ export default function EditEventPage() {
           ...allChannelIds.map(id => `/channels/${id}`)
         ];
         await revalidatePaths(pathsToRevalidate);
+        await revalidateEventDetail(Number(eventId));
       } catch (err) {
         console.error("Revalidation error:", err);
       }

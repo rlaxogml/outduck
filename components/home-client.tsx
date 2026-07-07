@@ -187,16 +187,6 @@ export function HomeClient({
   const [visibleCount, setVisibleCount] = useState(() => cachedHomeState?.visibleCount ?? 10);
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
-  const [decayCache, setDecayCache] = useState<any[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cachedDecay = localStorage.getItem("outduck-seen-decay-cache");
-        return cachedDecay ? JSON.parse(cachedDecay) : [];
-      } catch (e) {}
-    }
-    return [];
-  });
-
   const [shuffleToken, setShuffleToken] = useState(() => {
     if (typeof window !== "undefined") {
       try {
@@ -219,71 +209,34 @@ export function HomeClient({
   const isFirstTabPersist = useRef(true);
   const isFirstSortPersist = useRef(true);
 
-  // Load and update decay cache & shuffle token on mount
+  // Regenerate the shuffle token on a hard reload / first load so the recommended order varies
+  // per session, while staying stable across in-session client navigation.
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
-        // Determine if this is a hard reload/first load or a client-side navigation
-        // window.__outduck_initialized is only undefined on hard reload or first page load.
+        // One-time cleanup: the seen-decay recommendation system was removed, so drop its
+        // now-unused localStorage keys left over in existing users' browsers.
+        localStorage.removeItem("outduck-seen-decay-cache");
+        localStorage.removeItem("outduck-last-visible-ids");
+
+        // window.__outduck_initialized is only undefined on a hard reload or first page load.
         const isReload = !(window as any).__outduck_initialized;
-        console.log("=== [HomeClient Mount] ===", {
-          isReload,
-          sessionStorageToken: sessionStorage.getItem("outduck-home-shuffle-token"),
-          windowInitialized: (window as any).__outduck_initialized
-        });
         (window as any).__outduck_initialized = true;
 
-        // 1. Handle Shuffle Token
         let token = sessionStorage.getItem("outduck-home-shuffle-token");
         if (!token || isReload) {
-          // Generate new token on reload or first visit
           token = String(Math.floor(Math.random() * 10000));
           sessionStorage.setItem("outduck-home-shuffle-token", token);
-          console.log("=== Generated New Shuffle Token ===", token);
           setShuffleToken(Number(token));
         } else {
-          console.log("=== Reusing Existing Shuffle Token ===", token);
           setShuffleToken((prev) => {
             const numToken = Number(token);
             return prev === numToken ? prev : numToken;
           });
         }
-
-        // 2. Handle Decay Cache
-        const cachedDecay = localStorage.getItem("outduck-seen-decay-cache");
-        let currentDecay = cachedDecay ? JSON.parse(cachedDecay) : [];
-
-        if (isReload) {
-          // Only process decay cache (decay stacks & penalize previous views) on actual page reload
-          currentDecay = currentDecay
-            .map((item: any) => ({ ...item, stack: item.stack - 1 }))
-            .filter((item: any) => item.stack > 0);
-
-          const cachedLastVisible = localStorage.getItem("outduck-last-visible-ids");
-          const lastVisibleIds = cachedLastVisible ? JSON.parse(cachedLastVisible) : [];
-
-          if (Array.isArray(lastVisibleIds) && lastVisibleIds.length > 0) {
-            lastVisibleIds.forEach((id: number) => {
-              const existingIdx = currentDecay.findIndex((item: any) => item.id === id);
-              if (existingIdx > -1) {
-                currentDecay[existingIdx].stack = 3;
-              } else {
-                currentDecay.push({ id, stack: 3 });
-              }
-            });
-          }
-          localStorage.setItem("outduck-seen-decay-cache", JSON.stringify(currentDecay));
-          localStorage.removeItem("outduck-last-visible-ids"); // Clear so we don't repeat
-          setDecayCache(currentDecay);
-        } else {
-          setDecayCache((prev) => {
-            if (prev.length === currentDecay.length) return prev;
-            return currentDecay;
-          });
-        }
       }
     } catch (e) {
-      console.warn("HomeClient: Failed to initialize decay cache/shuffle token:", e);
+      console.warn("HomeClient: Failed to initialize shuffle token:", e);
     } finally {
       setIsMounted(true);
     }
@@ -773,16 +726,7 @@ export function HomeClient({
 
           score = Math.max(score, 1);
 
-          // D. Apply Local Decay Penalty (stack: 1 => 0.65, stack: 2 => 0.35, stack: 3 => 0.05)
-          const decayItem = decayCache.find((item: any) => item.id === event.id);
-          if (decayItem) {
-            const penaltyFactor = 1 - (decayItem.stack / 3) * 0.95;
-            score = score * penaltyFactor;
-          }
-
-          score = Math.max(score, 1);
-
-          // E. Weight conversion using Square Root Scaling (1번 방법)
+          // Weight conversion using Square Root Scaling (feeds the Efraimidis-Spirakis shuffle below)
           const weight = Math.sqrt(score);
 
           // F. Seeded Random Key (Efraimidis & Spirakis / Exponential Keys Trick)
@@ -855,14 +799,6 @@ export function HomeClient({
 
     return result;
   })();
-
-  // Save current visible IDs for the next reload (to apply 3-stack decay penalty)
-  useEffect(() => {
-    if (filteredEvents.length > 0 && sortType === "recommended") {
-      const visibleIds = filteredEvents.slice(0, visibleCount).map(e => e.id);
-      localStorage.setItem("outduck-last-visible-ids", JSON.stringify(visibleIds));
-    }
-  }, [filteredEvents, visibleCount, sortType]);
 
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasMoreOffline, setHasMoreOffline] = useState(() => cachedHomeState?.hasMoreOffline ?? (initialOfflineEvents.length === 30));

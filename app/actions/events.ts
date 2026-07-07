@@ -137,6 +137,21 @@ export async function fetchMoreEvents(
   }
 }
 
+// Busts the per-event Data Cache entry created by unstable_cache in app/events/[id]/page.tsx.
+// Call on edit/delete so the cached detail doesn't stay stale for up to an hour.
+export async function revalidateEventDetail(eventId: number) {
+  const { revalidateTag } = await import("next/cache");
+  try {
+    // { expire: 0 } = expire immediately so the editor sees fresh data on the next load
+    // (not stale-while-revalidate, which would show the pre-edit version once).
+    revalidateTag(`offline-event-${eventId}`, { expire: 0 });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Event detail cache revalidation failed:", error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function revalidatePaths(paths: string[]) {
   const { revalidatePath } = await import("next/cache");
   try {
