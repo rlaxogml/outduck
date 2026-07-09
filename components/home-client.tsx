@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
 import { EventTabs } from "@/components/event-tabs";
 import { CategoryFilter } from "@/components/category-filter";
 import { EventCard } from "@/components/event-card";
 import { supabase } from "@/lib/supabase/client";
-import { fetchMoreEvents } from "@/app/actions/events";
+import { fetchMoreEvents, fetchLatestEvents } from "@/app/actions/events";
 import type { User } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { PosterSlider } from "@/components/poster-slider";
@@ -46,10 +46,18 @@ const HOME_SCROLL_STORAGE_KEY = "outduck-home-scroll-state";
 let cachedHomeState: {
   offline: Event[];
   online: Event[];
+  freshOffline: Event[];
+  freshOnline: Event[];
   visibleCount: number;
   hasMoreOffline: boolean;
   hasMoreOnline: boolean;
 } | null = null;
+
+// 신선도 머지 스로틀: 마지막 조회 후 이 시간(60초) 안이면 재조회하지 않는다.
+// 모듈 변수라 SPA 이동에도 유지 → 홈을 자주 드나들어도 요청이 몰리지 않는다.
+// 클라이언트 모듈 로드(≈최초 페이지 로드/하이드레이션) 시각으로 초기화해, SSR 직후 첫 진입엔 재조회를 건너뛴다.
+const HOME_FRESHNESS_INTERVAL_MS = 60 * 1000;
+let lastHomeFreshAt = typeof window !== "undefined" ? Date.now() : 0;
 
 
 interface HomeClientProps {
@@ -70,6 +78,67 @@ export function HomeClient({
 
   const [offlineEvents, setOfflineEvents] = useState<Event[]>(() => cachedHomeState?.offline ?? initialOfflineEvents);
   const [onlineEvents, setOnlineEvents] = useState<Event[]>(() => cachedHomeState?.online ?? initialOnlineEvents);
+
+  // 신선도 머지로 발견한 "새로 등록된 행사" 오버레이. 페이지네이션(offlineEvents.length 기반)을
+  // 건드리지 않도록 base 목록과 분리해 보관하고, 표시할 때만 dedup 병합한다.
+  const [freshOffline, setFreshOffline] = useState<Event[]>(() => cachedHomeState?.freshOffline ?? []);
+  const [freshOnline, setFreshOnline] = useState<Event[]>(() => cachedHomeState?.freshOnline ?? []);
+
+  // 콜백에서 최신 base 목록을 stale closure 없이 참조하기 위한 ref.
+  const offlineEventsRef = useRef(offlineEvents);
+  offlineEventsRef.current = offlineEvents;
+  const onlineEventsRef = useRef(onlineEvents);
+  onlineEventsRef.current = onlineEvents;
+
+  // 홈 재진입/포커스 시 최신 등록 행사를 조회해 base에 없는 것만 오버레이에 추가한다.
+  // 기존 목록·순서·페이지네이션·셔플은 그대로 두고 "새 행사만" 끼워 넣어, 추천순이 흔들리지 않는다.
+  const runFreshnessMerge = useCallback(async () => {
+    if (Date.now() - lastHomeFreshAt < HOME_FRESHNESS_INTERVAL_MS) return;
+    lastHomeFreshAt = Date.now();
+
+    try {
+      const { offline, online } = await fetchLatestEvents(40);
+
+      if (offline) {
+        setFreshOffline((prev) => {
+          const baseIds = new Set(offlineEventsRef.current.map((e) => e.id));
+          const kept = prev.filter((e) => !baseIds.has(e.id)); // base에 편입된 건 오버레이에서 제거
+          const have = new Set(kept.map((e) => e.id));
+          const added = offline.filter((e: Event) => !baseIds.has(e.id) && !have.has(e.id));
+          if (added.length === 0 && kept.length === prev.length) return prev;
+          return [...added, ...kept];
+        });
+      }
+
+      if (online) {
+        setFreshOnline((prev) => {
+          const baseIds = new Set(onlineEventsRef.current.map((e) => e.id));
+          const kept = prev.filter((e) => !baseIds.has(e.id));
+          const have = new Set(kept.map((e) => e.id));
+          const added = online.filter((e: Event) => !baseIds.has(e.id) && !have.has(e.id));
+          if (added.length === 0 && kept.length === prev.length) return prev;
+          return [...added, ...kept];
+        });
+      }
+    } catch (e) {
+      // 신선도 갱신 실패는 조용히 무시 (기존 목록 유지)
+    }
+  }, []);
+
+  // 홈 진입(mount)·창 포커스·탭 복귀 시 신선도 머지 실행 (스로틀은 runFreshnessMerge 내부에서 처리).
+  useEffect(() => {
+    runFreshnessMerge();
+    const onFocus = () => runFreshnessMerge();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") runFreshnessMerge();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [runFreshnessMerge]);
 
   // Synchronous state initialization from cached session and metadata to prevent hydration flickers and layout shifts
   const [user, setUser] = useState<User | null>(() => {
@@ -542,7 +611,19 @@ export function HomeClient({
   }, [user]);
 
   const filteredEvents = (() => {
-    let result = activeTab === "offline" ? offlineEvents : onlineEvents;
+    const base = activeTab === "offline" ? offlineEvents : onlineEvents;
+    const fresh = activeTab === "offline" ? freshOffline : freshOnline;
+
+    // 신선도 오버레이: base에 아직 없는 새 행사만 앞에 얹는다(dedup).
+    // 이후 정렬(추천순=셔플)이 각 행사를 결정적 슬롯에 배치하므로 배열 순서는 표시에 영향 없음.
+    let result: Event[];
+    if (fresh.length > 0) {
+      const baseIds = new Set(base.map((e) => e.id));
+      const newOnes = fresh.filter((e) => !baseIds.has(e.id));
+      result = newOnes.length > 0 ? [...newOnes, ...base] : base;
+    } else {
+      result = base;
+    }
 
     // 1. Category Filter
     if (activeCategory === "always") {
@@ -809,11 +890,13 @@ export function HomeClient({
     cachedHomeState = {
       offline: offlineEvents,
       online: onlineEvents,
+      freshOffline,
+      freshOnline,
       visibleCount,
       hasMoreOffline,
       hasMoreOnline,
     };
-  }, [offlineEvents, onlineEvents, visibleCount, hasMoreOffline, hasMoreOnline]);
+  }, [offlineEvents, onlineEvents, freshOffline, freshOnline, visibleCount, hasMoreOffline, hasMoreOnline]);
 
   // 4. Infinite Scroll Observer to seamlessly load additional events as the user scrolls
   useEffect(() => {

@@ -9,7 +9,7 @@ import type { User } from "@supabase/supabase-js";
 import { Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trackPerformance } from "@/lib/performance";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { imageColors, formatEventDate, formatOnlineEventDate, extractChannels, getCategory } from "@/lib/event-format";
 
 const categoryLabelMap: Record<string, string> = {
@@ -70,19 +70,39 @@ const isEventOnDate = (event: any, targetDate: Date) => {
   return true;
 };
 
-// 캘린더 화면 상태(보던 월·선택 날짜·필터)를 메모리에 보관 → SPA 이동 후 돌아오면 그 화면으로 복원.
-// 하드 리로드/콜드 스타트엔 사라져 오늘 날짜로 초기화된다.
-let cachedCalendarView: { currentMonth: Date; selectedDate: Date; activeFilters: string[]; scrollY: number } | null = null;
+// 캘린더 화면 상태(보던 월·선택 날짜·필터·스크롤)를 Query 캐시에 보관한다.
+// 마운트 중엔 관찰 쿼리가 캐시 엔트리를 살려두고, 다른 화면으로 나가 gcTime(30분) 동안
+// 아무도 안 쓰면 Query GC가 폐기한다 → 재방문 시 오늘 날짜/기본 필터로 초기화(유튜브식 세션 만료).
+// 하드 리로드/탭 종료 시엔 QueryClient가 파괴되며 함께 사라진다.
+// 만료 타이머를 손으로 비교(Date.now())하지 않고 gcTime 설정값에 위임하는 게 핵심.
+type CalendarView = { currentMonth: Date; selectedDate: Date; activeFilters: string[]; scrollY: number };
+const CALENDAR_VIEW_KEY = ["calendar-view"] as const;
+const CALENDAR_VIEW_GC_MS = 1000 * 60 * 30; // 30분 미사용 시 폐기(=만료)
 
 function CalendarContent() {
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("event") ? Number(searchParams.get("event")) : null;
 
+  const queryClient = useQueryClient();
+
+  // 화면 상태 스냅샷을 Query 캐시로 관찰한다. mount 동안엔 이 옵저버가 엔트리를 살려두고,
+  // 언마운트(다른 화면 이동) 후 gcTime이 지나면 GC가 폐기 → 재방문 시 기본값으로 초기화.
+  // staleTime: Infinity → UI 상태라 재요청 없음. queryFn은 캐시가 비었을 때(첫 방문/만료 후)만 실행된다.
+  useQuery({
+    queryKey: CALENDAR_VIEW_KEY,
+    queryFn: (): CalendarView => ({ currentMonth: new Date(), selectedDate: new Date(), activeFilters: ["all"], scrollY: 0 }),
+    staleTime: Infinity,
+    gcTime: CALENDAR_VIEW_GC_MS,
+  });
+
+  // 마운트 시점 스냅샷(만료됐으면 undefined) — 초기 상태·기본 필터·스크롤 복원에 사용.
+  const [restoredView] = useState<CalendarView | undefined>(() => queryClient.getQueryData<CalendarView>(CALENDAR_VIEW_KEY));
+
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [focusEventId, setFocusEventId] = useState<number | null>(highlightId);
-  const [activeFilters, setActiveFilters] = useState<string[]>(() => cachedCalendarView?.activeFilters ?? ["all"]);
-  const [selectedDate, setSelectedDate] = useState<Date>(() => cachedCalendarView?.selectedDate ?? new Date());
-  const [currentMonth, setCurrentMonth] = useState<Date>(() => cachedCalendarView?.currentMonth ?? new Date());
+  const [activeFilters, setActiveFilters] = useState<string[]>(() => restoredView?.activeFilters ?? ["all"]);
+  const [selectedDate, setSelectedDate] = useState<Date>(() => restoredView?.selectedDate ?? new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(() => restoredView?.currentMonth ?? new Date());
   const [user, setUser] = useState<User | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -110,15 +130,20 @@ function CalendarContent() {
 
   useEffect(() => {
     // 복원된 화면 상태가 있으면 기본 필터(subscribed)로 덮어쓰지 않는다.
-    if (user && !cachedCalendarView) {
+    if (user && !restoredView) {
       setActiveFilters(["subscribed"]);
     }
-  }, [user]);
+  }, [user, restoredView]);
 
-  // 화면 상태(월/날짜/필터)를 메모리 캐시에 반영 (SPA 이동 후 복원용). 스크롤 위치는 별도 유지.
+  // 화면 상태(월/날짜/필터)를 Query 캐시에 반영 (SPA 이동 후 복원용). 스크롤 위치는 별도 유지.
   useEffect(() => {
-    cachedCalendarView = { currentMonth, selectedDate, activeFilters, scrollY: cachedCalendarView?.scrollY ?? 0 };
-  }, [currentMonth, selectedDate, activeFilters]);
+    queryClient.setQueryData<CalendarView>(CALENDAR_VIEW_KEY, (prev) => ({
+      currentMonth,
+      selectedDate,
+      activeFilters,
+      scrollY: prev?.scrollY ?? 0,
+    }));
+  }, [currentMonth, selectedDate, activeFilters, queryClient]);
 
   // 스크롤 위치 저장/복원 — 일정 목록까지 내려본 뒤 다른 화면 갔다 와도 그 위치 유지.
   const scrollRestoredRef = useRef(false);
@@ -126,14 +151,14 @@ function CalendarContent() {
   useEffect(() => {
     const onScroll = () => {
       if (!scrollRestoredRef.current) return; // 복원 중엔 저장하지 않음
-      if (cachedCalendarView) cachedCalendarView.scrollY = window.scrollY;
+      queryClient.setQueryData<CalendarView>(CALENDAR_VIEW_KEY, (prev) => (prev ? { ...prev, scrollY: window.scrollY } : prev));
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
-    const y = cachedCalendarView?.scrollY ?? 0;
+    const y = restoredView?.scrollY ?? 0;
     if (y <= 0) {
       scrollRestoredRef.current = true;
       return;
@@ -585,10 +610,22 @@ function CalendarContent() {
                     tileDate.setHours(0, 0, 0, 0);
                     const isPast = tileDate < today;
 
+                    const eventCount = dayEvents.length;
+
+                    // 행사 4개 이상: 아바타 대신 그날 행사 개수를 "+N" 회색 동그라미로 표시
+                    if (eventCount > 3) {
+                      return (
+                        <div className={cn("flex justify-center items-center mt-0.5 md:mt-1 w-full transition-opacity duration-200", isPast && "opacity-40")}>
+                          <span className="flex items-center justify-center min-w-[24px] h-6 md:min-w-[38px] md:h-[38px] px-1.5 rounded-full bg-slate-100 dark:bg-slate-700/60 text-xs md:text-base font-bold leading-none text-slate-500 dark:text-slate-300">
+                            +{eventCount}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    // 행사 3개 이하: 지금처럼 채널 프로필 아바타 표시
                     if (channelsWithProfile.length > 0) {
-                      const hasMore = channelsWithProfile.length >= 6;
-                      const displayList = hasMore ? channelsWithProfile.slice(0, 5) : channelsWithProfile;
-                      const extraCount = channelsWithProfile.length - 5;
+                      const displayList = channelsWithProfile.slice(0, 3);
 
                       return (
                         <div className={cn("grid grid-cols-3 gap-0.5 mt-1 justify-items-center items-center w-full px-1 transition-opacity duration-200", isPast && "opacity-40")}>
@@ -603,11 +640,6 @@ function CalendarContent() {
                               )}
                             </div>
                           ))}
-                          {hasMore && (
-                            <div className="w-7 h-7 rounded-full border border-border bg-white flex items-center justify-center text-[10px] font-bold text-black flex-shrink-0 shadow-sm">
-                              +{extraCount}
-                            </div>
-                          )}
                         </div>
                       );
                     }

@@ -137,6 +137,108 @@ export async function fetchMoreEvents(
   }
 }
 
+// 홈 신선도 머지용: created_at 최신순으로 오프라인/온라인 행사를 조회한다.
+// (fetchMoreEvents는 start_date 순이라 "새로 등록된" 행사를 놓칠 수 있어 created_at 순으로 따로 조회)
+export async function fetchLatestEvents(limit: number = 40) {
+  const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+
+  try {
+    const offlineQuery = supabase
+      .from("offline_events")
+      .select(`
+        id,
+        event_id,
+        title,
+        start_date,
+        end_date,
+        image_url,
+        reservation_type,
+        created_at,
+        events(
+          event_channels(
+            channels(id, name, type, image_url)
+          )
+        ),
+        offline_event_locations(location)
+      `)
+      .or(`end_date.gte.${todayStr},end_date.is.null`)
+      .order("created_at", { ascending: false })
+      .range(0, limit - 1);
+
+    const onlineQuery = supabase
+      .from("online_events")
+      .select(`
+        id,
+        event_id,
+        title,
+        start_at,
+        end_at,
+        image_url,
+        created_at,
+        events(
+          event_channels(
+            channels(id, name, type, image_url)
+          )
+        )
+      `)
+      .or(`end_at.gte.${todayStr},end_at.is.null`)
+      .order("created_at", { ascending: false })
+      .range(0, limit - 1);
+
+    const [{ data: offlineData, error: offErr }, { data: onlineData, error: onErr }] = await Promise.all([
+      offlineQuery,
+      onlineQuery,
+    ]);
+    if (offErr) throw offErr;
+    if (onErr) throw onErr;
+
+    const offline = (offlineData || []).map((event, index) => {
+      const channels = extractChannels((event.events as any)?.event_channels);
+      return {
+        id: event.id,
+        baseEventId: event.event_id,
+        title: event.title,
+        date: formatEventDate(event.start_date, event.end_date),
+        location: event.offline_event_locations?.map((l: any) => l.location).join(", ") || "",
+        category: getCategory(channels[0]?.type),
+        imageColor: imageColors[index % imageColors.length],
+        imageUrl: event.image_url,
+        reservationType: event.reservation_type as any,
+        channels: channels.map((c) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+        isAlways: !event.start_date,
+        createdAt: event.created_at,
+        startDateValue: event.start_date,
+        endDateValue: event.end_date,
+      };
+    });
+
+    const online = (onlineData || []).map((event, index) => {
+      const channels = extractChannels((event.events as any)?.event_channels);
+      return {
+        id: event.id,
+        baseEventId: event.event_id,
+        title: event.title,
+        date: formatOnlineEventDate(event.start_at, event.end_at),
+        location: "온라인",
+        category: getCategory(channels[0]?.type),
+        imageColor: imageColors[index % imageColors.length],
+        imageUrl: event.image_url,
+        reservationType: undefined,
+        channels: channels.map((c) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
+        isAlways: !event.start_at,
+        createdAt: event.created_at,
+        startDateValue: event.start_at,
+        endDateValue: event.end_at,
+      };
+    });
+
+    return { offline, online, error: null };
+  } catch (error: any) {
+    console.error("Error fetching latest events:", error);
+    return { offline: null, online: null, error: error.message };
+  }
+}
+
 // Busts the per-event Data Cache entry created by unstable_cache in app/events/[id]/page.tsx.
 // Call on edit/delete so the cached detail doesn't stay stale for up to an hour.
 export async function revalidateEventDetail(eventId: number) {

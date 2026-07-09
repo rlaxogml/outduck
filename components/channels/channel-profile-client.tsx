@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
-import { Star, Calendar, ShoppingBag, Settings2, ChevronDown, ChevronUp, Plus, Pencil, Loader2 } from "lucide-react";
+import { Star, Calendar, ShoppingBag, Settings2, ChevronDown, ChevronUp, Plus, Pencil, Loader2, Search, type LucideIcon } from "lucide-react";
 import { EventCard } from "@/components/event-card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ChannelSettingsCard } from "@/app/settings/page";
@@ -136,6 +136,72 @@ const syncFavoriteCache = (userId: string, targetChannel: Channel, isAdding: boo
     console.warn("Failed to sync favorites cache:", e);
   }
 };
+
+// 카드 그리드 맨 뒤에 붙는 "행사 제보" 유도 카드
+function ReportEventCard() {
+  return (
+    <Link
+      href="/suggest"
+      className="group flex flex-col items-center justify-center text-center gap-4 min-h-[240px] h-full p-6 -mx-4 sm:mx-0 border-y sm:border border-dashed border-border/70 rounded-none sm:rounded-2xl bg-muted/20 hover:bg-muted/40 hover:border-primary/50 transition-colors"
+    >
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60 text-muted-foreground/70 group-hover:scale-110 transition-transform">
+        <Search className="h-8 w-8" />
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-base md:text-lg font-bold text-foreground">찾는 행사가 없나요?</p>
+        <p className="text-sm text-muted-foreground">운영자에게 제보해보세요</p>
+      </div>
+      <span className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-foreground text-background font-bold text-sm shadow-sm group-hover:bg-foreground/90 transition-colors">
+        제보하러 가기
+      </span>
+    </Link>
+  );
+}
+
+// 등록된 일정이 없을 때 빈 상태 (+ 제보 유도)
+function EmptyEventsState({
+  icon: Icon,
+  title,
+  isOwner,
+  channelId,
+}: {
+  icon: LucideIcon;
+  title: string;
+  isOwner: boolean;
+  channelId: number | string;
+}) {
+  return (
+    <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
+      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
+        <Icon className="h-10 w-10 text-muted-foreground/60" />
+      </div>
+      <div className="text-center space-y-1.5 flex flex-col items-center">
+        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground">
+          만약 행사 정보가 등록이 안돼있다면
+          <br />
+          운영자에게 제보해주세요
+        </p>
+        <div className="pt-4 flex flex-col items-center gap-2.5 animate-in fade-in zoom-in-95 duration-200">
+          {isOwner && (
+            <Link
+              href={`/events/new?channelId=${channelId}`}
+              className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+            >
+              행사 등록하러 가기
+            </Link>
+          )}
+          <Link
+            href="/suggest"
+            className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-foreground text-background font-bold text-sm shadow-sm hover:bg-foreground/90 transition-all hover:scale-105 active:scale-95"
+          >
+            제보하러 가기
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ChannelProfileClient({
   channelId,
@@ -531,25 +597,7 @@ export function ChannelProfileClient({
           {activeTab === "all" ? (
             <>
               {activeAllEvents.length === 0 ? (
-                <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
-                    <Calendar className="h-10 w-10 text-muted-foreground/60" />
-                  </div>
-                  <div className="text-center space-y-1.5 flex flex-col items-center">
-                    <h3 className="text-lg font-semibold text-foreground">등록된 일정이 없어요</h3>
-                    <p className="text-sm text-muted-foreground">새로운 일정이 추가되면 이곳에서 확인하실 수 있습니다.</p>
-                    {isOwner && (
-                      <div className="pt-4 animate-in fade-in zoom-in-95 duration-200">
-                        <Link
-                          href={`/events/new?channelId=${channelId}`}
-                          className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
-                        >
-                          행사 등록하러 가기
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <EmptyEventsState icon={Calendar} title="등록된 일정이 없어요" isOwner={isOwner} channelId={channelId} />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   {activeAllEvents.map((event, index) => (
@@ -570,6 +618,7 @@ export function ChannelProfileClient({
                       showEventTypeBadge={true}
                     />
                   ))}
+                  <ReportEventCard />
                 </div>
               )}
 
@@ -621,25 +670,7 @@ export function ChannelProfileClient({
           ) : activeTab === "offline" ? (
             <>
               {activeOfflineEvents.length === 0 ? (
-                <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
-                    <Calendar className="h-10 w-10 text-muted-foreground/60" />
-                  </div>
-                  <div className="text-center space-y-1.5 flex flex-col items-center">
-                    <h3 className="text-lg font-semibold text-foreground">등록된 오프라인 일정이 없어요</h3>
-                    <p className="text-sm text-muted-foreground">새로운 일정이 추가되면 이곳에서 확인하실 수 있습니다.</p>
-                    {isOwner && (
-                      <div className="pt-4 animate-in fade-in zoom-in-95 duration-200">
-                        <Link
-                          href={`/events/new?channelId=${channelId}`}
-                          className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
-                        >
-                          행사 등록하러 가기
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <EmptyEventsState icon={Calendar} title="등록된 오프라인 일정이 없어요" isOwner={isOwner} channelId={channelId} />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   {activeOfflineEvents.map((event, index) => (
@@ -659,6 +690,7 @@ export function ChannelProfileClient({
                       isRightCard={index % 2 === 1}
                     />
                   ))}
+                  <ReportEventCard />
                 </div>
               )}
 
@@ -709,25 +741,7 @@ export function ChannelProfileClient({
           ) : (
             <>
               {activeOnlineEvents.length === 0 ? (
-                <div className="flex flex-col min-h-[300px] items-center justify-center gap-5 py-12 rounded-xl bg-muted/20 border border-dashed border-border/50">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50">
-                    <ShoppingBag className="h-10 w-10 text-muted-foreground/60" />
-                  </div>
-                  <div className="text-center space-y-1.5 flex flex-col items-center">
-                    <h3 className="text-lg font-semibold text-foreground">등록된 온라인 일정이 없어요</h3>
-                    <p className="text-sm text-muted-foreground">새로운 일정이 추가되면 이곳에서 확인하실 수 있습니다.</p>
-                    {isOwner && (
-                      <div className="pt-4 animate-in fade-in zoom-in-95 duration-200">
-                        <Link
-                          href={`/events/new?channelId=${channelId}`}
-                          className="inline-flex items-center justify-center h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-sm hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
-                        >
-                          행사 등록하러 가기
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <EmptyEventsState icon={ShoppingBag} title="등록된 온라인 일정이 없어요" isOwner={isOwner} channelId={channelId} />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   {activeOnlineEvents.map((event, index) => (
@@ -747,6 +761,7 @@ export function ChannelProfileClient({
                       isRightCard={index % 2 === 1}
                     />
                   ))}
+                  <ReportEventCard />
                 </div>
               )}
 

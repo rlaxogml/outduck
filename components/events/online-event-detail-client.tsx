@@ -926,48 +926,79 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
                 </div>
               )}
 
-              {/* Action Buttons Row (Save, Link, Share) */}
-              <div className="flex justify-around md:justify-start md:gap-3 items-center mt-6 md:mt-8 pt-5 md:pt-0 border-t md:border-t-0 border-border/40">
-                <button 
-                  onClick={handleBookmark} 
-                  className={`flex flex-col items-center gap-2 transition-colors w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:text-sm md:font-semibold md:shadow-sm
-                    ${isBookmarked 
-                      ? "text-pink-500 md:bg-pink-500 md:text-white md:border-pink-500 md:hover:bg-pink-600" 
-                      : "text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] md:bg-background md:text-[#3a5378] dark:md:text-[#a0b8d6] md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10"
-                    }`}
+              {/* Mobile-only Heart/Share Icons (events 페이지와 동일한 컴팩트 아이콘) */}
+              <div className="flex md:hidden justify-end items-center gap-0.5 mt-3">
+                <button
+                  onClick={handleBookmark}
+                  className={cn(
+                    "p-1.5 transition-all active:scale-95 duration-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800",
+                    isBookmarked ? "text-pink-500" : "text-[#6a83a8] dark:text-[#8ba3c7]"
+                  )}
+                  aria-label="관심 저장"
                 >
-                  <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
-                    <Heart className={`w-6 h-6 md:w-4 md:h-4 ${isBookmarked ? "fill-pink-500 md:fill-white" : ""}`} />
+                  <Heart
+                    className={cn(
+                      "w-[24px] h-[24px] transition-all",
+                      isBookmarked ? "fill-pink-500 stroke-pink-500" : "stroke-current"
+                    )}
+                  />
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="p-1.5 text-[#6a83a8] dark:text-[#8ba3c7] hover:text-foreground transition-all active:scale-95 duration-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                  aria-label="공유"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-[24px] h-[24px]">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                    <polyline points="16 6 12 2 8 6"></polyline>
+                    <line x1="12" y1="2" x2="12" y2="15"></line>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Action Buttons Row for PC/Desktop Only (Save, Link, Share) */}
+              <div className="hidden md:flex justify-start gap-3 items-center mt-8 pt-0 border-t-0 border-border/40">
+                <button
+                  onClick={handleBookmark}
+                  className={cn(
+                    "flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold shadow-sm transition-colors",
+                    isBookmarked
+                      ? "text-pink-500 bg-pink-500 text-white border-pink-500 hover:bg-pink-600"
+                      : "text-[#3a5378] dark:text-[#a0b8d6] bg-background border-[#4f6b94]/30 dark:border-[#627fa6]/30 hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10"
+                  )}
+                >
+                  <div className="w-5 h-5 flex items-center justify-center">
+                    <Heart className={cn("w-4 h-4", isBookmarked ? "fill-white" : "")} />
                   </div>
-                  <span className="text-[12px] md:text-sm font-medium md:font-semibold">{isBookmarked ? "관심저장" : "저장"}</span>
+                  <span className="text-sm font-semibold">{isBookmarked ? "관심저장" : "저장"}</span>
                 </button>
 
                 {firstExplicitLink && (
-                  <button 
+                  <button
                     onClick={() => {
                       const url = firstExplicitLink.link_url;
                       const targetUrl = url.startsWith("http") ? url : `https://${url}`;
                       window.open(targetUrl, "_blank", "noopener,noreferrer");
                     }}
-                    className="flex flex-col items-center gap-2 text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] transition-colors w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:bg-background md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10 md:text-[#3a5378] dark:md:text-[#a0b8d6] md:text-sm md:font-semibold shadow-sm"
+                    className="flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border border-[#4f6b94]/30 dark:border-[#627fa6]/30 bg-background hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10 text-[#3a5378] dark:text-[#a0b8d6] text-sm font-semibold shadow-sm transition-colors"
                   >
-                    <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
-                      <ExternalLink className="w-6 h-6 md:w-4 md:h-4" />
+                    <div className="w-5 h-5 flex items-center justify-center">
+                      <ExternalLink className="w-4 h-4" />
                     </div>
-                    <span className="text-[12px] md:text-sm font-medium md:font-semibold">이동하기</span>
+                    <span className="text-sm font-semibold">이동하기</span>
                   </button>
                 )}
 
-                <button 
+                <button
                   onClick={handleShare}
-                  className="flex flex-col items-center gap-2 text-[#6a83a8] hover:text-[#3a5378] dark:text-[#8ba3c7] dark:hover:text-[#a0b8d6] transition-colors w-full md:flex-row md:justify-center md:gap-2 md:px-4 md:py-3 md:rounded-xl md:border md:border-[#4f6b94]/30 dark:md:border-[#627fa6]/30 md:bg-background md:hover:bg-[#4f6b94]/10 dark:md:hover:bg-[#627fa6]/10 md:text-[#3a5378] dark:md:text-[#a0b8d6] md:text-sm md:font-semibold shadow-sm"
+                  className="flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border border-[#4f6b94]/30 dark:border-[#627fa6]/30 bg-background hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10 text-[#3a5378] dark:text-[#a0b8d6] text-sm font-semibold shadow-sm transition-colors"
                 >
-                  <div className="w-10 h-10 md:w-5 md:h-5 flex items-center justify-center">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 md:w-4 md:h-4">
+                  <div className="w-5 h-5 flex items-center justify-center">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
                     </svg>
                   </div>
-                  <span className="text-[12px] md:text-sm font-medium md:font-semibold">공유</span>
+                  <span className="text-sm font-semibold">공유</span>
                 </button>
               </div>
             </div>
@@ -1570,6 +1601,14 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
           margin-top: 1rem;
           margin-bottom: 1rem;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        /* 데스크톱: 본문 이미지가 컨테이너보다 좁을 때 왼쪽에 붙지 않도록 중앙 정렬 */
+        @media (min-width: 768px) {
+          .ql-editor-display img {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+          }
         }
         /* 모바일: 컨테이너 풀폭 + 모든 블록에 좌우 여백(텍스트는 항상 들여쓰기 유지).
            이미지는 텍스트와 한 문단에 인라인으로 섞여 있어, 자기 문단의 1rem 패딩만 상쇄해 화면 폭까지 확장.

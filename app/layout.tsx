@@ -9,6 +9,7 @@ import { ScrollToTop } from "@/components/ui/scroll-to-top"
 import { InAppBrowserBarrier } from "@/components/in-app-browser-barrier"
 import { Footer } from "@/components/footer"
 import { PushNotificationListener } from "@/components/push-notification-listener"
+import { AppResumeReset } from "@/components/app-resume-reset"
 import { QueryProvider } from "@/components/providers/query-provider"
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -52,6 +53,7 @@ export default function RootLayout({
         `}} />
         <InAppBrowserBarrier />
         <PushNotificationListener />
+        <AppResumeReset />
         <QueryProvider>
           {children}
           <Footer />

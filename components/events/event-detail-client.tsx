@@ -696,7 +696,7 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
 
       {/* 2. Main Content & Tabs Container */}
       <div className="mx-0 md:mx-auto max-w-2xl md:max-w-6xl bg-background md:rounded-3xl border-y md:border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 overflow-hidden">
-        
+
         {/* Tabs Header */}
         <div className="flex items-center border-b border-border/60 bg-background">
           <button
@@ -1125,6 +1125,14 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
           margin-top: 1rem;
           margin-bottom: 1rem;
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        /* 데스크톱: 본문 이미지가 컨테이너보다 좁을 때 왼쪽에 붙지 않도록 중앙 정렬 */
+        @media (min-width: 768px) {
+          .ql-editor-display img {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+          }
         }
         /* 모바일: 컨테이너 풀폭 + 모든 블록에 좌우 여백(텍스트는 항상 들여쓰기 유지).
            이미지는 텍스트와 한 문단에 인라인으로 섞여 있어, 자기 문단의 1rem 패딩만 상쇄해 화면 폭까지 확장.

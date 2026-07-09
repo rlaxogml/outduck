@@ -46,7 +46,15 @@ export function BottomNav() {
           <Link
             key={item.id}
             href={item.path}
-            onClick={() => setPendingPath(item.path)}
+            onClick={(e) => {
+              // 이미 이 탭에 있을 때 다시 누르면 → 최상단으로 스크롤 (유튜브식 재탭 동작)
+              if (item.path === pathname) {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                return;
+              }
+              setPendingPath(item.path);
+            }}
             className={cn(
               "flex flex-col items-center justify-center flex-1 h-full py-1.5 transition-all duration-200 cursor-pointer relative rounded-2xl mx-1",
               isActive ? "bg-slate-100 dark:bg-slate-800/60" : "bg-transparent hover:bg-slate-50 dark:hover:bg-slate-900/30"
