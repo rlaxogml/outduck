@@ -168,6 +168,30 @@ export default function SettingsPage() {
     }
   }, []);
 
+  // 서브탭을 URL(?tab=)에 반영해 히스토리에 쌓는다 → 하드웨어/브라우저 뒤로가기로 메뉴(설정 첫 화면)로 돌아온다.
+  // 메뉴 → 서브탭은 pushState(항목 쌓기), 서브탭 ↔ 서브탭은 replaceState(항목 교체).
+  const openTab = (tab: Tab) => {
+    if (typeof window !== "undefined") {
+      const url = `${window.location.pathname}?tab=${tab}`;
+      if (activeTab === null) {
+        window.history.pushState(null, "", url);
+      } else {
+        window.history.replaceState(null, "", url);
+      }
+    }
+    setActiveTab(tab);
+  };
+
+  // 뒤로/앞으로 이동 시 URL과 activeTab을 동기화 (서브탭에서 뒤로가기 → 메뉴로 닫힘).
+  useEffect(() => {
+    const syncTabFromUrl = () => {
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      setActiveTab(tab === "advanced" || tab === "notifications" || tab === "inquiry" ? (tab as Tab) : null);
+    };
+    window.addEventListener("popstate", syncTabFromUrl);
+    return () => window.removeEventListener("popstate", syncTabFromUrl);
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -524,7 +548,7 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3.5 pb-4 mb-6 md:hidden px-2 border-b border-border/60">
           {activeTab !== null ? (
             <button
-              onClick={() => setActiveTab(null)}
+              onClick={() => window.history.back()}
               className="p-1 -ml-1 text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
               title="뒤로 가기"
             >
@@ -554,7 +578,7 @@ export default function SettingsPage() {
               </div>
               
               <button
-                onClick={() => setActiveTab("notifications")}
+                onClick={() => openTab("notifications")}
                 className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === "notifications"
                     ? "bg-primary/10 text-primary"
@@ -574,7 +598,7 @@ export default function SettingsPage() {
               </button>
 
               <button
-                onClick={() => setActiveTab("advanced")}
+                onClick={() => openTab("advanced")}
                 className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === "advanced"
                     ? "bg-primary/10 text-primary"
@@ -586,7 +610,7 @@ export default function SettingsPage() {
               </button>
 
               <button
-                onClick={() => setActiveTab("inquiry")}
+                onClick={() => openTab("inquiry")}
                 className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                   activeTab === "inquiry"
                     ? "bg-primary/10 text-primary"
@@ -602,7 +626,7 @@ export default function SettingsPage() {
           {/* Content */}
           <main className="flex-1 w-full min-w-0">
           {activeTab === null && (
-            <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
               <div>
                 <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-1">계정 설정</h3>
                 <p className="text-muted-foreground text-xs md:text-sm">프로필 정보와 활동 내역을 확인합니다.</p>
@@ -705,10 +729,10 @@ export default function SettingsPage() {
 
               {/* Mobile-only menu list (Galaxy Settings / YouTube "내 페이지" style) */}
               <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 pt-2">
-                <SettingsMenuRow icon={Bell} label="알림" onClick={() => setActiveTab("notifications")} />
+                <SettingsMenuRow icon={Bell} label="알림" onClick={() => openTab("notifications")} />
                 <SettingsMenuRow icon={Megaphone} label="제보하기" onClick={() => router.push("/suggest")} />
-                <SettingsMenuRow icon={Settings2} label="주최자 설정" onClick={() => setActiveTab("advanced")} />
-                <SettingsMenuRow icon={MessageSquare} label="고객 문의" onClick={() => setActiveTab("inquiry")} />
+                <SettingsMenuRow icon={Settings2} label="주최자 설정" onClick={() => openTab("advanced")} />
+                <SettingsMenuRow icon={MessageSquare} label="고객 문의" onClick={() => openTab("inquiry")} />
               </div>
 
               {/* Danger Zone — 계정 탈퇴는 항상 맨 아래(고객 문의 밑)에 배치 */}
@@ -738,7 +762,7 @@ export default function SettingsPage() {
           )}
 
           {activeTab === "notifications" && (
-            <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
               <div>
                 <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-1">알림 설정</h3>
                 <p className="text-muted-foreground text-xs md:text-sm">중요한 알림을 받을지 설정합니다.</p>
@@ -785,7 +809,7 @@ export default function SettingsPage() {
           )}
 
           {activeTab === "inquiry" && (
-            <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
               <div>
                 <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-1">고객 문의 & 피드백</h3>
                 <p className="text-muted-foreground text-xs md:text-sm">서비스 개선을 위한 의견이나 불편 사항을 보내주세요.</p>
@@ -872,7 +896,7 @@ export default function SettingsPage() {
 
 
           {activeTab === "advanced" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-8 animate-in fade-in duration-500">
               <div>
                 <h3 className="text-2xl font-bold tracking-tight mb-1">주최자 설정</h3>
                 <p className="text-muted-foreground text-sm">특수 권한 및 관리자 기능을 설정합니다.</p>

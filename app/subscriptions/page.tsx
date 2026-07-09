@@ -191,6 +191,17 @@ export default function SubscriptionsPage() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const handleGoogleLogin = async () => {
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.href },
+      });
+    } catch (error) {
+      console.error("Login redirect failed:", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -200,6 +211,12 @@ export default function SubscriptionsPage() {
             <div className="text-center py-20 flex flex-col items-center justify-center border border-dashed border-muted rounded-xl bg-card">
               <p className="text-lg font-semibold text-muted-foreground mb-3">로그인이 필요합니다</p>
               <p className="text-sm text-muted-foreground mb-4">로그인하고 내가 팔로우한 채널들의 행사를 한눈에 모아보세요!</p>
+              <button
+                onClick={handleGoogleLogin}
+                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-sm hover:bg-primary/90 active:scale-95 transition-all"
+              >
+                로그인 하러 가기
+              </button>
             </div>
           )}
 
