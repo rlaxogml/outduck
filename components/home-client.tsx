@@ -31,6 +31,7 @@ type Event = {
   createdAt: string;
   startDateValue: string | null;
   endDateValue: string | null;
+  eventType?: "offline" | "online";
 };
 
 function seededRandom(seed: number) {
@@ -72,7 +73,7 @@ export function HomeClient({
   initialPosters = [],
 }: HomeClientProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"offline" | "online">("offline");
+  const [activeTab, setActiveTab] = useState<"all" | "offline" | "online">("all");
   const [activeCategory, setActiveCategory] = useState("all");
   const [sortType, setSortType] = useState<"recommended" | "recent" | "upcoming">("recommended");
 
@@ -329,7 +330,7 @@ export function HomeClient({
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem("outduck-active-event-tab");
-      if ((saved === "offline" || saved === "online") && saved !== activeTab) {
+      if ((saved === "all" || saved === "offline" || saved === "online") && saved !== activeTab) {
         setActiveTab(saved);
       }
     } catch (e) {}
@@ -611,15 +612,36 @@ export function HomeClient({
   }, [user]);
 
   const filteredEvents = (() => {
-    const base = activeTab === "offline" ? offlineEvents : onlineEvents;
-    const fresh = activeTab === "offline" ? freshOffline : freshOnline;
+    // "전체" 탭은 오프라인+온라인을 병합해 보여준다. 각 행사에 eventType을 태깅해
+    // 카드가 온/오프라인 뱃지를 표시하고, id 충돌(오프/온라인 테이블 id가 겹칠 수 있음)에
+    // 대비해 dedup은 eventType+id 복합키로 한다.
+    let base: Event[];
+    let fresh: Event[];
+    if (activeTab === "all") {
+      base = [
+        ...offlineEvents.map((e) => ({ ...e, eventType: "offline" as const })),
+        ...onlineEvents.map((e) => ({ ...e, eventType: "online" as const })),
+      ];
+      fresh = [
+        ...freshOffline.map((e) => ({ ...e, eventType: "offline" as const })),
+        ...freshOnline.map((e) => ({ ...e, eventType: "online" as const })),
+      ];
+    } else if (activeTab === "offline") {
+      base = offlineEvents;
+      fresh = freshOffline;
+    } else {
+      base = onlineEvents;
+      fresh = freshOnline;
+    }
+
+    const uid = (e: Event) => (activeTab === "all" ? `${e.eventType}-${e.id}` : String(e.id));
 
     // 신선도 오버레이: base에 아직 없는 새 행사만 앞에 얹는다(dedup).
     // 이후 정렬(추천순=셔플)이 각 행사를 결정적 슬롯에 배치하므로 배열 순서는 표시에 영향 없음.
     let result: Event[];
     if (fresh.length > 0) {
-      const baseIds = new Set(base.map((e) => e.id));
-      const newOnes = fresh.filter((e) => !baseIds.has(e.id));
+      const baseIds = new Set(base.map(uid));
+      const newOnes = fresh.filter((e) => !baseIds.has(uid(e)));
       result = newOnes.length > 0 ? [...newOnes, ...base] : base;
     } else {
       result = base;
@@ -901,8 +923,11 @@ export function HomeClient({
   // 4. Infinite Scroll Observer to seamlessly load additional events as the user scrolls
   useEffect(() => {
     // Determine if we can fetch more based on current tab
-    const hasMore = activeTab === "offline" ? hasMoreOffline : hasMoreOnline;
-    
+    // "전체" 탭은 오프라인·온라인 중 하나라도 더 있으면 계속 불러온다.
+    const hasMore = activeTab === "all"
+      ? (hasMoreOffline || hasMoreOnline)
+      : activeTab === "offline" ? hasMoreOffline : hasMoreOnline;
+
     // visibleCount controls the smooth client-side reveal, we fetch when we get close to the end
     if (!hasMore && visibleCount >= filteredEvents.length) return;
 
@@ -912,21 +937,52 @@ export function HomeClient({
           // If we reached the end of the client-side list, fetch more from server
           if (visibleCount >= filteredEvents.length && hasMore) {
             setIsFetchingMore(true);
-            const currentLength = activeTab === "offline" ? offlineEvents.length : onlineEvents.length;
-            
-            const { data, error } = await fetchMoreEvents(activeTab, currentLength, 30);
-            
-            if (data && data.length > 0) {
-              if (activeTab === "offline") {
-                setOfflineEvents(prev => [...prev, ...data as any]);
-                if (data.length < 30) setHasMoreOffline(false);
-              } else {
-                setOnlineEvents(prev => [...prev, ...data as any]);
-                if (data.length < 30) setHasMoreOnline(false);
+
+            if (activeTab === "all") {
+              // 전체 탭: 남아있는 쪽(오프라인/온라인)을 병렬로 함께 페이징
+              const tasks: Promise<{ type: "offline" | "online"; data: any[] | null }>[] = [];
+              if (hasMoreOffline) {
+                tasks.push(
+                  fetchMoreEvents("offline", offlineEvents.length, 30).then(res => ({ type: "offline" as const, data: res.data }))
+                );
+              }
+              if (hasMoreOnline) {
+                tasks.push(
+                  fetchMoreEvents("online", onlineEvents.length, 30).then(res => ({ type: "online" as const, data: res.data }))
+                );
+              }
+              const results = await Promise.all(tasks);
+              for (const r of results) {
+                if (r.data && r.data.length > 0) {
+                  if (r.type === "offline") {
+                    setOfflineEvents(prev => [...prev, ...r.data as any]);
+                    if (r.data.length < 30) setHasMoreOffline(false);
+                  } else {
+                    setOnlineEvents(prev => [...prev, ...r.data as any]);
+                    if (r.data.length < 30) setHasMoreOnline(false);
+                  }
+                } else {
+                  if (r.type === "offline") setHasMoreOffline(false);
+                  else setHasMoreOnline(false);
+                }
               }
             } else {
-              if (activeTab === "offline") setHasMoreOffline(false);
-              else setHasMoreOnline(false);
+              const currentLength = activeTab === "offline" ? offlineEvents.length : onlineEvents.length;
+
+              const { data, error } = await fetchMoreEvents(activeTab, currentLength, 30);
+
+              if (data && data.length > 0) {
+                if (activeTab === "offline") {
+                  setOfflineEvents(prev => [...prev, ...data as any]);
+                  if (data.length < 30) setHasMoreOffline(false);
+                } else {
+                  setOnlineEvents(prev => [...prev, ...data as any]);
+                  if (data.length < 30) setHasMoreOnline(false);
+                }
+              } else {
+                if (activeTab === "offline") setHasMoreOffline(false);
+                else setHasMoreOnline(false);
+              }
             }
             setIsFetchingMore(false);
           }
@@ -969,7 +1025,7 @@ export function HomeClient({
     let saved: {
       anchorDelta: number;
       visibleCount: number;
-      activeTab: "offline" | "online";
+      activeTab: "all" | "offline" | "online";
       offlineCount: number;
       onlineCount: number;
     };
@@ -1135,7 +1191,7 @@ export function HomeClient({
           {/* Tabs - also serves as the scroll-restoration anchor point, since it's
               always rendered right after the banners/favorite-channels zone */}
           <div ref={scrollAnchorRef}>
-            <EventTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            <EventTabs showAllTab activeTab={activeTab} onTabChange={setActiveTab} />
           </div>
 
           {/* Category Filter */}
@@ -1150,26 +1206,30 @@ export function HomeClient({
           <section className="p-4 min-h-[650px]">
             <div key={`${activeTab}-${activeCategory}-${sortType}`}>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                {filteredEvents.slice(0, visibleCount).map((event, index) => (
-                  <EventCard
-                    key={event.id}
-                    id={event.id}
-                    title={event.title}
-                    date={event.date}
-                    location={event.location}
-                    category={event.category}
-                    imageColor={event.imageColor}
-                    imageUrl={event.imageUrl}
-                    reservationType={event.reservationType}
-                    channels={event.channels}
-                    user={user}
-                    eventType={activeTab}
-                    baseEventId={event.baseEventId}
-                    bookmarkedIds={userBookmarks}
-                    isRightCard={index % 2 === 1}
-                    isPriority={index < 4}
-                  />
-                ))}
+                {filteredEvents.slice(0, visibleCount).map((event, index) => {
+                  const cardType = activeTab === "all" ? (event.eventType ?? "offline") : activeTab;
+                  return (
+                    <EventCard
+                      key={activeTab === "all" ? `${event.eventType}-${event.id}` : event.id}
+                      id={event.id}
+                      title={event.title}
+                      date={event.date}
+                      location={event.location}
+                      category={event.category}
+                      imageColor={event.imageColor}
+                      imageUrl={event.imageUrl}
+                      reservationType={event.reservationType}
+                      channels={event.channels}
+                      user={user}
+                      eventType={cardType}
+                      baseEventId={event.baseEventId}
+                      bookmarkedIds={userBookmarks}
+                      isRightCard={index % 2 === 1}
+                      isPriority={index < 4}
+                      showEventTypeBadge={activeTab === "all"}
+                    />
+                  );
+                })}
               </div>
 
               {filteredEvents.length === 0 && (
