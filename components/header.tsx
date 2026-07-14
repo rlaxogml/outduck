@@ -667,7 +667,7 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
           </div>
 
           {/* Integrated Search Bar: Explicit fixed width overrides to force CSS Grid 'auto' expansion */}
-          {pathname !== "/all-channels" && (
+          {pathname !== "/all-channels" ? (
             <div className="relative w-full md:w-[400px] lg:w-[550px] xl:w-[650px] max-w-lg md:max-w-2xl mx-3 md:mx-auto md:px-4 hidden md:block">
               <div className="relative flex w-full items-center">
                 <Search className="absolute left-4 h-[18px] w-[18px] text-muted-foreground" />
@@ -759,6 +759,9 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
                 </div>
               )}
             </div>
+          ) : (
+            /* all-channels: 검색창을 숨겨도 그리드 3열을 유지하기 위한 빈 가운데 칸 */
+            <div className="hidden md:block" aria-hidden />
           )}
 
           <div className="flex-shrink-0 justify-self-end flex items-center gap-2.5 md:gap-3.5">
