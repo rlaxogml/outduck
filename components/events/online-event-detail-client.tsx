@@ -7,11 +7,20 @@ import { Header } from "@/components/header";
 import { revalidatePaths } from "@/app/actions/events";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn, linkifyHtml } from "@/lib/utils";
-import { Heart, Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLink, Link2, Info, User as UserIcon, Eye, MessageSquare, X } from "lucide-react";
+import { Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLink, Link2, Info, User as UserIcon, Eye, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import ReactDOM from "react-dom";
 import { CommentsSection } from "@/components/events/comments-section";
+import {
+  HeroBackButton,
+  HeroProfileName,
+  OwnerActionRow,
+  HeroMobileIcons,
+  HeroOutlineButton,
+  HeroDesktopActions,
+  ImageLightbox,
+} from "@/components/events/event-hero-parts";
 import { trackPerformance } from "@/lib/performance";
 
 // React 19 findDOMNode Polyfill (react-quill 호환성 확보용)
@@ -834,13 +843,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
       {/* 1. Hero Section Container with floating back button */}
       <div className="mx-auto max-w-2xl md:max-w-6xl relative mt-2 md:mt-6 mb-4 md:mb-6 px-0">
         {/* Floating Back Button */}
-        <button
-          onClick={() => router.back()}
-          className="absolute left-6 md:-left-24 top-2 md:top-8 z-40 flex items-center justify-center w-10 h-10 md:w-16 md:h-16 rounded-full border border-border/60 bg-white/90 dark:bg-muted/90 text-foreground shadow-md backdrop-blur-sm hover:scale-105 active:scale-95 transition-all"
-          aria-label="뒤로가기"
-        >
-          <ChevronLeft className="w-5 h-5 md:w-8 md:h-8 stroke-[2.5]" />
-        </button>
+        <HeroBackButton onClick={() => router.back()} />
 
         {/* Hero Card content */}
         <div className="bg-background border-b border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:rounded-3xl md:border md:border-slate-200/80 overflow-hidden">
@@ -867,30 +870,16 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
             {/* Left (Info) on Desktop, Below on Mobile */}
             <div className="w-full md:w-[45%] px-5 md:px-0 pt-0 md:pt-0 pb-6 md:pb-0 flex flex-col justify-center">
               {/* Overlapping Channel Images / Desktop Row Profiles */}
-              {event.channels.length > 0 && (
-                <div className="relative -mt-8 md:mt-0 mb-4 md:mb-6 z-20 flex items-center -space-x-3 md:-space-x-3">
-                  {event.channels.map((channel, i) => (
-                    <div 
-                      key={channel.id} 
-                      className="transition-transform hover:scale-105 hover:z-30 cursor-pointer relative" 
-                      style={{ zIndex: 20 - i }}
-                      onClick={() => router.push(`/channels/${channel.id}`)}
-                    >
-                      <div className="w-16 h-16 md:w-14 md:h-14 rounded-full border-4 md:border-2 border-background shadow-md overflow-hidden bg-muted flex items-center justify-center">
-                        {channel.image_url ? (
-                          <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-lg md:text-base font-bold text-muted-foreground">{channel.name.charAt(0)}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <HeroProfileName
+                channels={event.channels}
+                onChannelClick={(id) => router.push(`/channels/${id}`)}
+                className="mb-4 md:mb-6"
+                avatarClassName="w-16 h-16 md:w-14 md:h-14"
+              />
 
               <div className="flex items-start justify-between md:items-center gap-4">
                 <div className="flex-1">
-                  <div className="flex items-center md:items-start md:flex-col gap-2 mb-1.5 flex-wrap">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h1 className="text-xl md:text-2xl font-bold tracking-tight break-keep leading-tight text-foreground animate-in fade-in duration-300">
                         {event.title}
@@ -901,7 +890,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
                         </span>
                       )}
                     </div>
-                    <span className="text-[13px] md:text-base text-muted-foreground font-medium shrink-0 whitespace-nowrap mt-0.5 md:mt-0">
+                    <span className="md:hidden text-[13px] text-muted-foreground font-medium shrink-0 whitespace-nowrap mt-0.5">
                       {event.channels.length > 0 ? event.channels[0].name : "온라인 행사"}
                     </span>
                   </div>
@@ -910,97 +899,35 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
 
               {/* Owner Action Row */}
               {isOwner && (
-                <div className="flex gap-2 mt-4 md:mt-6">
-                  <button 
-                    onClick={() => router.push(`/online-events/${event.id}/edit`)}
-                    className="flex-1 py-2 bg-secondary text-secondary-foreground text-sm font-semibold rounded-xl hover:bg-secondary/80 transition-colors"
-                  >
-                    행사 수정
-                  </button>
-                  <button 
-                    onClick={handleDelete}
-                    className="flex-1 py-2 bg-destructive/10 text-destructive text-sm font-semibold rounded-xl hover:bg-destructive/20 transition-colors"
-                  >
-                    행사 삭제
-                  </button>
-                </div>
+                <OwnerActionRow
+                  onEdit={() => router.push(`/online-events/${event.id}/edit`)}
+                  onDelete={handleDelete}
+                />
               )}
 
               {/* Mobile-only Heart/Share Icons (events 페이지와 동일한 컴팩트 아이콘) */}
               <div className="flex md:hidden justify-end items-center gap-0.5 mt-3">
-                <button
-                  onClick={handleBookmark}
-                  className={cn(
-                    "p-1.5 transition-all active:scale-95 duration-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800",
-                    isBookmarked ? "text-pink-500" : "text-[#6a83a8] dark:text-[#8ba3c7]"
-                  )}
-                  aria-label="관심 저장"
-                >
-                  <Heart
-                    className={cn(
-                      "w-[24px] h-[24px] transition-all",
-                      isBookmarked ? "fill-pink-500 stroke-pink-500" : "stroke-current"
-                    )}
-                  />
-                </button>
-                <button
-                  onClick={handleShare}
-                  className="p-1.5 text-[#6a83a8] dark:text-[#8ba3c7] hover:text-foreground transition-all active:scale-95 duration-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
-                  aria-label="공유"
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-[24px] h-[24px]">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-                    <polyline points="16 6 12 2 8 6"></polyline>
-                    <line x1="12" y1="2" x2="12" y2="15"></line>
-                  </svg>
-                </button>
+                <HeroMobileIcons
+                  isBookmarked={isBookmarked}
+                  onBookmark={handleBookmark}
+                  onShare={handleShare}
+                />
               </div>
 
               {/* Action Buttons Row for PC/Desktop Only (Save, Link, Share) */}
-              <div className="hidden md:flex justify-start gap-3 items-center mt-8 pt-0 border-t-0 border-border/40">
-                <button
-                  onClick={handleBookmark}
-                  className={cn(
-                    "flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold shadow-sm transition-colors",
-                    isBookmarked
-                      ? "text-pink-500 bg-pink-500 text-white border-pink-500 hover:bg-pink-600"
-                      : "text-[#3a5378] dark:text-[#a0b8d6] bg-background border-[#4f6b94]/30 dark:border-[#627fa6]/30 hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10"
-                  )}
-                >
-                  <div className="w-5 h-5 flex items-center justify-center">
-                    <Heart className={cn("w-4 h-4", isBookmarked ? "fill-white" : "")} />
-                  </div>
-                  <span className="text-sm font-semibold">{isBookmarked ? "관심저장" : "저장"}</span>
-                </button>
-
+              <HeroDesktopActions isBookmarked={isBookmarked} onBookmark={handleBookmark} onShare={handleShare}>
                 {firstExplicitLink && (
-                  <button
+                  <HeroOutlineButton
                     onClick={() => {
                       const url = firstExplicitLink.link_url;
                       const targetUrl = url.startsWith("http") ? url : `https://${url}`;
                       window.open(targetUrl, "_blank", "noopener,noreferrer");
                     }}
-                    className="flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border border-[#4f6b94]/30 dark:border-[#627fa6]/30 bg-background hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10 text-[#3a5378] dark:text-[#a0b8d6] text-sm font-semibold shadow-sm transition-colors"
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center">
-                      <ExternalLink className="w-4 h-4" />
-                    </div>
-                    <span className="text-sm font-semibold">이동하기</span>
-                  </button>
+                    icon={<ExternalLink className="w-4 h-4" />}
+                    label="이동하기"
+                  />
                 )}
-
-                <button
-                  onClick={handleShare}
-                  className="flex flex-row justify-center gap-2 px-4 py-3 rounded-xl border border-[#4f6b94]/30 dark:border-[#627fa6]/30 bg-background hover:bg-[#4f6b94]/10 dark:hover:bg-[#627fa6]/10 text-[#3a5378] dark:text-[#a0b8d6] text-sm font-semibold shadow-sm transition-colors"
-                >
-                  <div className="w-5 h-5 flex items-center justify-center">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
-                    </svg>
-                  </div>
-                  <span className="text-sm font-semibold">공유</span>
-                </button>
-              </div>
+              </HeroDesktopActions>
             </div>
           </div>
         </div>
@@ -1646,27 +1573,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
       `}</style>
 
       {/* Image Lightbox */}
-      {selectedImage && (
-        <div 
-          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-200"
-          onClick={() => setSelectedImage(null)}
-        >
-          <button 
-            className="absolute top-4 right-4 md:top-8 md:right-8 text-white/70 hover:text-white transition-colors"
-            onClick={() => setSelectedImage(null)}
-          >
-            <X className="w-8 h-8" />
-          </button>
-          <div className="relative w-full h-full flex items-center justify-center">
-            <img 
-              src={selectedImage} 
-              alt="확대 이미지" 
-              className="max-w-full max-h-full object-contain shadow-2xl animate-in zoom-in-95 duration-300"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        </div>
-      )}
+      <ImageLightbox src={selectedImage} onClose={() => setSelectedImage(null)} />
     </div>
   );
 }
