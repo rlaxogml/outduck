@@ -10,6 +10,74 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
+// 스토리지 삭제 전용 관리자 클라이언트.
+// 클라이언트의 storage.remove()는 버킷 RLS에 막히면 조용히 실패하므로,
+// service role 키로 RLS를 우회해 확실히 삭제한다.
+const getStorageAdmin = () =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+const PUBLIC_URL_MARKER = "/storage/v1/object/public/";
+
+/**
+ * 특정 버킷에서 주어진 경로들을 삭제한다(service role). 실패해도 예외를 던지지 않는다.
+ */
+export async function deleteStoragePaths(
+  bucket: string,
+  paths: string[]
+): Promise<{ ok: boolean; removed: number }> {
+  const clean = Array.from(new Set(paths.filter((p) => !!p)));
+  if (clean.length === 0) return { ok: true, removed: 0 };
+  try {
+    const { data, error } = await getStorageAdmin().storage.from(bucket).remove(clean);
+    if (error) {
+      console.error(`[deleteStoragePaths] '${bucket}' 삭제 실패:`, error.message);
+      return { ok: false, removed: 0 };
+    }
+    return { ok: true, removed: data?.length ?? 0 };
+  } catch (err) {
+    console.error(`[deleteStoragePaths] '${bucket}' 예외:`, err);
+    return { ok: false, removed: 0 };
+  }
+}
+
+/**
+ * 공개 스토리지 URL 목록을 받아 버킷별로 묶어 삭제한다(service role).
+ * 외부 호스트 URL(cafe24 등)·빈 값은 자동으로 건너뛴다. 버킷 구분 없이 안전하게 호출 가능.
+ */
+export async function deleteStorageImages(
+  urls: (string | null | undefined)[]
+): Promise<{ ok: boolean; removed: number }> {
+  const byBucket = new Map<string, string[]>();
+  for (const raw of urls) {
+    if (!raw) continue;
+    const idx = raw.indexOf(PUBLIC_URL_MARKER);
+    if (idx === -1) continue; // 외부 URL·비스토리지 값은 건너뜀
+    let rest = raw.slice(idx + PUBLIC_URL_MARKER.length); // "<bucket>/<path...>"
+    const q = rest.indexOf("?");
+    if (q !== -1) rest = rest.slice(0, q);
+    const slash = rest.indexOf("/");
+    if (slash === -1) continue;
+    const bucket = rest.slice(0, slash);
+    const path = decodeURIComponent(rest.slice(slash + 1));
+    if (!path) continue;
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket)!.push(path);
+  }
+
+  let removed = 0;
+  let ok = true;
+  for (const [bucket, paths] of byBucket) {
+    const res = await deleteStoragePaths(bucket, paths);
+    removed += res.removed;
+    if (!res.ok) ok = false;
+  }
+  return { ok, removed };
+}
+
 export async function fetchMoreEvents(
   type: "offline" | "online",
   offset: number,

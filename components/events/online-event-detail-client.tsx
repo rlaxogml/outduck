@@ -6,7 +6,8 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/image-compress";
 import { Header } from "@/components/header";
-import { revalidatePaths } from "@/app/actions/events";
+import { revalidatePaths, deleteStorageImages } from "@/app/actions/events";
+import { extractHtmlImageUrls } from "@/lib/image-upload";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn, linkifyHtml } from "@/lib/utils";
 import { Calendar, Link as LinkIcon, ShoppingBag, ChevronLeft, ExternalLink, Link2, Info, User as UserIcon, Eye, MessageSquare } from "lucide-react";
@@ -729,17 +730,11 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
     try {
       if (!event?.event_id) throw new Error("이벤트 정보를 찾을 수 없습니다.");
 
-      if (event.image_url && event.image_url.includes("/storage/v1/object/public/event_images/event-main-image/")) {
-        const parts = event.image_url.split("event-main-image/");
-        const fileName = parts[parts.length - 1];
-        if (fileName) {
-          try {
-            await supabase.storage.from("event_images").remove([`event-main-image/${fileName}`]);
-          } catch (storageErr) {
-            console.error("Failed to delete event main image from storage:", storageErr);
-          }
-        }
-      }
+      // 이 행사의 모든 이미지(메인 + 설명 본문 임베드)를 service role로 확실히 삭제.
+      await deleteStorageImages([
+        event.image_url,
+        ...extractHtmlImageUrls(event.description),
+      ]);
 
       await supabase.from("event_channels").delete().eq("event_id", event.event_id);
       await supabase.from("event_bookmarks").delete().eq("event_id", event.event_id);

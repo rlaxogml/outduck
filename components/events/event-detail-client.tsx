@@ -22,7 +22,8 @@ import {
 } from "@/components/events/event-hero-parts";
 import dynamic from "next/dynamic";
 import { trackPerformance } from "@/lib/performance";
-import { revalidatePaths, revalidateEventDetail } from "@/app/actions/events";
+import { revalidatePaths, revalidateEventDetail, deleteStorageImages } from "@/app/actions/events";
+import { extractHtmlImageUrls } from "@/lib/image-upload";
 
 const EventNoticesBoard = dynamic(() => import("@/components/events/event-notices-board"), {
   ssr: false,
@@ -335,37 +336,13 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
     try {
       if (!event?.event_id) throw new Error("이벤트 정보를 찾을 수 없습니다.");
 
-      if (event.image_url && event.image_url.includes("/storage/v1/object/public/event_images/event-main-image/")) {
-        const parts = event.image_url.split("event-main-image/");
-        const fileName = parts[parts.length - 1];
-        if (fileName) {
-          try {
-            await supabase.storage.from("event_images").remove([`event-main-image/${fileName}`]);
-          } catch (storageErr) {
-            console.error("Failed to delete event main image from storage:", storageErr);
-          }
-        }
-      }
-
-      if (event.images && event.images.length > 0) {
-        const supportPathsToDelete: string[] = [];
-        event.images.forEach(img => {
-          if (img.image_url && img.image_url.includes("/storage/v1/object/public/event_images/event-support/")) {
-            const parts = img.image_url.split("event-support/");
-            const fileName = parts[parts.length - 1];
-            if (fileName) {
-              supportPathsToDelete.push(`event-support/${fileName}`);
-            }
-          }
-        });
-        if (supportPathsToDelete.length > 0) {
-          try {
-            await supabase.storage.from("event_images").remove(supportPathsToDelete);
-          } catch (storageErr) {
-            console.error("Failed to delete support images from storage:", storageErr);
-          }
-        }
-      }
+      // 이 행사의 모든 이미지(메인 + 서포트 + 설명 본문 임베드)를 service role로 확실히 삭제.
+      // 외부 URL·빈 값은 서버액션이 알아서 건너뛴다.
+      await deleteStorageImages([
+        event.image_url,
+        ...(event.images?.map((img) => img.image_url) ?? []),
+        ...extractHtmlImageUrls(event.description),
+      ]);
 
       await supabase.from("offline_event_locations").delete().eq("offline_event_id", eventId);
       await supabase.from("event_channels").delete().eq("event_id", event.event_id);

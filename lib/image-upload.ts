@@ -2,6 +2,19 @@ import { supabase } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/image-compress";
 import { toast } from "sonner";
 
+// 설명 HTML(리치 에디터 본문)에서 <img src> URL 목록을 뽑아낸다.
+// 스토리지 정리(삭제/수정 diff)에서 설명 이미지도 함께 지우기 위해 사용.
+export function extractHtmlImageUrls(html: string | null | undefined): string[] {
+  if (!html) return [];
+  const urls: string[] = [];
+  const re = /<img[^>]+src=["']([^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    urls.push(m[1]);
+  }
+  return urls;
+}
+
 export async function uploadBase64Images(htmlContent: string): Promise<string> {
   if (!htmlContent || !htmlContent.includes("data:image/")) return htmlContent;
   

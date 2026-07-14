@@ -15,9 +15,9 @@ import type { User } from "@supabase/supabase-js";
 import { TimeInputPair } from "@/components/events/time-input-pair";
 import { DateInputTriple } from "@/components/events/date-input-triple";
 import RichTextEditor from "@/components/events/rich-text-editor";
-import { revalidatePaths } from "@/app/actions/events";
+import { revalidatePaths, deleteStoragePaths, deleteStorageImages } from "@/app/actions/events";
 import { useEventImageUpload } from "@/hooks/use-event-image-upload";
-import { uploadBase64Images } from "@/lib/image-upload";
+import { uploadBase64Images, extractHtmlImageUrls } from "@/lib/image-upload";
 
 
 type Channel = {
@@ -40,6 +40,8 @@ export default function EditOnlineEventPage() {
   // Form states
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  // 로드 시점의 원본 설명 HTML(저장 시 빠진 설명 이미지 정리용 diff 기준).
+  const initialDescriptionRef = useRef("");
   const currentYear = new Date().getFullYear().toString();
   const [startYear, setStartYear] = useState(currentYear);
   const [startMonth, setStartMonth] = useState("");
@@ -181,6 +183,7 @@ export default function EditOnlineEventPage() {
 
             setTitle(event.title || "");
             setDescription(event.description || "");
+            initialDescriptionRef.current = event.description || "";
             setImageUrl(event.image_url || null);
             if (event.image_url && event.image_url.includes("event_images/event-main-image/")) {
               const parts = event.image_url.split("event-main-image/");
@@ -346,17 +349,19 @@ export default function EditOnlineEventPage() {
 
       if (relationError) throw relationError;
 
-      // Delete delayed images from storage since the event was updated successfully!
+      // 교체된 메인 이미지: service role로 확실히 삭제(RLS 우회).
       if (mainDeletedPaths.length > 0) {
-        try {
-          const { error: storageErr } = await supabase.storage.from("event_images").remove(mainDeletedPaths);
-          if (storageErr) {
-            console.error("Failed to delete old main image from storage error:", storageErr);
-          }
-        } catch (err) {
-          console.error("Failed to delete old main image from storage:", err);
-        }
+        await deleteStoragePaths("event_images", mainDeletedPaths);
       }
+
+      // 설명 본문에서 빠진 이미지(툴바 업로드/복붙 모두)를 스토리지에서 정리.
+      const removedDescImages = extractHtmlImageUrls(initialDescriptionRef.current).filter(
+        (u) => !finalDescription.includes(u)
+      );
+      if (removedDescImages.length > 0) {
+        await deleteStorageImages(removedDescImages);
+      }
+      initialDescriptionRef.current = finalDescription;
 
       toast.success("온라인 행사가 성공적으로 수정되었습니다!");
       try {

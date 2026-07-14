@@ -43,14 +43,15 @@ if (typeof window !== "undefined") {
 
 const uploadNoticeImage = async (file: File): Promise<string | null> => {
   try {
-    const fileExt = file.name.split('.').pop();
+    const compressed = await compressImage(file);
+    const fileExt = compressed.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const filePath = `${fileName}`;
+    // 설명 이미지 저장 위치를 복붙(base64) 경로와 동일하게 event_images/description/ 로 통일.
+    const filePath = `description/${fileName}`;
 
-    // notices 버킷이 없더라도 안전하게 업로드를 유도
     const { data, error } = await supabase.storage
-      .from('notices')
-      .upload(filePath, await compressImage(file));
+      .from('event_images')
+      .upload(filePath, compressed);
 
     if (error) {
       console.error('Image upload error:', error);
@@ -58,7 +59,7 @@ const uploadNoticeImage = async (file: File): Promise<string | null> => {
     }
 
     const { data: { publicUrl } } = supabase.storage
-      .from('notices')
+      .from('event_images')
       .getPublicUrl(filePath);
 
     return publicUrl;
@@ -191,7 +192,7 @@ export default function RichTextEditor({
                 }
                 toast.success('이미지 업로드에 성공했습니다.');
               } else {
-                toast.error('이미지 업로드에 실패했습니다. notices 스토리지 버킷이 생성되어 있으며 공개 액세스가 가능한지 확인해주세요.');
+                toast.error('이미지 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.');
               }
             }
           };
@@ -533,14 +534,10 @@ export default function RichTextEditor({
                 <button
                   type="button"
                   onClick={() => {
-                    // 에디터 본문에서 해당 이미지 제거
+                    // 본문에서만 제거한다. 스토리지 실제 삭제는 "저장" 시점에
+                    // 이전/신규 설명을 비교해 정리하므로(수정 취소 시 원본 보존),
+                    // 여기서 즉시 지우지 않는다.
                     deleteImageBySrc(url);
-                    // Storage에서도 삭제 시도
-                    const storageBase = supabase.storage.from('notices').getPublicUrl('').data.publicUrl.replace(/\/$/, '');
-                    if (url.startsWith(storageBase)) {
-                      const path = url.replace(storageBase + '/', '');
-                      supabase.storage.from('notices').remove([path]);
-                    }
                   }}
                   className="absolute -top-2 -right-2 w-6 h-6 bg-white border-2 border-black text-black rounded-full flex items-center justify-center text-xs font-bold shadow hover:bg-red-500 hover:border-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100"
                   title="이미지 삭제"

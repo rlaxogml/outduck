@@ -19,8 +19,8 @@ import { DateInputTriple } from "@/components/events/date-input-triple";
 import { useKakaoAddress } from "@/hooks/use-kakao-address";
 import { useEventImageUpload } from "@/hooks/use-event-image-upload";
 import RichTextEditor from "@/components/events/rich-text-editor";
-import { revalidatePaths, revalidateEventDetail } from "@/app/actions/events";
-import { uploadBase64Images } from "@/lib/image-upload";
+import { revalidatePaths, revalidateEventDetail, deleteStoragePaths, deleteStorageImages } from "@/app/actions/events";
+import { uploadBase64Images, extractHtmlImageUrls } from "@/lib/image-upload";
 
 type Channel = {
   id: number;
@@ -46,6 +46,8 @@ export default function EditEventPage() {
   // Form states
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  // 로드 시점의 원본 설명 HTML(저장 시 빠진 설명 이미지 정리용 diff 기준).
+  const initialDescriptionRef = useRef("");
   const [locations, setLocations] = useState<{ location: string; latitude: number | null; longitude: number | null }[]>([]);
   const [locationInput, setLocationInput] = useState("");
   const [isManualLocation, setIsManualLocation] = useState(false);
@@ -431,6 +433,7 @@ export default function EditEventPage() {
 
             setTitle(event.title || "");
             setDescription(event.description || "");
+            initialDescriptionRef.current = event.description || "";
             setImageUrl(event.image_url || null);
             if (event.image_url && event.image_url.includes("event_images/event-main-image/")) {
               const parts = event.image_url.split("event-main-image/");
@@ -879,21 +882,23 @@ export default function EditEventPage() {
         if (upsertImgErr) throw upsertImgErr;
       }
 
+      // 교체된 메인 이미지 + 제거된 서포트 이미지: service role로 확실히 삭제(RLS 우회).
       const pathsToDelete = [
         ...imagesToDelete.map(x => x.path).filter(Boolean),
         ...mainDeletedPaths
       ] as string[];
       if (pathsToDelete.length > 0) {
-        try {
-          const { error: storageErr } = await supabase.storage.from("event_images").remove(pathsToDelete);
-          if (storageErr) {
-            console.error("Failed to delete support images from storage error:", storageErr);
-            toast.error("사용하지 않는 이미지 스토리지 삭제 실패: " + storageErr.message);
-          }
-        } catch (storageErr) {
-          console.error("Failed to delete support images from storage:", storageErr);
-        }
+        await deleteStoragePaths("event_images", pathsToDelete);
       }
+
+      // 설명 본문에서 빠진 이미지(툴바 업로드/복붙 모두)를 스토리지에서 정리.
+      const removedDescImages = extractHtmlImageUrls(initialDescriptionRef.current).filter(
+        (u) => !finalDescription.includes(u)
+      );
+      if (removedDescImages.length > 0) {
+        await deleteStorageImages(removedDescImages);
+      }
+      initialDescriptionRef.current = finalDescription;
 
       toast.success("행사가 성공적으로 수정되었습니다!");
       try {
