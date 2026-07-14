@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
@@ -120,7 +121,7 @@ export default function AllChannelsPage() {
                 <Link key={channel.id} href={`/channels/${channel.id}`} className="flex flex-col items-center group">
                   <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border border-border shadow-sm overflow-hidden bg-white mb-2 sm:mb-3 group-hover:scale-105 transition-transform flex items-center justify-center">
                     {channel.image_url ? (
-                      <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
+                      <CoverImage src={channel.image_url} alt={channel.name} className="w-full h-full" sizes="80px" />
                     ) : (
                       <span className="text-2xl font-bold text-muted-foreground">{channel.name.charAt(0)}</span>
                     )}

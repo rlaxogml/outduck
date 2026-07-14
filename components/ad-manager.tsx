@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { supabase } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -88,7 +90,7 @@ export function AdManager({ userId, onBack, onExtendAd }: { userId: string; onBa
     try {
       const { error: uploadError } = await supabase.storage
         .from("ad_posters")
-        .upload(filePath, file);
+        .upload(filePath, await compressImage(file));
 
       if (uploadError) throw uploadError;
 
@@ -179,7 +181,7 @@ export function AdManager({ userId, onBack, onExtendAd }: { userId: string; onBa
               </div>
               {imageUrl ? (
                 <div className="relative group rounded-2xl overflow-hidden border border-border bg-muted flex items-center justify-center w-full aspect-[21/9]">
-                  <img src={imageUrl} alt="Banner" className="w-full h-full object-cover" />
+                  <CoverImage src={imageUrl} alt="Banner" className="w-full h-full" sizes="(max-width: 768px) 100vw, 600px" />
                   <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer">
                     <UploadCloud className="w-8 h-8 text-white mb-2" />
                     <p className="text-sm font-bold text-white">클릭하여 이미지 변경</p>
@@ -279,7 +281,7 @@ export function AdManager({ userId, onBack, onExtendAd }: { userId: string; onBa
               <Card key={ad.id} className={`rounded-3xl border-border shadow-sm overflow-hidden flex flex-col md:flex-row transition-all hover:shadow-md ${isExpired ? 'opacity-70 saturate-50' : ''}`}>
                 <div className="w-full md:w-1/3 aspect-[21/9] md:aspect-auto md:h-full bg-muted shrink-0 border-b md:border-b-0 md:border-r border-border">
                   {ad.image_url ? (
-                    <img src={ad.image_url} alt={ad.title} className="w-full h-full object-cover" />
+                    <CoverImage src={ad.image_url} alt={ad.title} className="w-full h-full" sizes="(max-width: 768px) 100vw, 33vw" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-muted">
                       <ImageIcon className="w-8 h-8 opacity-20" />

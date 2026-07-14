@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, useMemo, Fragment, useRef, useId } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { Header } from "@/components/header";
 import { revalidatePaths } from "@/app/actions/events";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -359,7 +361,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
 
       const { data, error } = await supabase.storage
         .from('notices')
-        .upload(filePath, file);
+        .upload(filePath, await compressImage(file));
 
       if (error) {
         console.error('Image upload error:', error);
@@ -853,10 +855,12 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
             <div className="w-full md:w-[55%] shrink-0 relative">
               <div className="w-full aspect-[16/9] bg-muted relative md:rounded-2xl overflow-hidden md:shadow-md">
                 {event.image_url ? (
-                  <img 
-                    src={event.image_url} 
-                    alt={event.title} 
-                    className="w-full h-full object-cover cursor-pointer" 
+                  <CoverImage
+                    src={event.image_url}
+                    alt={event.title}
+                    className="w-full h-full cursor-pointer"
+                    sizes="(max-width: 768px) 100vw, 55vw"
+                    preload
                     onClick={() => setSelectedImage(event.image_url)}
                   />
                 ) : (
@@ -1238,7 +1242,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
                         <div className="flex flex-wrap gap-3">
                           {urls.map((src, idx) => (
                             <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm shrink-0 bg-muted group">
-                              <img src={src} alt="Attached" className="w-full h-full object-cover" />
+                              <CoverImage src={src} alt="Attached" className="w-full h-full" sizes="160px" />
                               <button
                                 onClick={() => {
                                   const escapedSrc = src.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -1442,11 +1446,7 @@ export function OnlineEventDetailClient({ initialEvent }: { initialEvent: Online
 
                               {hasImage && thumbnail && (
                                 <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-xl overflow-hidden border border-border/40 shrink-0 shadow-sm">
-                                  <img 
-                                    src={thumbnail} 
-                                    alt="공지 이미지" 
-                                    className="w-full h-full object-cover" 
-                                  />
+                                  <CoverImage src={thumbnail} alt="공지 이미지" className="w-full h-full" sizes="64px" />
                                   {imageUrls.length > 1 && (
                                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-extrabold text-[11px] md:text-[13px] select-none tracking-wider">
                                       {imageUrls.length}+

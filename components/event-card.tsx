@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 import { toast } from "sonner";
-import Image from "next/image";
+import { CoverImage } from "@/components/ui/cover-image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase/client";
@@ -227,11 +227,12 @@ export function EventCard({
       <div className="relative">
         <div className={`aspect-[16/9] ${!imageUrl ? imageColor : 'bg-muted'} relative overflow-hidden rounded-none sm:rounded-t-2xl`}>
           {imageUrl ? (
-            <img
+            <CoverImage
               src={imageUrl}
               alt={title}
-              className="object-cover absolute inset-0 w-full h-full"
-              loading={isPriority ? "eager" : "lazy"}
+              className="w-full h-full"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 400px"
+              preload={isPriority}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">

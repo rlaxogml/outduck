@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, Suspense } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
@@ -632,7 +633,7 @@ function CalendarContent() {
                           {displayList.map((ch, idx) => (
                             <div key={idx} className="w-7 h-7 rounded-full border border-background shadow-sm overflow-hidden flex-shrink-0 bg-muted">
                               {ch.image_url ? (
-                                <img src={ch.image_url} alt={ch.name} className="w-full h-full object-cover" />
+                                <CoverImage src={ch.image_url} alt={ch.name} className="w-full h-full" sizes="80px" />
                               ) : (
                                 <div className="w-full h-full bg-indigo-400 text-xs flex items-center justify-center font-bold text-white">
                                   {ch.name.charAt(0)}
@@ -703,7 +704,7 @@ function CalendarContent() {
                               ).slice(0, 3).map((ch: any, idx: number) => (
                                 <div key={idx} className="w-10 h-10 md:w-16 md:h-16 rounded-full border-2 border-background overflow-hidden bg-muted flex-shrink-0 shadow-sm">
                                   {ch.image_url ? (
-                                    <img src={ch.image_url} alt={ch.name} className="w-full h-full object-cover" />
+                                    <CoverImage src={ch.image_url} alt={ch.name} className="w-full h-full" sizes="80px" />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-indigo-500 text-white font-bold text-xs md:text-lg">
                                       {ch.name.charAt(0)}

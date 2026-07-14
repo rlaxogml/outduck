@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, Fragment } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Header } from "@/components/header";
@@ -504,10 +505,12 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
             <div className="w-full md:w-[55%] shrink-0 relative">
               <div className="w-full aspect-[16/9] bg-muted relative md:rounded-2xl overflow-hidden md:shadow-md">
                 {event.image_url ? (
-                  <img 
-                    src={event.image_url} 
-                    alt={event.title} 
-                    className="w-full h-full object-cover cursor-pointer" 
+                  <CoverImage
+                    src={event.image_url}
+                    alt={event.title}
+                    className="w-full h-full cursor-pointer"
+                    sizes="(max-width: 768px) 100vw, 55vw"
+                    preload
                     onClick={() => setSelectedImage(event.image_url)}
                   />
                 ) : (
@@ -981,10 +984,12 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
                 className={`shrink-0 snap-start ${i === 0 ? 'pl-5 md:pl-10' : 'pl-4'} ${i === event.images.length - 1 ? 'pr-5 md:pr-10' : ''}`}
               >
                 <div className="w-56 md:w-72 aspect-square bg-muted rounded-2xl overflow-hidden shadow-sm border border-border/40">
-                  <img 
-                    src={img.image_url} 
-                    alt="행사 이미지" 
-                    className="w-full h-full object-cover transition-transform hover:scale-105 cursor-pointer" 
+                  <CoverImage
+                    src={img.image_url}
+                    alt="행사 이미지"
+                    className="w-full h-full cursor-pointer"
+                    imgClassName="transition-transform hover:scale-105"
+                    sizes="(max-width: 768px) 224px, 288px"
                     onClick={() => setSelectedImage(img.image_url)}
                   />
                 </div>

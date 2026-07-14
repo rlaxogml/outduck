@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -488,7 +489,7 @@ function NewEventPageContent() {
 
         const { error: uploadError } = await supabase.storage
           .from("event_images")
-          .upload(filePath, file);
+          .upload(filePath, await compressImage(file));
 
         if (uploadError) throw uploadError;
 

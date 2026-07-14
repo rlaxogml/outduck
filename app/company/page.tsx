@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -234,7 +236,7 @@ export default function CompanyPage() {
 
       const { error: uploadError } = await supabase.storage
         .from('channel-images')
-        .upload(filePath, file);
+        .upload(filePath, await compressImage(file));
 
       if (uploadError) throw uploadError;
 
@@ -291,7 +293,7 @@ export default function CompanyPage() {
             <div className="relative w-14 h-14 md:w-16 md:h-16 bg-brand-gradient p-[2.5px] rounded-full shadow-md group-hover:scale-105 transition-all duration-300 ease-out cursor-pointer">
               <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-muted flex items-center justify-center shrink-0">
                 {channel.image_url ? (
-                  <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover animate-in fade-in" />
+                  <CoverImage src={channel.image_url} alt={channel.name} className="w-full h-full" imgClassName="animate-in fade-in" sizes="64px" />
                 ) : (
                   <span className="text-base md:text-lg font-black text-muted-foreground/60">{channel.name.slice(0, 1).toUpperCase()}</span>
                 )}
@@ -889,7 +891,7 @@ export default function CompanyPage() {
 
       const { error: uploadError } = await supabase.storage
         .from("channel-images")
-        .upload(filePath, file);
+        .upload(filePath, await compressImage(file));
 
       if (uploadError) throw uploadError;
 
@@ -1013,7 +1015,7 @@ export default function CompanyPage() {
 
       const { error: uploadError } = await supabase.storage
         .from("channel-images")
-        .upload(filePath, file);
+        .upload(filePath, await compressImage(file));
 
       if (uploadError) throw uploadError;
 

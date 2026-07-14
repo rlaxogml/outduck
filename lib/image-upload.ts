@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { toast } from "sonner";
 
 export async function uploadBase64Images(htmlContent: string): Promise<string> {
@@ -40,13 +41,17 @@ export async function uploadBase64Images(htmlContent: string): Promise<string> {
         const blob = new Blob([byteArray], { type: item.mimeType });
         
         const fileExt = item.mimeType.split("/")[1] || "png";
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const tmpName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const compressed = await compressImage(
+          new File([blob], tmpName, { type: item.mimeType })
+        );
+        const fileName = compressed.name;
         const filePath = `description/${fileName}`;
-        
+
         const { data, error } = await supabase.storage
           .from('event_images')
-          .upload(filePath, blob, {
-            contentType: item.mimeType
+          .upload(filePath, compressed, {
+            contentType: compressed.type
           });
           
         if (error) {

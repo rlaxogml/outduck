@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { Heart, ChevronLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +63,7 @@ export function HeroProfileName({
               )}
             >
               {channel.image_url ? (
-                <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
+                <CoverImage src={channel.image_url} alt={channel.name} className="w-full h-full" sizes="80px" />
               ) : (
                 <span className="text-lg md:text-base font-bold text-muted-foreground">{channel.name.charAt(0)}</span>
               )}

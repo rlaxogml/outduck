@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -385,7 +386,7 @@ export default function AdApplyPage() {
 
       const { data, error: uploadError } = await supabase.storage
         .from("ad_poster")
-        .upload(filePath, selectedFile, {
+        .upload(filePath, await compressImage(selectedFile), {
           cacheControl: "3600",
           upsert: false
         });

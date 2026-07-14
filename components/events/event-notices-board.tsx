@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -513,11 +514,7 @@ export default function EventNoticesBoard({
                       {/* Right content: Thumbnail */}
                       {hasImage && thumbnail && (
                         <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-xl overflow-hidden border border-border/40 shrink-0 shadow-sm">
-                          <img 
-                            src={thumbnail} 
-                            alt="공지 이미지" 
-                            className="w-full h-full object-cover" 
-                          />
+                          <CoverImage src={thumbnail} alt="공지 이미지" className="w-full h-full" sizes="64px" />
                           {imageUrls.length > 1 && (
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-extrabold text-[11px] md:text-[13px] select-none tracking-wider">
                               {imageUrls.length}+

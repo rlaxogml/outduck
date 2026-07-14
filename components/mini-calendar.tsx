@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { supabase } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { cn } from "@/lib/utils";
@@ -487,7 +488,7 @@ export function MiniCalendar({
                       {channelsWithProfile.slice(0, 5).map((ch, i) => (
                         <div key={i} className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-background bg-muted overflow-hidden shadow-sm">
                           {ch.image_url ? (
-                            <img src={ch.image_url} alt="" className="w-full h-full object-cover" />
+                            <CoverImage src={ch.image_url} alt="" className="w-full h-full" sizes="48px" />
                           ) : (
                             <div className="w-full h-full bg-indigo-400 flex items-center justify-center text-[8px] font-bold text-white">
                               {ch.name.charAt(0)}
@@ -552,7 +553,7 @@ export function MiniCalendar({
                           {event.channels.slice(0, 2).map((ch, idx) => (
                             <div key={idx} className="w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-background overflow-hidden bg-muted flex-shrink-0 shadow-sm">
                               {ch.image_url ? (
-                                <img src={ch.image_url} alt={ch.name} className="w-full h-full object-cover" />
+                                <CoverImage src={ch.image_url} alt={ch.name} className="w-full h-full" sizes="80px" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-indigo-500 text-white font-bold text-xs">
                                   {ch.name.charAt(0)}

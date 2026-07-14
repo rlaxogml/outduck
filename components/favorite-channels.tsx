@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { CoverImage } from "@/components/ui/cover-image";
 import { supabase } from "@/lib/supabase/client";
 import Link from "next/link";
 import { trackPerformance } from "@/lib/performance";
@@ -455,7 +456,7 @@ export function FavoriteChannels({
                 <div className="relative w-14 h-14 md:w-20 md:h-20 bg-brand-gradient p-[2.5px] rounded-full shadow-sm group-hover:scale-105 transition-transform">
                   <div className="w-full h-full rounded-full overflow-hidden border-2 border-white bg-muted flex items-center justify-center shrink-0">
                     {channel.image_url ? (
-                      <img src={channel.image_url} alt={channel.name} className="w-full h-full object-cover" />
+                      <CoverImage src={channel.image_url} alt={channel.name} className="w-full h-full" sizes="80px" />
                     ) : (
                       <span className="text-base md:text-xl font-bold text-muted-foreground">{channel.name.slice(0, 1).toUpperCase()}</span>
                     )}

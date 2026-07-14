@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { toast } from "sonner";
 
 interface UseImageUploadParams {
@@ -51,14 +52,15 @@ export function useImageUpload({
         }
       }
 
-      const fileExt = file.name.split(".").pop();
+      const compressed = await compressImage(file);
+      const fileExt = compressed.name.split(".").pop();
       const randomPart = Math.random().toString(36).substring(2);
       const fileName = `${prefix}${randomPart}-${Date.now()}.${fileExt}`;
       const filePath = `${folderPath}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from(bucket)
-        .upload(filePath, file);
+        .upload(filePath, compressed);
 
       if (uploadError) throw uploadError;
 

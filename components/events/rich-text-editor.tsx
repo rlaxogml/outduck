@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef, useId } from "react";
 import ReactDOM from "react-dom";
 import { supabase } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import "react-quill/dist/quill.snow.css";
@@ -49,7 +50,7 @@ const uploadNoticeImage = async (file: File): Promise<string | null> => {
     // notices 버킷이 없더라도 안전하게 업로드를 유도
     const { data, error } = await supabase.storage
       .from('notices')
-      .upload(filePath, file);
+      .upload(filePath, await compressImage(file));
 
     if (error) {
       console.error('Image upload error:', error);

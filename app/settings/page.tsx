@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -341,7 +342,7 @@ export default function SettingsPage() {
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file);
+        .upload(filePath, await compressImage(file));
 
       if (uploadError) throw uploadError;
 
@@ -1219,7 +1220,7 @@ export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: an
 
       const { error: uploadError } = await supabase.storage
         .from("channel-images")
-        .upload(filePath, file);
+        .upload(filePath, await compressImage(file));
 
       if (uploadError) throw uploadError;
 
