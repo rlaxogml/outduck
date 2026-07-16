@@ -83,6 +83,11 @@ let cachedMapFilters: {
   weeksThreshold: number;
 } | null = null;
 
+// 지도 이벤트(마커 캔버스 포함) + 유저 상태를 메모리에 보관 → 재방문 시 재조회·재생성 없이 즉시 복원.
+// 단일 스냅샷(한 지도 분량)이라 계속 커지지 않고, 콜드 스타트(하드 리로드)에 초기화된다.
+let cachedMapEvents: any[] | null = null;
+let cachedMapUserIds: { bookmarked: number[]; subscribed: number[] } | null = null;
+
 function MapContent() {
   const searchParams = useSearchParams();
   const initialEventId = searchParams.get("eventId");
@@ -139,11 +144,11 @@ function MapContent() {
   const [isScriptLoaded, setIsScriptLoaded] = useState(() => {
     return typeof window !== "undefined" && !!window.kakao && !!window.kakao.maps;
   });
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState<any[]>(() => cachedMapEvents ?? []);
+  const [loading, setLoading] = useState(() => cachedMapEvents ? false : true);
   const [user, setUser] = useState<any>(null);
-  const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>([]);
-  const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>([]);
+  const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>(() => cachedMapUserIds?.bookmarked ?? []);
+  const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>(() => cachedMapUserIds?.subscribed ?? []);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(() => cachedMapFilters?.selectedCategories ?? []);
   const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing" | "within_weeks">(() => cachedMapFilters?.interactionFilter ?? "all");
   const [weeksThreshold, setWeeksThreshold] = useState<number>(() => cachedMapFilters?.weeksThreshold ?? 2);
@@ -156,6 +161,11 @@ function MapContent() {
   useEffect(() => {
     cachedMapFilters = { selectedCategories, interactionFilter, weeksThreshold };
   }, [selectedCategories, interactionFilter, weeksThreshold]);
+
+  // 유저 상태(북마크·구독)를 메모리 캐시에 동기화 → 재방문 시 필터 재계산 입력이 안 바뀌어 지도 초기화가 안정됨
+  useEffect(() => {
+    cachedMapUserIds = { bookmarked: userBookmarkedEventIds, subscribed: userSubscribedChannelIds };
+  }, [userBookmarkedEventIds, userSubscribedChannelIds]);
 
   const mapRef = useRef<any>(null);
   const isMapInitialized = useRef(false);
@@ -282,6 +292,9 @@ function MapContent() {
 
   // 2. Fetch events from Supabase and pre-generate marker base64 images
   useEffect(() => {
+    // 캐시된 이벤트가 있으면 재조회·캔버스 재생성을 건너뛴다 (재방문 즉시 복원).
+    if (cachedMapEvents) return;
+
     const abortController = new AbortController();
 
     const fetchEvents = async () => {
@@ -451,6 +464,7 @@ function MapContent() {
           );
 
           setEvents(eventsWithMarkerImages);
+          cachedMapEvents = eventsWithMarkerImages;
         }
       } catch (err: any) {
         if (!err?.message?.includes("AbortError")) {
