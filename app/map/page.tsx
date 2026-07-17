@@ -157,6 +157,14 @@ function MapContent() {
   const [drawnMarkersCount, setDrawnMarkersCount] = useState(0);
   const [isMapReady, setIsMapReady] = useState(false);
 
+  // 아웃덕 앱(WebView)에서만 내 위치 기능을 켠다. 일반 웹 브라우저에서는 동작하지 않음.
+  // 앱 WebView는 커스텀 userAgent에 "OutduckApp"을 붙여 요청한다.
+  const isApp = useMemo(
+    () => typeof navigator !== "undefined" && /OutduckApp/i.test(navigator.userAgent),
+    []
+  );
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
   // 필터 선택을 메모리 캐시에 동기화 (SPA 이동 후 복원용)
   useEffect(() => {
     cachedMapFilters = { selectedCategories, interactionFilter, weeksThreshold };
@@ -167,6 +175,55 @@ function MapContent() {
     cachedMapUserIds = { bookmarked: userBookmarkedEventIds, subscribed: userSubscribedChannelIds };
   }, [userBookmarkedEventIds, userSubscribedChannelIds]);
 
+  // 앱에서만: 현재 위치를 추적(watchPosition)한다.
+  // - 지도 페이지에서만 동작하고, 벗어나면 clearWatch로 중단 → 배터리 절약
+  // - enableHighAccuracy:false (WiFi/기지국 기반)로 배터리 부담 최소화
+  // - 이동 시 점 갱신은 오버레이 ref로 직접 setPosition → 리렌더/지도 재초기화 없음
+  useEffect(() => {
+    if (!isApp) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+
+    let cancelled = false;
+    let watchId: number | null = null;
+
+    const applyPosition = (pos: GeolocationPosition) => {
+      if (cancelled) return;
+      const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      userLocationRef.current = loc;
+      const overlay = userLocationOverlayRef.current;
+      if (overlay && typeof window !== "undefined" && window.kakao) {
+        // 이미 점이 있으면 위치만 갱신 (state 미변경 → 지도 재초기화 안 함)
+        overlay.setPosition(new window.kakao.maps.LatLng(loc.lat, loc.lng));
+      } else {
+        // 최초 1회만 state 갱신 → 지도 effect가 점을 생성
+        setUserLocation(loc);
+      }
+    };
+
+    const startWatch = () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      watchId = navigator.geolocation.watchPosition(
+        applyPosition,
+        () => {
+          // 권한 거부/실패 시 조용히 무시 (내 위치 마커만 생략)
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 10000 }
+      );
+    };
+
+    startWatch();
+    // 네이티브가 위치 권한을 방금 승인했을 때 추적을 새로 시작
+    window.addEventListener("outduck:location-ready", startWatch);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("outduck:location-ready", startWatch);
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [isApp]);
+
   const mapRef = useRef<any>(null);
   const isMapInitialized = useRef(false);
   const markersRef = useRef<any[]>([]);
@@ -174,6 +231,9 @@ function MapContent() {
   const openOverlayRef = useRef<any>(null);
   const overlayRevealTimerRef = useRef<number | null>(null);
   const userIdRef = useRef<string | null>(null);
+  // 내 위치 표시용 오버레이(파란 점)와 좌표 ref
+  const userLocationOverlayRef = useRef<any>(null);
+  const userLocationRef = useRef<{ lat: number; lng: number } | null>(null);
 
   const handleResetBounds = () => {
     const map = mapRef.current;
@@ -578,7 +638,17 @@ function MapContent() {
           overlaysRef.current = [];
           if (openOverlayRef.current) openOverlayRef.current.setMap(null);
           openOverlayRef.current = null;
+          if (userLocationOverlayRef.current) {
+            userLocationOverlayRef.current.setMap(null);
+            userLocationOverlayRef.current = null;
+          }
           setDrawnMarkersCount(0);
+
+          // 앱에서 위치가 확보된 경우의 내 위치 좌표 (추적 중이면 ref가 최신)
+          const latestLoc = userLocationRef.current || userLocation;
+          const userLatLng = latestLoc
+            ? new kakao.maps.LatLng(latestLoc.lat, latestLoc.lng)
+            : null;
 
           const targetEvent = filteredEvents.find((ev) => String(ev.id) === String(focusedEventId));
 
@@ -992,6 +1062,22 @@ function MapContent() {
 
               setDrawnMarkersCount(successCount);
 
+              // 3-1. 내 위치(파란 점) 오버레이 — 앱에서 위치가 확보된 경우만
+              if (userLatLng) {
+                const dot = document.createElement("div");
+                dot.className = "od-user-loc";
+                dot.innerHTML = `<span class="od-user-loc-pulse"></span><span class="od-user-loc-dot"></span>`;
+                const userOverlay = new kakao.maps.CustomOverlay({
+                  position: userLatLng,
+                  content: dot,
+                  xAnchor: 0.5,
+                  yAnchor: 0.5,
+                  zIndex: 5,
+                });
+                userOverlay.setMap(map);
+                userLocationOverlayRef.current = userOverlay;
+              }
+
               // 4. Set map viewport bounds
               const safetyDelay = isFirstMapCreation ? 350 : 50;
               setTimeout(() => {
@@ -999,7 +1085,18 @@ function MapContent() {
 
                 if (targetCoords.length > 0) {
                   userAdjustedMapView = true;
-                  if (targetCoords.length === 1) {
+                  if (userLatLng) {
+                    // 이벤트 상세 → 지도 진입: 내 위치 + 선택 행사 마커가 모두 보이도록 뷰를 맞춘다.
+                    const bothBounds = new kakao.maps.LatLngBounds();
+                    targetCoords.forEach((c) => bothBounds.extend(c));
+                    bothBounds.extend(userLatLng);
+                    map.setBounds(bothBounds);
+                    // 선택 행사 정보창 열기
+                    if (targetOverlays[0]) {
+                      targetOverlays[0].setMap(map);
+                      openOverlayRef.current = targetOverlays[0];
+                    }
+                  } else if (targetCoords.length === 1) {
                     map.setLevel(3);
                     setTimeout(() => {
                       if (!isMounted) return;
@@ -1085,7 +1182,7 @@ function MapContent() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [isScriptLoaded, loading, filteredEvents, focusedEventId]);
+  }, [isScriptLoaded, loading, filteredEvents, focusedEventId, userLocation]);
 
   // Active ResizeObserver to trigger map relayout instantly when map container size changes in pixels
   useEffect(() => {
@@ -1108,7 +1205,16 @@ function MapContent() {
                 if (markersRef.current && markersRef.current.length > 0) {
                   const targetMarker = markersRef.current.find((m: any) => m.getMap() !== null);
                   if (targetMarker) {
-                    map.setCenter(targetMarker.getPosition());
+                    const uLoc = userLocationRef.current;
+                    if (uLoc && window.kakao) {
+                      // 내 위치 + 선택 행사가 모두 보이도록 유지
+                      const bothBounds = new window.kakao.maps.LatLngBounds();
+                      bothBounds.extend(targetMarker.getPosition());
+                      bothBounds.extend(new window.kakao.maps.LatLng(uLoc.lat, uLoc.lng));
+                      map.setBounds(bothBounds);
+                    } else {
+                      map.setCenter(targetMarker.getPosition());
+                    }
                   }
                 }
               } else if (markersRef.current && markersRef.current.length > 0) {
@@ -1594,6 +1700,40 @@ function MapContent() {
               }
               #map-container {
                 touch-action: none !important;
+              }
+              /* 내 위치(파란 점) 마커 */
+              .od-user-loc {
+                position: relative;
+                width: 18px;
+                height: 18px;
+                pointer-events: none;
+              }
+              .od-user-loc-dot {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 14px;
+                height: 14px;
+                transform: translate(-50%, -50%);
+                background: #2563eb;
+                border: 2px solid #ffffff;
+                border-radius: 9999px;
+                box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+              }
+              .od-user-loc-pulse {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 14px;
+                height: 14px;
+                transform: translate(-50%, -50%);
+                background: rgba(37, 99, 235, 0.35);
+                border-radius: 9999px;
+                animation: od-user-loc-pulse 2s ease-out infinite;
+              }
+              @keyframes od-user-loc-pulse {
+                0% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+                100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
               }
               @media (max-width: 767px) {
                 body, html {
