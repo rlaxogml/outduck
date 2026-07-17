@@ -28,12 +28,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Fetch channels to index their detail pages
     const { data: channels } = await supabase
       .from('channels')
-      .select('id, updated_at')
+      .select('id, created_at')
       .limit(1000)
 
     const channelUrls = (channels || []).map((channel: any) => ({
       url: `${baseUrl}/channels/${channel.id}`,
-      lastModified: channel.updated_at ? new Date(channel.updated_at) : new Date(),
+      lastModified: channel.created_at ? new Date(channel.created_at) : new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.6,
     }))
@@ -41,12 +41,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Fetch events to index their detail pages
     const { data: events } = await supabase
       .from('events')
-      .select('id, updated_at')
+      .select('id, created_at')
       .limit(1000)
 
     const eventUrls = (events || []).map((event: any) => ({
       url: `${baseUrl}/events/${event.id}`,
-      lastModified: event.updated_at ? new Date(event.updated_at) : new Date(),
+      lastModified: event.created_at ? new Date(event.created_at) : new Date(),
       changeFrequency: 'daily' as const,
       priority: 0.7,
     }))
