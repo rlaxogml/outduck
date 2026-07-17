@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
+import { signInWithGoogle } from "@/lib/auth";
 import { compressImage } from "@/lib/image-compress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -503,12 +504,7 @@ export default function SettingsPage() {
   const handleGoogleLogin = async () => {
     setIsLoggingIn(true);
     try {
-      await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
+      await signInWithGoogle();
     } catch (error) {
       console.error("Login redirect failed:", error);
       setIsLoggingIn(false);

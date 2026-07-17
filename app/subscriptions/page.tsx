@@ -8,6 +8,7 @@ import { FavoriteChannels } from "@/components/favorite-channels";
 import { EventTabs } from "@/components/event-tabs";
 import { EventCard } from "@/components/event-card";
 import { supabase } from "@/lib/supabase/client";
+import { signInWithGoogle } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import type { User } from "@supabase/supabase-js";
 import { imageColors, formatEventDate, formatOnlineEventDate, extractChannels, getCategory, dedupeById } from "@/lib/event-format";
@@ -193,10 +194,7 @@ export default function SubscriptionsPage() {
 
   const handleGoogleLogin = async () => {
     try {
-      await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: window.location.href },
-      });
+      await signInWithGoogle();
     } catch (error) {
       console.error("Login redirect failed:", error);
     }

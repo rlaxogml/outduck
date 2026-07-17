@@ -5,6 +5,7 @@ import { CoverImage } from "@/components/ui/cover-image";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase/client";
+import { signOutCompletely } from "@/lib/auth";
 import { compressImage } from "@/lib/image-compress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1181,7 +1182,7 @@ export default function CompanyPage() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOutCompletely();
     toast.success("로그아웃 되었습니다.");
     router.replace("/");
   };

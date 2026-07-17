@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase/client";
+import { signInWithGoogle, signOutCompletely } from "@/lib/auth";
 import { toast } from "sonner";
 import { CUSTOM_EVENTS } from "@/lib/constants";
 
@@ -477,12 +478,7 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
   const handleGoogleLogin = async () => {
     setIsLoggingIn(true);
     try {
-      await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
+      await signInWithGoogle();
     } catch (error) {
       console.error("Login redirect failed:", error);
       setIsLoggingIn(false);
@@ -491,20 +487,12 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
 
 
   const handleLogout = () => {
-    // 강제로 Supabase 관련 로컬 스토리지 키 먼저 삭제
-    for (const key of Object.keys(localStorage)) {
-      if (key.startsWith('sb-')) {
-        localStorage.removeItem(key);
-      }
-    }
-
     // 상태 바로 초기화
     setUser(null);
 
-    // 로그아웃 API는 백그라운드에서 호출 (await 하지 않음 - 무한 대기 방지)
-    supabase.auth.signOut().catch((error) => {
-      console.error("Logout error:", error);
-    });
+    // sb-* 로컬 캐시 삭제 + signOut. 동기 정리가 먼저 실행되고 signOut은 백그라운드로
+    // 진행된다(await 하지 않아 무한 대기 방지).
+    signOutCompletely();
 
     // 즉시 새로고침하여 홈으로
     if (window.location.pathname === "/") {
