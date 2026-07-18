@@ -186,19 +186,21 @@ function MapContent() {
     let cancelled = false;
     let watchId: number | null = null;
 
-    const applyPosition = (pos: GeolocationPosition) => {
+    const applyCoords = (lat: number, lng: number) => {
       if (cancelled) return;
-      const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const loc = { lat, lng };
       userLocationRef.current = loc;
       const overlay = userLocationOverlayRef.current;
       if (overlay && typeof window !== "undefined" && window.kakao) {
         // 이미 점이 있으면 위치만 갱신 (state 미변경 → 지도 재초기화 안 함)
-        overlay.setPosition(new window.kakao.maps.LatLng(loc.lat, loc.lng));
+        overlay.setPosition(new window.kakao.maps.LatLng(lat, lng));
       } else {
         // 최초 1회만 state 갱신 → 지도 effect가 점을 생성
         setUserLocation(loc);
       }
     };
+    const applyPosition = (pos: GeolocationPosition) =>
+      applyCoords(pos.coords.latitude, pos.coords.longitude);
 
     const fetchImmediate = () => {
       // 마지막으로 알던 위치(캐시)를 즉시 가져와 점을 빠르게 띄운다. (그 뒤 watchPosition이 정밀 갱신)
@@ -224,11 +226,25 @@ function MapContent() {
       );
     };
 
+    // 앱(1.0.3+)이 네이티브로 위치를 주입하면 그걸 우선 사용하고,
+    // 느린 WebView 웹 위치(watch)는 중단한다. (구버전 앱/웹은 아래 웹 watch로 fallback)
+    const onNativeLocation = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (!d || typeof d.lat !== "number" || typeof d.lng !== "number") return;
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      applyCoords(d.lat, d.lng);
+    };
+    window.addEventListener("outduck:native-location", onNativeLocation as EventListener);
+
     startWatch();
-    // 네이티브가 위치 권한을 방금 승인했을 때 추적을 새로 시작
+    // 구버전 앱(1.0.2)이 위치 권한을 방금 승인했을 때 웹 watch를 새로 시작 (fallback 경로)
     window.addEventListener("outduck:location-ready", startWatch);
     return () => {
       cancelled = true;
+      window.removeEventListener("outduck:native-location", onNativeLocation as EventListener);
       window.removeEventListener("outduck:location-ready", startWatch);
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
@@ -256,7 +272,11 @@ function MapContent() {
       beam.style.opacity = "1";
     };
 
+    // 네이티브(앱 1.0.3+)가 나침반 방향을 주면 그걸 우선 사용한다 (WebView 방향 이벤트보다 안정적).
+    let nativeHeadingActive = false;
+
     const handleOrientation = (e: DeviceOrientationEvent) => {
+      if (nativeHeadingActive) return; // 네이티브 방향이 들어오면 웹 센서는 무시
       const anyE = e as any;
       let heading: number | null = null;
       if (typeof anyE.webkitCompassHeading === "number") {
@@ -268,10 +288,19 @@ function MapContent() {
       applyHeading(heading);
     };
 
-    // Android는 deviceorientationabsolute, iOS는 deviceorientation을 사용.
+    const onNativeHeading = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (!d || typeof d.heading !== "number") return;
+      nativeHeadingActive = true;
+      applyHeading(d.heading);
+    };
+    window.addEventListener("outduck:native-heading", onNativeHeading as EventListener);
+
+    // Android는 deviceorientationabsolute, iOS는 deviceorientation을 사용 (구버전 앱/웹 fallback).
     window.addEventListener("deviceorientationabsolute", handleOrientation as EventListener, true);
     window.addEventListener("deviceorientation", handleOrientation as EventListener, true);
     return () => {
+      window.removeEventListener("outduck:native-heading", onNativeHeading as EventListener);
       window.removeEventListener("deviceorientationabsolute", handleOrientation as EventListener, true);
       window.removeEventListener("deviceorientation", handleOrientation as EventListener, true);
     };
