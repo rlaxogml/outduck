@@ -224,6 +224,49 @@ function MapContent() {
     };
   }, [isApp]);
 
+  // 앱에서만: 기기 방향(나침반)을 받아 파란 점의 방향 콘을 회전시킨다.
+  // - Android: deviceorientationabsolute의 alpha (heading = 360 - alpha)
+  // - iOS: deviceorientation의 webkitCompassHeading (단, 사용자 제스처로 권한 요청 필요 → 추후)
+  // 앱은 세로 고정이라 화면 회전 보정은 불필요. 방향 센서는 별도 권한이 없다.
+  useEffect(() => {
+    if (!isApp) return;
+    if (typeof window === "undefined") return;
+
+    const applyHeading = (rawHeading: number) => {
+      const heading = ((rawHeading % 360) + 360) % 360;
+      lastHeadingRef.current = heading;
+      const beam = userLocationBeamRef.current;
+      if (!beam) return;
+      // 359°→1° 같은 경계에서 콘이 한 바퀴 도는 현상 방지: 최단 회전으로 누적
+      const prev = headingRotationRef.current;
+      const delta = (((heading - (prev % 360)) % 360) + 540) % 360 - 180;
+      const next = prev + delta;
+      headingRotationRef.current = next;
+      beam.style.transform = `rotate(${next}deg)`;
+      beam.style.opacity = "1";
+    };
+
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      const anyE = e as any;
+      let heading: number | null = null;
+      if (typeof anyE.webkitCompassHeading === "number") {
+        heading = anyE.webkitCompassHeading; // iOS: 이미 나침반 방향
+      } else if (e.absolute && typeof e.alpha === "number") {
+        heading = 360 - e.alpha; // Android(절대 방향)
+      }
+      if (heading == null || Number.isNaN(heading)) return;
+      applyHeading(heading);
+    };
+
+    // Android는 deviceorientationabsolute, iOS는 deviceorientation을 사용.
+    window.addEventListener("deviceorientationabsolute", handleOrientation as EventListener, true);
+    window.addEventListener("deviceorientation", handleOrientation as EventListener, true);
+    return () => {
+      window.removeEventListener("deviceorientationabsolute", handleOrientation as EventListener, true);
+      window.removeEventListener("deviceorientation", handleOrientation as EventListener, true);
+    };
+  }, [isApp]);
+
   const mapRef = useRef<any>(null);
   const isMapInitialized = useRef(false);
   const markersRef = useRef<any[]>([]);
@@ -234,6 +277,10 @@ function MapContent() {
   // 내 위치 표시용 오버레이(파란 점)와 좌표 ref
   const userLocationOverlayRef = useRef<any>(null);
   const userLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+  // 방향(나침반) 표시용: 콘 DOM ref, 마지막 heading(0~360), 누적 회전값(360→0 경계 튐 방지)
+  const userLocationBeamRef = useRef<HTMLElement | null>(null);
+  const lastHeadingRef = useRef<number | null>(null);
+  const headingRotationRef = useRef<number>(0);
 
   const handleResetBounds = () => {
     const map = mapRef.current;
@@ -642,6 +689,7 @@ function MapContent() {
             userLocationOverlayRef.current.setMap(null);
             userLocationOverlayRef.current = null;
           }
+          userLocationBeamRef.current = null;
           setDrawnMarkersCount(0);
 
           // 앱에서 위치가 확보된 경우의 내 위치 좌표 (추적 중이면 ref가 최신)
@@ -1062,11 +1110,11 @@ function MapContent() {
 
               setDrawnMarkersCount(successCount);
 
-              // 3-1. 내 위치(파란 점) 오버레이 — 앱에서 위치가 확보된 경우만
+              // 3-1. 내 위치(파란 점 + 방향 콘) 오버레이 — 앱에서 위치가 확보된 경우만
               if (userLatLng) {
                 const dot = document.createElement("div");
                 dot.className = "od-user-loc";
-                dot.innerHTML = `<span class="od-user-loc-pulse"></span><span class="od-user-loc-dot"></span>`;
+                dot.innerHTML = `<span class="od-user-loc-beam"></span><span class="od-user-loc-pulse"></span><span class="od-user-loc-dot"></span>`;
                 const userOverlay = new kakao.maps.CustomOverlay({
                   position: userLatLng,
                   content: dot,
@@ -1076,6 +1124,12 @@ function MapContent() {
                 });
                 userOverlay.setMap(map);
                 userLocationOverlayRef.current = userOverlay;
+                // 방향 콘 DOM을 붙잡아두고, 이미 알고 있는 방향이 있으면 즉시 반영
+                userLocationBeamRef.current = dot.querySelector(".od-user-loc-beam");
+                if (lastHeadingRef.current != null && userLocationBeamRef.current) {
+                  userLocationBeamRef.current.style.transform = `rotate(${headingRotationRef.current}deg)`;
+                  userLocationBeamRef.current.style.opacity = "1";
+                }
               }
 
               // 4. Set map viewport bounds
@@ -1701,39 +1755,62 @@ function MapContent() {
               #map-container {
                 touch-action: none !important;
               }
-              /* 내 위치(파란 점) 마커 */
+              /* 내 위치(파란 점 + 방향 콘) 마커 */
               .od-user-loc {
                 position: relative;
-                width: 18px;
-                height: 18px;
+                width: 44px;
+                height: 44px;
                 pointer-events: none;
               }
               .od-user-loc-dot {
                 position: absolute;
                 top: 50%;
                 left: 50%;
-                width: 14px;
-                height: 14px;
+                width: 20px;
+                height: 20px;
                 transform: translate(-50%, -50%);
                 background: #2563eb;
-                border: 2px solid #ffffff;
+                border: 3px solid #ffffff;
                 border-radius: 9999px;
-                box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+                box-shadow: 0 0 0 1.5px rgba(37, 99, 235, 0.5), 0 2px 6px rgba(0, 0, 0, 0.45);
+                z-index: 2;
               }
               .od-user-loc-pulse {
                 position: absolute;
                 top: 50%;
                 left: 50%;
-                width: 14px;
-                height: 14px;
+                width: 20px;
+                height: 20px;
                 transform: translate(-50%, -50%);
-                background: rgba(37, 99, 235, 0.35);
+                background: rgba(37, 99, 235, 0.3);
                 border-radius: 9999px;
                 animation: od-user-loc-pulse 2s ease-out infinite;
+                z-index: 1;
               }
               @keyframes od-user-loc-pulse {
-                0% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
-                100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
+                0% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+                100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+              }
+              /* 휴대폰이 향한 방향으로 회전하는 콘(부채꼴). 방향 확보 전엔 숨김. */
+              .od-user-loc-beam {
+                position: absolute;
+                inset: 0;
+                opacity: 0;
+                transform: rotate(0deg);
+                transition: transform 0.15s ease-out, opacity 0.3s ease-out;
+                z-index: 1;
+              }
+              .od-user-loc-beam::before {
+                content: "";
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                width: 0;
+                height: 0;
+                border-left: 13px solid transparent;
+                border-right: 13px solid transparent;
+                border-bottom: 22px solid rgba(37, 99, 235, 0.4);
+                transform: translate(-50%, -100%);
               }
               @media (max-width: 767px) {
                 body, html {
