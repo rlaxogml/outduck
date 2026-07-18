@@ -200,11 +200,21 @@ function MapContent() {
       }
     };
 
+    const fetchImmediate = () => {
+      // 마지막으로 알던 위치(캐시)를 즉시 가져와 점을 빠르게 띄운다. (그 뒤 watchPosition이 정밀 갱신)
+      navigator.geolocation.getCurrentPosition(
+        applyPosition,
+        () => {},
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
+      );
+    };
+
     const startWatch = () => {
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
       }
+      fetchImmediate();
       watchId = navigator.geolocation.watchPosition(
         applyPosition,
         () => {
@@ -281,6 +291,8 @@ function MapContent() {
   const userLocationBeamRef = useRef<HTMLElement | null>(null);
   const lastHeadingRef = useRef<number | null>(null);
   const headingRotationRef = useRef<number>(0);
+  // 이벤트 상세 진입 시 "내 위치+행사 둘 다 보기"를 최초 1회만 맞추기 위한 플래그
+  const didFitUserBoundsRef = useRef(false);
 
   const handleResetBounds = () => {
     const map = mapRef.current;
@@ -685,18 +697,9 @@ function MapContent() {
           overlaysRef.current = [];
           if (openOverlayRef.current) openOverlayRef.current.setMap(null);
           openOverlayRef.current = null;
-          if (userLocationOverlayRef.current) {
-            userLocationOverlayRef.current.setMap(null);
-            userLocationOverlayRef.current = null;
-          }
-          userLocationBeamRef.current = null;
           setDrawnMarkersCount(0);
-
-          // 앱에서 위치가 확보된 경우의 내 위치 좌표 (추적 중이면 ref가 최신)
-          const latestLoc = userLocationRef.current || userLocation;
-          const userLatLng = latestLoc
-            ? new kakao.maps.LatLng(latestLoc.lat, latestLoc.lng)
-            : null;
+          // 내 위치 점(파란 점+방향 콘)은 별도 effect가 관리한다.
+          // (지도 재초기화와 분리 → 위치가 뒤늦게 잡혀도 지도 뷰가 리셋되지 않음)
 
           const targetEvent = filteredEvents.find((ev) => String(ev.id) === String(focusedEventId));
 
@@ -1110,29 +1113,6 @@ function MapContent() {
 
               setDrawnMarkersCount(successCount);
 
-              // 3-1. 내 위치(파란 점 + 방향 콘) 오버레이 — 앱에서 위치가 확보된 경우만
-              if (userLatLng) {
-                const dot = document.createElement("div");
-                dot.className = "od-user-loc";
-                dot.innerHTML = `<span class="od-user-loc-beam"></span><span class="od-user-loc-pulse"></span><span class="od-user-loc-dot"></span>`;
-                const userOverlay = new kakao.maps.CustomOverlay({
-                  position: userLatLng,
-                  content: dot,
-                  xAnchor: 0.5,
-                  yAnchor: 0.5,
-                  // 행사 마커(최대 15)보다 위, 정보 팝업(20)보다는 아래
-                  zIndex: 16,
-                });
-                userOverlay.setMap(map);
-                userLocationOverlayRef.current = userOverlay;
-                // 방향 콘 DOM을 붙잡아두고, 이미 알고 있는 방향이 있으면 즉시 반영
-                userLocationBeamRef.current = dot.querySelector(".od-user-loc-beam");
-                if (lastHeadingRef.current != null && userLocationBeamRef.current) {
-                  userLocationBeamRef.current.style.transform = `rotate(${headingRotationRef.current}deg)`;
-                  userLocationBeamRef.current.style.opacity = "1";
-                }
-              }
-
               // 4. Set map viewport bounds
               const safetyDelay = isFirstMapCreation ? 350 : 50;
               setTimeout(() => {
@@ -1140,18 +1120,7 @@ function MapContent() {
 
                 if (targetCoords.length > 0) {
                   userAdjustedMapView = true;
-                  if (userLatLng) {
-                    // 이벤트 상세 → 지도 진입: 내 위치 + 선택 행사 마커가 모두 보이도록 뷰를 맞춘다.
-                    const bothBounds = new kakao.maps.LatLngBounds();
-                    targetCoords.forEach((c) => bothBounds.extend(c));
-                    bothBounds.extend(userLatLng);
-                    map.setBounds(bothBounds);
-                    // 선택 행사 정보창 열기
-                    if (targetOverlays[0]) {
-                      targetOverlays[0].setMap(map);
-                      openOverlayRef.current = targetOverlays[0];
-                    }
-                  } else if (targetCoords.length === 1) {
+                  if (targetCoords.length === 1) {
                     map.setLevel(3);
                     setTimeout(() => {
                       if (!isMounted) return;
@@ -1237,7 +1206,66 @@ function MapContent() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [isScriptLoaded, loading, filteredEvents, focusedEventId, userLocation]);
+  }, [isScriptLoaded, loading, filteredEvents, focusedEventId]);
+
+  // 이벤트 상세로 새로 진입할 때마다 "둘 다 보기" 자동 맞춤을 다시 허용
+  useEffect(() => {
+    didFitUserBoundsRef.current = false;
+  }, [focusedEventId]);
+
+  // 내 위치(파란 점+방향 콘) 오버레이를 지도 재초기화와 분리해서 관리한다.
+  // → 위치가 뒤늦게 잡혀도 지도 뷰(사용자가 이동시킨 화면)를 리셋하지 않는다.
+  useEffect(() => {
+    if (!isApp) return;
+    if (!userLocation) return;
+    // 지도 초기화(마커 배치·포커스 중앙정렬)가 끝난 뒤에만 실행 →
+    // 메인 effect의 뷰 설정과 "둘 다 보기"가 경쟁(레이스)하지 않게 한다.
+    if (!isMapReady) return;
+    const map = mapRef.current;
+    const kakao = typeof window !== "undefined" ? window.kakao : null;
+    if (!map || !kakao?.maps) return;
+
+    const userLatLng = new kakao.maps.LatLng(userLocation.lat, userLocation.lng);
+
+    if (!userLocationOverlayRef.current) {
+      const dot = document.createElement("div");
+      dot.className = "od-user-loc";
+      dot.innerHTML = `<span class="od-user-loc-beam"></span><span class="od-user-loc-pulse"></span><span class="od-user-loc-dot"></span>`;
+      const userOverlay = new kakao.maps.CustomOverlay({
+        position: userLatLng,
+        content: dot,
+        xAnchor: 0.5,
+        yAnchor: 0.5,
+        zIndex: 16,
+        // 카카오는 일반 오버레이를 마커 레이어 "아래"에 그린다.
+        // clickable을 켜면 마커보다 위 레이어에 올라가 가려지지 않는다.
+        // (content는 pointer-events:none 이라 지도 조작을 막지 않음)
+        clickable: true,
+      });
+      userOverlay.setMap(map);
+      userLocationOverlayRef.current = userOverlay;
+      userLocationBeamRef.current = dot.querySelector(".od-user-loc-beam");
+      if (lastHeadingRef.current != null && userLocationBeamRef.current) {
+        userLocationBeamRef.current.style.transform = `rotate(${headingRotationRef.current}deg)`;
+        userLocationBeamRef.current.style.opacity = "1";
+      }
+    } else {
+      userLocationOverlayRef.current.setPosition(userLatLng);
+    }
+
+    // 이벤트 상세 진입(focusedEventId)일 때만: 위치가 처음 잡혔을 때 한 번,
+    // 내 위치 + 선택 행사 마커가 모두 보이도록 맞춘다. (일반 진입은 뷰를 건드리지 않음)
+    if (focusedEventId && !didFitUserBoundsRef.current) {
+      const targetMarker = markersRef.current.find((m: any) => m.getMap() !== null);
+      if (targetMarker) {
+        const bothBounds = new kakao.maps.LatLngBounds();
+        bothBounds.extend(targetMarker.getPosition());
+        bothBounds.extend(userLatLng);
+        map.setBounds(bothBounds);
+        didFitUserBoundsRef.current = true;
+      }
+    }
+  }, [isApp, userLocation, focusedEventId, isMapReady]);
 
   // Active ResizeObserver to trigger map relayout instantly when map container size changes in pixels
   useEffect(() => {
