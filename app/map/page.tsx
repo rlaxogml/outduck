@@ -1120,7 +1120,8 @@ function MapContent() {
                   content: dot,
                   xAnchor: 0.5,
                   yAnchor: 0.5,
-                  zIndex: 5,
+                  // 행사 마커(최대 15)보다 위, 정보 팝업(20)보다는 아래
+                  zIndex: 16,
                 });
                 userOverlay.setMap(map);
                 userLocationOverlayRef.current = userOverlay;
