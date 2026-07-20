@@ -1891,7 +1891,7 @@ function MapContent() {
             {isMapReady && filteredEvents.length > 0 && (
               <button
                 onClick={handleResetBounds}
-                className="absolute right-8 bottom-[calc(env(safe-area-inset-bottom,0px)_+_2.75rem)] md:bottom-4 md:right-4 z-40 flex h-10 items-center gap-2 rounded-xl border border-border bg-background/90 backdrop-blur-sm px-3.5 font-bold text-foreground shadow-xl hover:bg-accent hover:text-accent-foreground hover:border-border/80 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]"
+                className="absolute right-8 bottom-8 md:bottom-4 md:right-4 z-40 flex h-10 items-center gap-2 rounded-xl border border-border bg-background/90 backdrop-blur-sm px-3.5 font-bold text-foreground shadow-xl hover:bg-accent hover:text-accent-foreground hover:border-border/80 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]"
                 title="지도를 맞추어 모든 행사 한눈에 보기"
               >
                 <Maximize2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
