@@ -878,25 +878,28 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
                     <div className="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-500 mt-0.5 flex items-center justify-center">
                       <Link2 className="w-5 h-5 stroke-[2]" />
                     </div>
-                    <div className="flex-1 text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 leading-snug">
+                    <div className="flex-1 min-w-0 text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100 leading-snug">
                       <div className="font-bold mb-3 text-[16px] md:text-[18px] text-slate-900 dark:text-slate-100">링크</div>
                       <div className="flex flex-col gap-4">
                         {event.links
                           .filter(l => l.link_name.trim() && l.link_url.trim())
                           .map((link, idx) => (
-                            <div key={idx} className="flex items-center flex-wrap gap-x-1.5 gap-y-1 text-[16px] md:text-[18px]">
-                              <span className="font-bold text-slate-800 dark:text-slate-200 shrink-0">
+                            <div key={idx} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-[16px] md:text-[18px]">
+                              <span className="font-bold text-slate-800 dark:text-slate-200 break-words">
                                 {link.link_name}
+                                <span className="text-slate-400 dark:text-slate-500 font-normal"> :</span>
                               </span>
-                              <span className="text-slate-400 dark:text-slate-500 shrink-0">:</span>
-                              <a
-                                href={link.link_url.startsWith("http") ? link.link_url : `https://${link.link_url}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-500 dark:text-blue-400 hover:underline font-medium break-all text-[16px] md:text-[18px]"
-                              >
-                                {link.link_url.replace(/^(https?:\/\/)?(www\.)?/, "")}
-                              </a>
+                              <span className="flex-1 min-w-[12rem] max-w-full md:max-w-[26rem]">
+                                <a
+                                  href={link.link_url.startsWith("http") ? link.link_url : `https://${link.link_url}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title={link.link_url.replace(/^(https?:\/\/)?(www\.)?/, "")}
+                                  className="block truncate text-blue-500 dark:text-blue-400 hover:underline font-medium"
+                                >
+                                  {link.link_url.replace(/^(https?:\/\/)?(www\.)?/, "")}
+                                </a>
+                              </span>
                             </div>
                           ))
                         }
