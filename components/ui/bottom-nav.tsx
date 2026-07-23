@@ -42,10 +42,18 @@ export function BottomNav() {
         const isActive = activePath === item.path;
         const Icon = item.icon;
 
+        // 백스택을 홈 기준으로 얕게 유지한다.
+        // - 홈으로 이동(홈은 항상 루트) 또는 다른 탭에서 탭으로 이동 → replace(히스토리 안 쌓음)
+        // - 홈에서 다른 탭으로 "처음" 들어갈 때만 push
+        // 결과: 히스토리는 [홈, 현재탭] 최대 2칸 → 어느 탭에서든 뒤로가기 한 번이면 홈.
+        // (상세/세팅 서브탭 등 탭 위에 push된 화면은 기존대로 유지된다.)
+        const replaceHistory = item.path === "/" || pathname !== "/";
+
         return (
           <Link
             key={item.id}
             href={item.path}
+            replace={replaceHistory}
             onClick={(e) => {
               // 이미 이 탭에 있을 때 다시 누르면 → 최상단으로 스크롤 (유튜브식 재탭 동작)
               if (item.path === pathname) {
