@@ -28,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 type Tab = "notifications" | "advanced" | "inquiry";
 
 const TAB_LABELS: Record<Tab, string> = {
-  notifications: "알림",
+  notifications: "알림 설정",
   advanced: "주최자 설정",
   inquiry: "고객 문의",
 };
@@ -541,9 +541,9 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-background pb-12">
       <div className="mx-auto max-w-6xl w-full px-4 py-8 md:py-12">
-        {/* Mobile Header / Subheader */}
-        <div className="flex items-center gap-3.5 pb-4 mb-6 md:hidden px-2 border-b border-border/60">
-          {activeTab !== null ? (
+        {/* Mobile Subheader — 서브탭에서만 표시(뒤로가기 + 탭 제목). 메뉴 화면에선 헤더 없음. */}
+        {activeTab !== null && (
+          <div className="flex items-center gap-3.5 pb-4 mb-6 md:hidden px-2 border-b border-border/60">
             <button
               onClick={() => window.history.back()}
               className="p-1 -ml-1 text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
@@ -551,11 +551,11 @@ export default function SettingsPage() {
             >
               <ChevronLeft className="h-6 w-6" />
             </button>
-          ) : null}
-          <h2 className="text-xl font-bold tracking-tight">
-            {activeTab === null ? "설정" : TAB_LABELS[activeTab]}
-          </h2>
-        </div>
+            <h2 className="text-xl font-bold tracking-tight">
+              {TAB_LABELS[activeTab]}
+            </h2>
+          </div>
+        )}
 
         <div className="flex flex-col md:flex-row gap-8 items-start">
           {/* Sidebar */}
@@ -583,7 +583,7 @@ export default function SettingsPage() {
                 }`}
               >
                 <Bell className="h-5 w-5" />
-                알림
+                알림 설정
               </button>
 
               <button
@@ -591,7 +591,7 @@ export default function SettingsPage() {
                 className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
               >
                 <Megaphone className="h-5 w-5" />
-                제보하기
+                행사/채널 제보하기
               </button>
 
               <button
@@ -624,11 +624,6 @@ export default function SettingsPage() {
           <main className="flex-1 w-full min-w-0">
           {activeTab === null && (
             <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
-              <div>
-                <h3 className="text-xl md:text-2xl font-bold tracking-tight mb-1">계정 설정</h3>
-                <p className="text-muted-foreground text-xs md:text-sm">프로필 정보와 활동 내역을 확인합니다.</p>
-              </div>
-
               <div className="md:border md:border-slate-300 dark:md:border-slate-700 md:rounded-2xl md:bg-card md:shadow-sm p-0 md:p-6 space-y-6 md:space-y-8">
                 {/* Profile Image & Name */}
                 <div className="flex flex-row gap-4 md:gap-6 items-center">
@@ -676,18 +671,26 @@ export default function SettingsPage() {
 
                 {/* Activity Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-4">
-                  <div className="rounded-xl bg-muted/50 p-4 md:p-5 flex flex-col justify-center">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/subscriptions")}
+                    className="rounded-xl bg-muted/50 p-4 md:p-5 flex flex-col justify-center text-left transition-colors hover:bg-muted active:bg-muted cursor-pointer"
+                  >
                     <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">팔로우 중인 채널</div>
                     <div className="text-xl md:text-3xl font-bold text-foreground">
                       {favoritesCount.toLocaleString()}
                     </div>
-                  </div>
-                  <div className="rounded-xl bg-muted/50 p-4 md:p-5 flex flex-col justify-center">
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/bookmarks")}
+                    className="rounded-xl bg-muted/50 p-4 md:p-5 flex flex-col justify-center text-left transition-colors hover:bg-muted active:bg-muted cursor-pointer"
+                  >
                     <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">찜한 행사</div>
                     <div className="text-xl md:text-3xl font-bold text-foreground">
                       {bookmarksCount.toLocaleString()}
                     </div>
-                  </div>
+                  </button>
                 </div>
               </div>
 
@@ -726,8 +729,8 @@ export default function SettingsPage() {
 
               {/* Mobile-only menu list (Galaxy Settings / YouTube "내 페이지" style) */}
               <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 pt-2">
-                <SettingsMenuRow icon={Bell} label="알림" onClick={() => openTab("notifications")} />
-                <SettingsMenuRow icon={Megaphone} label="제보하기" onClick={() => router.push("/suggest")} />
+                <SettingsMenuRow icon={Bell} label="알림 설정" onClick={() => openTab("notifications")} />
+                <SettingsMenuRow icon={Megaphone} label="행사/채널 제보하기" onClick={() => router.push("/suggest")} />
                 <SettingsMenuRow icon={Settings2} label="주최자 설정" onClick={() => openTab("advanced")} />
                 <SettingsMenuRow icon={MessageSquare} label="고객 문의" onClick={() => openTab("inquiry")} />
               </div>
