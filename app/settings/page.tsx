@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { User } from "@supabase/supabase-js";
-import { Camera, Save, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, Check, ChevronsUpDown, MessageSquare, Pencil, Smartphone, Megaphone } from "lucide-react";
+import { Camera, Save, Bell, Settings2, Loader2, KeyRound, Trash2, Plus, AlertTriangle, Building2, Link as LinkIcon, ChevronLeft, ChevronRight, Check, ChevronsUpDown, MessageSquare, Pencil, Smartphone, Megaphone } from "lucide-react";
 import { Header } from "@/components/header";
 import { toast } from "sonner"; // Assuming sonner is available, or use alert
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -541,9 +541,9 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-background pb-12">
       <div className="mx-auto max-w-6xl w-full px-4 py-8 md:py-12">
-        {/* Mobile Subheader — 서브탭에서만 표시(뒤로가기 + 탭 제목). 메뉴 화면에선 헤더 없음. */}
-        {activeTab !== null && (
-          <div className="flex items-center gap-3.5 pb-4 mb-6 md:hidden px-2 border-b border-border/60">
+        {/* Mobile Header — 메뉴 화면은 "마이페이지", 서브탭은 뒤로가기 + 탭 제목. */}
+        <div className="flex items-center gap-3.5 pb-4 mb-6 md:hidden px-2 border-b border-border/60">
+          {activeTab !== null ? (
             <button
               onClick={() => window.history.back()}
               className="p-1 -ml-1 text-foreground hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
@@ -551,11 +551,11 @@ export default function SettingsPage() {
             >
               <ChevronLeft className="h-6 w-6" />
             </button>
-            <h2 className="text-xl font-bold tracking-tight">
-              {TAB_LABELS[activeTab]}
-            </h2>
-          </div>
-        )}
+          ) : null}
+          <h2 className="text-xl font-bold tracking-tight">
+            {activeTab === null ? "마이페이지" : TAB_LABELS[activeTab]}
+          </h2>
+        </div>
 
         <div className="flex flex-col md:flex-row gap-8 items-start">
           {/* Sidebar */}
@@ -674,22 +674,28 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => router.push("/subscriptions")}
-                    className="rounded-xl bg-muted/50 p-4 md:p-5 flex flex-col justify-center text-left transition-colors hover:bg-muted active:bg-muted cursor-pointer"
+                    className="rounded-xl bg-muted/50 p-4 md:p-5 flex items-center justify-between gap-2 text-left transition-colors hover:bg-muted active:bg-muted cursor-pointer"
                   >
-                    <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">팔로우 중인 채널</div>
-                    <div className="text-xl md:text-3xl font-bold text-foreground">
-                      {favoritesCount.toLocaleString()}
+                    <div className="min-w-0">
+                      <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">팔로우 중인 채널</div>
+                      <div className="text-xl md:text-3xl font-bold text-foreground">
+                        {favoritesCount.toLocaleString()}
+                      </div>
                     </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
                   </button>
                   <button
                     type="button"
                     onClick={() => router.push("/bookmarks")}
-                    className="rounded-xl bg-muted/50 p-4 md:p-5 flex flex-col justify-center text-left transition-colors hover:bg-muted active:bg-muted cursor-pointer"
+                    className="rounded-xl bg-muted/50 p-4 md:p-5 flex items-center justify-between gap-2 text-left transition-colors hover:bg-muted active:bg-muted cursor-pointer"
                   >
-                    <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">찜한 행사</div>
-                    <div className="text-xl md:text-3xl font-bold text-foreground">
-                      {bookmarksCount.toLocaleString()}
+                    <div className="min-w-0">
+                      <div className="text-xs md:text-sm text-muted-foreground mb-1 font-medium">찜한 행사</div>
+                      <div className="text-xl md:text-3xl font-bold text-foreground">
+                        {bookmarksCount.toLocaleString()}
+                      </div>
                     </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
                   </button>
                 </div>
               </div>
