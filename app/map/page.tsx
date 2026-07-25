@@ -244,8 +244,9 @@ function MapContent() {
     window.addEventListener("outduck:location-ready", startWatch);
 
     // 지도 진입 "뒤에" 권한을 늦게 허용하면 초기 위치 요청은 이미 실패한 상태다.
-    // (앱 재설치 후 권한 재승인 등) 아래 3경로로 자동 재시도해 재진입 없이도 점이 뜨게 한다.
-    // 재시도는 아직 위치를 못 잡았을 때(userLocationRef.current == null)만 의미가 있다.
+    // (앱 재설치 후 권한 재승인 등) 아래 두 이벤트 경로로 자동 재시도해 재진입 없이도 점이 뜨게 한다.
+    // 둘 다 실제 이벤트가 발생할 때만 동작하므로, 권한을 안 주는 유저에겐 재요청이 나가지 않는다.
+    // (재시도는 아직 위치를 못 잡았을 때(userLocationRef.current == null)만 의미가 있다.)
 
     // (1) Permissions API: 위치 권한이 granted로 바뀌면 즉시 재시작 (주로 Android WebView)
     let permStatus: PermissionStatus | null = null;
@@ -271,25 +272,12 @@ function MapContent() {
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    // (3) 안전망 폴링: Permissions API 미지원 기기/즉석 권한 승인 대응.
-    //     위치가 잡히거나 약 30초(10회) 지나면 중단 → 배터리 부담 최소화.
-    let retryCount = 0;
-    const retryTimer = setInterval(() => {
-      if (cancelled || userLocationRef.current || retryCount >= 10) {
-        clearInterval(retryTimer);
-        return;
-      }
-      retryCount += 1;
-      startWatch();
-    }, 3000);
-
     return () => {
       cancelled = true;
       window.removeEventListener("outduck:native-location", onNativeLocation as EventListener);
       window.removeEventListener("outduck:location-ready", startWatch);
       document.removeEventListener("visibilitychange", onVisible);
       permStatus?.removeEventListener("change", onPermChange);
-      clearInterval(retryTimer);
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
   }, [isApp]);
