@@ -242,10 +242,54 @@ function MapContent() {
     startWatch();
     // 구버전 앱(1.0.2)이 위치 권한을 방금 승인했을 때 웹 watch를 새로 시작 (fallback 경로)
     window.addEventListener("outduck:location-ready", startWatch);
+
+    // 지도 진입 "뒤에" 권한을 늦게 허용하면 초기 위치 요청은 이미 실패한 상태다.
+    // (앱 재설치 후 권한 재승인 등) 아래 3경로로 자동 재시도해 재진입 없이도 점이 뜨게 한다.
+    // 재시도는 아직 위치를 못 잡았을 때(userLocationRef.current == null)만 의미가 있다.
+
+    // (1) Permissions API: 위치 권한이 granted로 바뀌면 즉시 재시작 (주로 Android WebView)
+    let permStatus: PermissionStatus | null = null;
+    const onPermChange = () => {
+      if (permStatus && permStatus.state === "granted" && !userLocationRef.current) startWatch();
+    };
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: "geolocation" as PermissionName })
+        .then((status) => {
+          if (cancelled) return;
+          permStatus = status;
+          status.addEventListener("change", onPermChange);
+          // 진입 시 이미 granted인데 초기 요청이 실패해 위치가 없으면 한 번 더 시도
+          if (status.state === "granted" && !userLocationRef.current) startWatch();
+        })
+        .catch(() => {});
+    }
+
+    // (2) 앱이 포그라운드로 돌아오고 아직 위치가 없으면 재시작 (앱 전환/재진입 대응)
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && !userLocationRef.current) startWatch();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    // (3) 안전망 폴링: Permissions API 미지원 기기/즉석 권한 승인 대응.
+    //     위치가 잡히거나 약 30초(10회) 지나면 중단 → 배터리 부담 최소화.
+    let retryCount = 0;
+    const retryTimer = setInterval(() => {
+      if (cancelled || userLocationRef.current || retryCount >= 10) {
+        clearInterval(retryTimer);
+        return;
+      }
+      retryCount += 1;
+      startWatch();
+    }, 3000);
+
     return () => {
       cancelled = true;
       window.removeEventListener("outduck:native-location", onNativeLocation as EventListener);
       window.removeEventListener("outduck:location-ready", startWatch);
+      document.removeEventListener("visibilitychange", onVisible);
+      permStatus?.removeEventListener("change", onPermChange);
+      clearInterval(retryTimer);
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
   }, [isApp]);
