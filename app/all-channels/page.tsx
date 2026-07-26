@@ -72,8 +72,8 @@ export default function AllChannelsPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-background pb-12">
       <Header />
 
-      <div className="max-w-5xl mx-auto px-4 mt-6">
-        <div className="bg-white dark:bg-muted/10 border border-border/60 shadow-sm rounded-3xl p-6 md:p-8">
+      <div className="max-w-5xl mx-auto px-4 mt-4 md:mt-6">
+        <div className="p-0 md:bg-white md:dark:bg-muted/10 md:border md:border-border/60 md:shadow-sm md:rounded-3xl md:p-8">
           <h1 className="text-2xl font-bold mb-6 text-foreground">모든 채널</h1>
 
           {/* 검색창 */}

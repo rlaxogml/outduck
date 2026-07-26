@@ -34,6 +34,21 @@ const SUPABASE_PUBLIC_PREFIX =
  *   → 조회수와 무관하게 캐시 이그레스가 급감.
  * 외부 호스트 URL(cafe24 등)·이미 최적화된 src는 그대로 둔다(멱등).
  */
+/**
+ * 단일 이미지 URL을 next/image 최적화 경로로 바꾼다(아바타 등 <img>/AvatarImage용).
+ * Supabase 공개 URL만 변환하고, 외부(구글 아바타)·blob·이미 최적화된 값은 그대로 반환.
+ */
+export function optimizedImageSrc(
+  src: string | null | undefined,
+  width = 128,
+  quality = 75
+): string | undefined {
+  if (!src) return undefined;
+  if (SUPABASE_PUBLIC_PREFIX.length <= "/storage/v1/object/public/".length) return src;
+  if (!src.startsWith(SUPABASE_PUBLIC_PREFIX)) return src;
+  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality}`;
+}
+
 export function optimizeHtmlImages(
   htmlString: string | null | undefined,
   width = 1080,
