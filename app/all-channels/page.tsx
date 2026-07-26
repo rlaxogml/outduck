@@ -116,7 +116,7 @@ export default function AllChannelsPage() {
               해당하는 채널이 없습니다.
             </div>
           ) : (
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-x-4 gap-y-8">
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-x-4 gap-y-8 bg-white dark:bg-muted/10 -mx-4 px-4 py-6 md:mx-0 md:px-0 md:py-0 md:bg-transparent">
               {filteredChannels.map((channel) => (
                 <Link key={channel.id} href={`/channels/${channel.id}`} className="flex flex-col items-center group">
                   <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border border-border shadow-sm overflow-hidden bg-white mb-2 sm:mb-3 group-hover:scale-105 transition-transform flex items-center justify-center">

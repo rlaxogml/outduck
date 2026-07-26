@@ -1065,11 +1065,11 @@ export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: an
       const fetchCompanyLogo = async () => {
         const { data } = await supabase
           .from("companies")
-          .select("logo_url")
+          .select("profile_image_url")
           .eq("name", channel.company)
           .maybeSingle();
-        if (data?.logo_url) {
-          setCompanyLogo(data.logo_url);
+        if (data?.profile_image_url) {
+          setCompanyLogo(data.profile_image_url);
         }
       };
       fetchCompanyLogo();
