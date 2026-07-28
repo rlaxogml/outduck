@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, optimizedImageSrc } from "@/lib/utils";
 import useEmblaCarousel from "embla-carousel-react";
 import { EmblaCarouselType } from "embla-carousel";
 import Autoplay from "embla-carousel-autoplay";
@@ -217,7 +217,7 @@ export function PosterSlider({ initialPosters }: { initialPosters?: Poster[] }) 
                   !poster.image_url && fallbackGradients[index % fallbackGradients.length]
                 )}
                 style={{
-                  backgroundImage: poster.image_url ? `url(${poster.image_url})` : undefined,
+                  backgroundImage: poster.image_url ? `url("${optimizedImageSrc(poster.image_url, 1080)}")` : undefined,
                   transition: "transform 0.2s ease-out, opacity 0.2s ease-out, filter 0.2s ease-out",
                   transformOrigin: "center center",
                 }}
