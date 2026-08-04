@@ -174,3 +174,13 @@ body[data-scroll-locked],
   list-style-type: none !important;
 }
 
+
+/* 설정 메뉴 항목 부드러운 하이라이트 (진입 시 어떤 항목인지 알려주는 용도).
+   디지털처럼 딱딱 깜빡이지 않고 ease-in-out으로 은은하게 2번 맥동 후 사라진다. */
+@keyframes soft-highlight {
+  0%, 100% { background-color: transparent; }
+  40% { background-color: color-mix(in oklch, var(--primary) 14%, transparent); }
+}
+.animate-soft-highlight {
+  animation: soft-highlight 1.6s ease-in-out 2;
+}

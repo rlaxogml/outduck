@@ -44,15 +44,23 @@ function SettingsMenuRow({
   icon: Icon,
   label,
   onClick,
+  id,
+  highlight,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   onClick: () => void;
+  id?: string;
+  highlight?: boolean;
 }) {
   return (
     <button
+      id={id}
       onClick={onClick}
-      className="w-full flex items-center gap-3 py-3.5 text-sm font-semibold hover:bg-muted/50 transition-colors"
+      className={cn(
+        "w-full flex items-center gap-3 py-3.5 px-2 -mx-2 rounded-xl text-sm font-semibold transition-colors",
+        highlight ? "animate-soft-highlight" : "hover:bg-muted/50",
+      )}
     >
       <Icon className="h-5 w-5 text-muted-foreground" />
       <span className="flex-1 text-left">{label}</span>
@@ -80,6 +88,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(() => (settingsCache ? false : true));
   const [activeTab, setActiveTab] = useState<Tab | null>(null);
   const [isAppWebView, setIsAppWebView] = useState(false);
+  // ?highlight=<key>로 진입하면 해당 메뉴 항목을 부드럽게 강조(스크롤+맥동). 위치 학습용.
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Account state
@@ -168,6 +178,30 @@ export default function SettingsPage() {
       }
       setIsAppWebView(!!(window as any).ReactNativeWebView);
     }
+  }, []);
+
+  // ?highlight=<key> 진입 처리: 해당 항목으로 스크롤 + 부드러운 하이라이트, 이후 파라미터 제거.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const key = params.get("highlight");
+    if (!key) return;
+
+    setHighlightKey(key);
+    // 재진입/새로고침 시 다시 강조되지 않도록 URL에서 highlight만 제거(다른 파라미터는 유지).
+    params.delete("highlight");
+    const newUrl = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname;
+    window.history.replaceState(null, "", newUrl);
+
+    const scrollTimer = setTimeout(() => {
+      document.getElementById(`settings-row-${key}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 350);
+    // 애니메이션(1.6s x2) 종료 후 강조 상태 해제
+    const clearTimer = setTimeout(() => setHighlightKey(null), 3800);
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(clearTimer);
+    };
   }, []);
 
   // 서브탭을 URL(?tab=)에 반영해 히스토리에 쌓는다 → 하드웨어/브라우저 뒤로가기로 메뉴(설정 첫 화면)로 돌아온다.
@@ -686,7 +720,7 @@ export default function SettingsPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => router.push("/bookmarks")}
+                    onClick={() => router.push("/subscriptions?tab=bookmarked")}
                     className="rounded-xl bg-muted/50 p-4 md:p-5 flex items-center justify-between gap-2 text-left transition-colors hover:bg-muted active:bg-muted cursor-pointer"
                   >
                     <div className="min-w-0">
@@ -735,10 +769,10 @@ export default function SettingsPage() {
 
               {/* Mobile-only menu list (Galaxy Settings / YouTube "내 페이지" style) */}
               <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60 pt-2">
-                <SettingsMenuRow icon={Bell} label="알림 설정" onClick={() => openTab("notifications")} />
-                <SettingsMenuRow icon={Megaphone} label="행사/채널 제보하기" onClick={() => router.push("/suggest")} />
-                <SettingsMenuRow icon={Settings2} label="주최자 설정" onClick={() => openTab("advanced")} />
-                <SettingsMenuRow icon={MessageSquare} label="고객 문의" onClick={() => openTab("inquiry")} />
+                <SettingsMenuRow id="settings-row-notifications" highlight={highlightKey === "notifications"} icon={Bell} label="알림 설정" onClick={() => openTab("notifications")} />
+                <SettingsMenuRow id="settings-row-suggest" highlight={highlightKey === "suggest"} icon={Megaphone} label="행사/채널 제보하기" onClick={() => router.push("/suggest")} />
+                <SettingsMenuRow id="settings-row-advanced" highlight={highlightKey === "advanced"} icon={Settings2} label="주최자 설정" onClick={() => openTab("advanced")} />
+                <SettingsMenuRow id="settings-row-inquiry" highlight={highlightKey === "inquiry"} icon={MessageSquare} label="고객 문의" onClick={() => openTab("inquiry")} />
               </div>
 
               {/* Danger Zone — 계정 탈퇴는 항상 맨 아래(고객 문의 밑)에 배치 */}

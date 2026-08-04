@@ -1021,7 +1021,7 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
               className={getNavStyle("/subscriptions").button}
             >
               <Star className={getNavStyle("/subscriptions").icon} />
-              <span className={getNavStyle("/subscriptions").textClassName}>팔로우 채널</span>
+              <span className={getNavStyle("/subscriptions").textClassName}>팔로우/찜</span>
             </Link>
             <span className="text-border shrink-0 select-none">|</span>
             <Link
@@ -1090,7 +1090,7 @@ export function Header({ activeCategory, onCategoryChange }: HeaderProps) {
                     <span className="text-sm font-bold text-foreground">팔로우 채널</span>
                   </Link>
                   <Link
-                    href="/bookmarks"
+                    href="/subscriptions?tab=bookmarked"
                     onClick={() => setIsDrawerOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-slate-50 dark:bg-slate-900/50 hover:bg-muted transition-all"
                   >
