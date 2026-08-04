@@ -38,7 +38,9 @@ export function HomeSuggestPrompt() {
 
   return (
     <div className="mt-3 mb-1 flex items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/40 px-3.5 py-3 animate-in fade-in slide-in-from-top-1 duration-300">
-      <p className="min-w-0 flex-1 break-keep text-[13px] font-medium leading-snug text-foreground">
+      {/* 아이콘은 인라인 유지, 줄바꿈된 아래 줄은 텍스트 시작 위치에 맞춰 들여쓰기(행잉 인덴트).
+          아이콘 14px + 여백 4px = 18px */}
+      <p className="min-w-0 flex-1 break-keep pl-[18px] -indent-[18px] text-[13px] font-medium leading-snug text-foreground">
         <Megaphone className="mr-1 inline-block h-[14px] w-[14px] align-[-0.125em] text-primary" />
         찾는 행사가 없으면 운영자에게 제보해주세요
       </p>
