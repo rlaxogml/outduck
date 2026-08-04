@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PosterSlider } from "@/components/poster-slider";
 import { OrganizerSection } from "@/components/organizer-section";
 import { FavoriteChannels } from "@/components/favorite-channels";
+import { HomeSuggestPrompt } from "@/components/home-suggest-prompt";
 import { Building2, ArrowRight, UserCircle } from "lucide-react";
 import { trackPerformance } from "@/lib/performance";
 
@@ -1187,6 +1188,9 @@ export function HomeClient({
             user={user}
             initialFavorites={userFavorites}
           />
+
+          {/* 관심 채널 아래 제보 안내 (닫으면 앱 세션 동안 숨김) */}
+          <HomeSuggestPrompt />
 
           {/* Tabs - also serves as the scroll-restoration anchor point, since it's
               always rendered right after the banners/favorite-channels zone */}
