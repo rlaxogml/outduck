@@ -37,10 +37,8 @@ export function HomeSuggestPrompt() {
   if (!ready || !visible) return null;
 
   return (
-    <div className="mt-3 mb-1 flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/40 px-3.5 py-3 animate-in fade-in slide-in-from-top-1 duration-300">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <Megaphone className="h-[18px] w-[18px]" />
-      </div>
+    <div className="mt-3 mb-1 flex items-start gap-2 rounded-2xl border border-border/60 bg-muted/40 px-3.5 py-3 animate-in fade-in slide-in-from-top-1 duration-300">
+      <Megaphone className="mt-0.5 h-[15px] w-[15px] shrink-0 text-primary" />
 
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-medium leading-snug text-foreground">
