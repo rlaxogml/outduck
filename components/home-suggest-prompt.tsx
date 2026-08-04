@@ -38,7 +38,7 @@ export function HomeSuggestPrompt() {
 
   return (
     <div className="mt-3 mb-1 flex items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/40 px-3.5 py-3 animate-in fade-in slide-in-from-top-1 duration-300">
-      <p className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-foreground">
+      <p className="min-w-0 flex-1 break-keep text-[13px] font-medium leading-snug text-foreground">
         <Megaphone className="mr-1 inline-block h-[14px] w-[14px] align-[-0.125em] text-primary" />
         찾는 행사가 없으면 운영자에게 제보해주세요
       </p>
