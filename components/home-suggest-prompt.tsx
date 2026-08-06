@@ -45,8 +45,10 @@ export function HomeSuggestPrompt() {
         찾는 행사가 없으면 운영자에게 제보해주세요
       </p>
 
+      {/* /suggest 직행 대신 my페이지(설정)로 보내고 "행사/채널 제보하기" 항목을 하이라이트.
+          → 이용자가 다음엔 my페이지에서 제보하면 된다는 걸 학습하도록. (하이라이트는 settings에서 ?highlight로 처리) */}
       <Link
-        href="/suggest"
+        href="/settings?highlight=suggest"
         className="flex shrink-0 items-center gap-1 rounded-xl bg-primary px-3 py-2 text-[12px] font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-95"
       >
         제보하기
