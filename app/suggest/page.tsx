@@ -17,6 +17,7 @@ import type { User } from "@supabase/supabase-js";
 import { trackPerformance } from "@/lib/performance";
 import { ChannelProposalForm } from "@/components/suggest/channel-proposal-form";
 import { EventProposalForm } from "@/components/suggest/event-proposal-form";
+import { PendingProposals } from "@/components/suggest/pending-proposals";
 
 export default function SuggestPage() {
   const router = useRouter();
@@ -85,12 +86,7 @@ export default function SuggestPage() {
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 pt-6 sm:pt-12">
         {mode === "selection" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="text-center space-y-2">
-              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">제안 / 제보하기</h1>
-              <p className="text-muted-foreground text-lg">아웃덕 플랫폼을 함께 만들어갈 제보 및 제안을 선택해 주세요.</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 sm:gap-6 mt-12">
+            <div className="grid grid-cols-2 gap-4 sm:gap-6">
               {/* Event Suggestion */}
               <button
                 onClick={() => setMode("event")}
@@ -119,6 +115,9 @@ export default function SuggestPage() {
                 </p>
               </button>
             </div>
+
+            {/* 현재 등록 대기중인 제보 리스트 (중복 제보 방지 + 본인 제보 접수 확인) */}
+            <PendingProposals />
           </div>
         )}
 
