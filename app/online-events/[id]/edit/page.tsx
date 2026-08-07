@@ -226,7 +226,30 @@ export default function EditOnlineEventPage() {
       }
     };
 
-    initPage();
+    // 간헐적 auth/네트워크 hang으로 initPage가 안 끝나면 무한 스피너가 된다.
+    // (auth 락 데드락은 client.ts noopLock으로 대응했으나, 토큰 refresh 등 네트워크 잔여 hang 방어)
+    // 일정 시간 내 안 끝나면 자동으로 한 번 새로고침(수동 새로고침이 해결하던 걸 자동화),
+    // 그래도 안 되면(재로드 후에도 hang) 스피너를 걷고 안내한다. 세션당 1회만 재로드해 루프 방지.
+    const RELOAD_FLAG = "outduck:edit-init-reloaded";
+    let done = false;
+    const hangTimer = setTimeout(() => {
+      if (done) return;
+      if (!sessionStorage.getItem(RELOAD_FLAG)) {
+        sessionStorage.setItem(RELOAD_FLAG, "1");
+        window.location.reload();
+      } else {
+        setIsLoading(false);
+        toast.error("정보를 불러오지 못했습니다. 새로고침 해주세요.");
+      }
+    }, 10000);
+
+    initPage().finally(() => {
+      done = true;
+      clearTimeout(hangTimer);
+      sessionStorage.removeItem(RELOAD_FLAG);
+    });
+
+    return () => clearTimeout(hangTimer);
   }, [eventId, router]);
 
   // Search channels for co-hosts

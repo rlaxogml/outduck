@@ -201,13 +201,15 @@ export default function RichTextEditor({
     }
   }), [toolbarId]);
 
-  const quillFormats = [
+  // react-quill은 formats/modules 레퍼런스가 바뀌면 에디터를 재구성한다.
+  // 매 렌더마다 새 배열이면 붙여넣기(onChange→부모 리렌더)마다 재빌드돼 스크롤이 튀므로 메모이즈한다.
+  const quillFormats = useMemo(() => [
     'size',
     'align',
     'bold', 'italic', 'underline', 'strike', 'blockquote',
     'list', 'bullet', 'indent',
     'link', 'image'
-  ];
+  ], []);
 
   // --- Quill Editor Image Close Button Overlay Logic ---
   const updateFloatingButtons = () => {
