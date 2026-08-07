@@ -28,7 +28,6 @@ interface ProposalsTabProps {
 }
 
 export function ProposalsTab({ adminUserId }: ProposalsTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<"channels" | "events">("channels");
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
   
   const [channelProposals, setChannelProposals] = useState<any[]>([]);
@@ -463,29 +462,16 @@ export function ProposalsTab({ adminUserId }: ProposalsTabProps) {
       
       {/* Filters and Sub Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-4">
-        <div className="flex bg-muted p-1.5 rounded-2xl border border-border/50 max-w-xs select-none">
-          <button
-            onClick={() => setActiveSubTab("channels")}
-            className={`flex-1 px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              activeSubTab === "channels"
-                ? "bg-background text-primary shadow-xs border border-border/20"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
+        <div className="flex items-center gap-3 text-xs font-bold text-muted-foreground select-none">
+          <span className="flex items-center gap-1.5">
             <Tv2 className="w-3.5 h-3.5" />
-            채널 제안 ({channelProposals.filter(cp => cp.status === "pending").length})
-          </button>
-          <button
-            onClick={() => setActiveSubTab("events")}
-            className={`flex-1 px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              activeSubTab === "events"
-                ? "bg-background text-primary shadow-xs border border-border/20"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
+            채널 제안 {channelProposals.filter(cp => cp.status === "pending").length}
+          </span>
+          <span className="text-border">·</span>
+          <span className="flex items-center gap-1.5">
             <CalendarDays className="w-3.5 h-3.5" />
-            행사 제보 ({eventProposals.filter(ep => ep.status === "pending").length})
-          </button>
+            행사 제보 {eventProposals.filter(ep => ep.status === "pending").length}
+          </span>
         </div>
 
         <div className="flex items-center gap-2 bg-muted/30 p-1.5 rounded-xl border border-border/50 select-none">
@@ -513,18 +499,18 @@ export function ProposalsTab({ adminUserId }: ProposalsTabProps) {
           <Loader2 className="w-10 h-10 animate-spin mb-4 text-primary opacity-60" />
           <p>데이터 로딩 중...</p>
         </div>
-      ) : activeSubTab === "channels" ? (
+      ) : (filteredChannels.length === 0 && filteredEvents.length === 0) ? (
         // ==========================================
-        // Channels Proposals List
+        // Combined empty state (채널 제안 + 행사 제보)
         // ==========================================
-        filteredChannels.length === 0 ? (
-          <div className="py-16 border-2 border-dashed border-border rounded-3xl bg-background/50 flex flex-col items-center justify-center text-center">
-            <Tv2 className="w-10 h-10 text-muted-foreground/30 mb-3" />
-            <h3 className="text-sm font-bold text-muted-foreground">채널 증설 제안 건이 없습니다.</h3>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {filteredChannels.map((req) => (
+        <div className="py-16 border-2 border-dashed border-border rounded-3xl bg-background/50 flex flex-col items-center justify-center text-center">
+          <CalendarDays className="w-10 h-10 text-muted-foreground/30 mb-3" />
+          <h3 className="text-sm font-bold text-muted-foreground">제보/제안 건이 없습니다.</h3>
+        </div>
+      ) : (
+        // 채널 제안 + 행사 제보를 한 그리드에 함께 표시
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {filteredChannels.map((req) => (
               <div key={req.id} className="group bg-background border border-border rounded-3xl p-5 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col relative overflow-hidden">
                 <div className={`absolute top-0 left-0 right-0 h-1 ${req.status === "approved" ? "bg-green-500" : req.status === "rejected" ? "bg-destructive" : "bg-amber-400"}`} />
                 <div className="flex gap-4 mb-4">
@@ -551,7 +537,7 @@ export function ProposalsTab({ adminUserId }: ProposalsTabProps) {
                     </div>
                     <p className="text-xs text-muted-foreground flex items-center gap-2">
                       <span className="bg-primary/5 text-primary border border-primary/10 rounded px-1.5 py-0.5 text-[10px] font-bold">
-                        {req.type === "youtuber" ? "유튜버" : req.type === "vtuber" ? "버튜버" : req.type === "festival" ? "축제" : "게임"}
+                        {req.type === "youtuber" ? "유튜버" : req.type === "vtuber" ? "버튜버" : req.type === "festival" ? "행사" : "게임"}
                       </span>
                       <span>제안자: {req.profiles?.nickname || "알 수 없음"}</span>
                     </p>
@@ -589,20 +575,7 @@ export function ProposalsTab({ adminUserId }: ProposalsTabProps) {
                 )}
               </div>
             ))}
-          </div>
-        )
-      ) : (
-        // ==========================================
-        // Events Proposals List
-        // ==========================================
-        filteredEvents.length === 0 ? (
-          <div className="py-16 border-2 border-dashed border-border rounded-3xl bg-background/50 flex flex-col items-center justify-center text-center">
-            <CalendarDays className="w-10 h-10 text-muted-foreground/30 mb-3" />
-            <h3 className="text-sm font-bold text-muted-foreground">행사 제보 건이 없습니다.</h3>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {filteredEvents.map((req) => {
+          {filteredEvents.map((req) => {
               // Check if connected to an unapproved channel proposal
               const isBlockedByChannel = req.channel_proposal_id && 
                 req.channel_proposals?.status !== "approved";
@@ -701,7 +674,6 @@ export function ProposalsTab({ adminUserId }: ProposalsTabProps) {
               );
             })}
           </div>
-        )
       )}
 
       {/* ==========================================
@@ -739,7 +711,7 @@ export function ProposalsTab({ adminUserId }: ProposalsTabProps) {
                   <option value="game">게임</option>
                   <option value="youtuber">유튜버</option>
                   <option value="vtuber">버튜버</option>
-                  <option value="festival">축제 / 행사</option>
+                  <option value="festival">행사</option>
                 </select>
               </div>
 
