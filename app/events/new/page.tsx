@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { compressImage } from "@/lib/image-compress";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,9 +95,6 @@ function NewEventPageContent() {
     handleImageUpload,
     deletedPaths: mainDeletedPaths,
   } = useEventImageUpload({ delayDelete: true });
-  const [supportImages, setSupportImages] = useState<{ id?: number; url: string; path?: string }[]>([]);
-  const [isUploadingSupport, setIsUploadingSupport] = useState(false);
-  const [supportImagesToDelete, setSupportImagesToDelete] = useState<string[]>([]);
   const [hostId, setHostId] = useState<string>("");
   const [coHosts, setCoHosts] = useState<Channel[]>([]);
 
@@ -468,60 +464,6 @@ function NewEventPageContent() {
     setCoHosts(prev => prev.filter(c => c.id !== id));
   };
 
-  const handleSupportImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const imageFiles = Array.from(files).filter(file => file.type.startsWith("image/"));
-    if (imageFiles.length === 0) {
-      toast.error("이미지 파일만 업로드 가능합니다.");
-      return;
-    }
-
-    setIsUploadingSupport(true);
-    try {
-      const uploadedList: { url: string; path: string }[] = [];
-      for (const file of imageFiles) {
-        const fileExt = file.name.split(".").pop();
-        const randomPart = Math.random().toString(36).substring(2);
-        const fileName = `${randomPart}-${Date.now()}.${fileExt}`;
-        const filePath = `images/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("event_images")
-          .upload(filePath, await compressImage(file));
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from("event_images")
-          .getPublicUrl(filePath);
-
-        uploadedList.push({
-          url: publicUrl,
-          path: filePath
-        });
-      }
-
-      setSupportImages(prev => [...prev, ...uploadedList]);
-      toast.success(`${uploadedList.length}장의 이미지가 업로드되었습니다.`);
-    } catch (err: any) {
-      console.error("Support images upload error:", err);
-      toast.error("이미지 업로드에 실패했습니다: " + (err.message || "알 수 없는 오류"));
-    } finally {
-      setIsUploadingSupport(false);
-    }
-  };
-
-  const handleRemoveSupportImage = (idx: number) => {
-    const img = supportImages[idx];
-    const path = img.path;
-    if (path) {
-      setSupportImagesToDelete(prev => [...prev, path]);
-    }
-    setSupportImages(prev => prev.filter((_, i) => i !== idx));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -712,18 +654,8 @@ function NewEventPageContent() {
           if (scheduleError) throw scheduleError;
         }
 
-        // Insert support images into event_images table
-        if (supportImages.length > 0) {
-          const imagesToInsert = supportImages.map((img, idx) => ({
-            event_id: baseEvent.id,
-            image_url: img.url,
-            order: idx
-          }));
-          const { error: imgError } = await supabase.from("event_images").insert(imagesToInsert);
-        }
-
         // Delete delayed images from storage since the event was registered successfully!
-        const pathsToDelete = [...mainDeletedPaths, ...supportImagesToDelete];
+        const pathsToDelete = [...mainDeletedPaths];
         if (pathsToDelete.length > 0) {
           try {
             await supabase.storage.from("event_images").remove(pathsToDelete);
@@ -811,19 +743,8 @@ function NewEventPageContent() {
 
         if (eventError) throw eventError;
 
-        // Insert support images into event_images table
-        if (supportImages.length > 0) {
-          const imagesToInsert = supportImages.map((img, idx) => ({
-            event_id: baseEvent.id,
-            image_url: img.url,
-            order: idx
-          }));
-          const { error: imgError } = await supabase.from("event_images").insert(imagesToInsert);
-          if (imgError) throw imgError;
-        }
-
         // Delete delayed images from storage since the event was registered successfully!
-        const pathsToDelete = [...mainDeletedPaths, ...supportImagesToDelete];
+        const pathsToDelete = [...mainDeletedPaths];
         if (pathsToDelete.length > 0) {
           try {
             await supabase.storage.from("event_images").remove(pathsToDelete);
@@ -1187,46 +1108,6 @@ function NewEventPageContent() {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold">행사 사진 (추가 이미지 여러 장)</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {supportImages.map((img, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-border group">
-                    <img src={img.url} alt={`Support preview ${idx + 1}`} className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSupportImage(idx)}
-                      className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                    <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/40 text-white text-[10px] font-semibold rounded-md backdrop-blur-sm">
-                      {idx + 1}
-                    </div>
-                  </div>
-                ))}
-
-                {isUploadingSupport ? (
-                  <div className="flex flex-col items-center justify-center aspect-square rounded-2xl border-2 border-dashed border-border/80 bg-muted/20">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    <span className="text-xs text-muted-foreground mt-2 font-medium">업로드 중...</span>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center aspect-square rounded-2xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group">
-                    <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors mb-1" />
-                    <span className="text-xs font-semibold text-muted-foreground group-hover:text-primary transition-colors text-center px-2">사진 추가</span>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      multiple
-                      onChange={handleSupportImagesUpload}
-                    />
-                  </label>
-                )}
-              </div>
-              <p className="text-[11px] text-muted-foreground">여러 장의 이미지를 직접 업로드할 수 있으며, 상세 페이지에서 이 순서대로 표시됩니다.</p>
-            </div>
           </div>
 
           {/* Schedule Info */}

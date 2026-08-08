@@ -950,34 +950,6 @@ export function EventDetailClient({ initialEvent }: { initialEvent: EventDetail 
         </div>
       )}
 
-      {/* 4. Additional Images Card */}
-      {activeTab === 'main' && event.images && event.images.length > 0 && (
-        <div className="mx-0 md:mx-auto max-w-2xl md:max-w-6xl bg-background md:rounded-3xl py-8 border-y md:border border-border/60 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-12 overflow-hidden animate-in fade-in duration-300">
-          <h2 className="text-[17px] md:text-xl font-bold mb-6 px-5 md:px-10 text-foreground flex items-center gap-2">
-            <span className="w-1.5 h-5 bg-primary rounded-full inline-block"></span>
-            행사 사진
-          </h2>
-          <div className="flex flex-nowrap overflow-x-auto pb-4 snap-x">
-            {event.images.map((img, i) => (
-              <div 
-                key={img.id} 
-                className={`shrink-0 snap-start ${i === 0 ? 'pl-5 md:pl-10' : 'pl-4'} ${i === event.images.length - 1 ? 'pr-5 md:pr-10' : ''}`}
-              >
-                <div className="w-56 md:w-72 aspect-square bg-muted rounded-2xl overflow-hidden shadow-sm border border-border/40">
-                  <CoverImage
-                    src={img.image_url}
-                    alt="행사 이미지"
-                    className="w-full h-full cursor-pointer"
-                    imgClassName="transition-transform hover:scale-105"
-                    sizes="(max-width: 768px) 224px, 288px"
-                    onClick={() => setSelectedImage(img.image_url)}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* 5. Comments Section */}
       {activeTab === 'main' && (
