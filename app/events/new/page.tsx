@@ -974,105 +974,6 @@ function NewEventPageContent() {
             </div>
 
             <div className="space-y-3">
-              <Label htmlFor="description" className="text-sm font-semibold">설명</Label>
-              <RichTextEditor
-                value={description}
-                onChange={setDescription}
-                placeholder="행사에 대한 상세 정보를 입력해주세요"
-              />
-            </div>
-
-            {eventType === "offline" && (
-              <div className="space-y-3">
-                <Label className="text-sm font-semibold">장소 <span className="text-destructive">*</span></Label>
-                
-                <div className="flex flex-col gap-3">
-                  {locations.length > 0 && (
-                    <div className="flex flex-col gap-2">
-                      {locations.map((loc, idx) => (
-                        <div key={idx} className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-xl border border-border">
-                          <span className="text-sm">{loc.location}</span>
-                          <button type="button" onClick={() => setLocations(prev => prev.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between mb-2 mt-2">
-                    <div className="flex items-center gap-2" onClick={() => setIsManualLocation(!isManualLocation)}>
-                      <div className={`w-5 h-5 rounded-[4px] border-2 flex items-center justify-center transition-colors cursor-pointer
-                        ${isManualLocation ? "bg-primary border-primary text-primary-foreground" : "bg-background border-foreground/40 hover:border-foreground"}`}
-                      >
-                        {isManualLocation && <Check className="w-3.5 h-3.5 stroke-[4]" />}
-                      </div>
-                      <Label className="text-xs font-bold cursor-pointer select-none">직접 입력 (지도에 표시되지 않음)</Label>
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 flex gap-2">
-                    <div className="relative flex-1">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder={isManualLocation ? "장소 직접 입력 (예: 전국 GS25)" : "장소 검색 (카카오맵)"}
-                        className="pl-10 h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
-                        value={locationInput}
-                        onChange={(e) => setLocationInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            if (locationInput.trim()) {
-                              setLocations(prev => [...prev, { location: locationInput.trim(), latitude: null, longitude: null }]);
-                              setLocationInput("");
-                              toast.success("장소가 등록 되었습니다");
-                            }
-                          }
-                        }}
-                        autoComplete="off"
-                      />
-
-                      {!isManualLocation && isSearchingAddr && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        </div>
-                      )}
-
-                      {!isManualLocation && addrResults.length > 0 && (
-                        <div className="absolute z-50 w-full mt-2 bg-white dark:bg-background border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto overflow-x-hidden animate-in fade-in zoom-in-95 duration-200 divide-y divide-border/40">
-                          {addrResults.map((item, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => selectAddress(item.placeName || item.address, item.lat, item.lng)}
-                              className="w-full text-left px-4 py-3 hover:bg-muted transition-colors text-sm flex flex-col gap-0.5 select-none"
-                            >
-                              <span className="font-semibold text-foreground">{item.placeName}</span>
-                              <span className="text-xs text-muted-foreground">{item.address}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <Button 
-                      type="button" 
-                      onClick={() => {
-                        if (locationInput.trim()) {
-                          setLocations(prev => [...prev, { location: locationInput.trim(), latitude: null, longitude: null }]);
-                          setLocationInput("");
-                          toast.success("장소가 등록 되었습니다");
-                        }
-                      }}
-                      className="h-12 px-6 rounded-xl font-bold bg-purple-600 hover:bg-purple-700 text-white transition-all shrink-0 shadow-sm hover:shadow-md active:scale-95"
-                    >
-                      추가
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-3">
               <Label className="text-sm font-semibold">대표 이미지</Label>
               <div className="relative group">
                 {imageUrl ? (
@@ -1406,6 +1307,99 @@ function NewEventPageContent() {
             </div>
           )}
 
+          {/* Location */}
+          {eventType === "offline" && (
+            <div className="bg-background rounded-2xl p-6 border border-border shadow-sm space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1 h-4 bg-primary rounded-full" />
+                <h2 className="font-bold text-lg">장소 <span className="text-destructive text-base">*</span></h2>
+              </div>
+              <div className="flex flex-col gap-3">
+                {locations.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {locations.map((loc, idx) => (
+                      <div key={idx} className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-xl border border-border">
+                        <span className="text-sm">{loc.location}</span>
+                        <button type="button" onClick={() => setLocations(prev => prev.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between mb-2 mt-2">
+                  <div className="flex items-center gap-2" onClick={() => setIsManualLocation(!isManualLocation)}>
+                    <div className={`w-5 h-5 rounded-[4px] border-2 flex items-center justify-center transition-colors cursor-pointer
+                      ${isManualLocation ? "bg-primary border-primary text-primary-foreground" : "bg-background border-foreground/40 hover:border-foreground"}`}
+                    >
+                      {isManualLocation && <Check className="w-3.5 h-3.5 stroke-[4]" />}
+                    </div>
+                    <Label className="text-xs font-bold cursor-pointer select-none">직접 입력 (지도에 표시되지 않음)</Label>
+                  </div>
+                </div>
+
+                <div className="relative z-10 flex gap-2">
+                  <div className="relative flex-1">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder={isManualLocation ? "장소 직접 입력 (예: 전국 GS25)" : "장소 검색 (카카오맵)"}
+                      className="pl-10 h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
+                      value={locationInput}
+                      onChange={(e) => setLocationInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (locationInput.trim()) {
+                            setLocations(prev => [...prev, { location: locationInput.trim(), latitude: null, longitude: null }]);
+                            setLocationInput("");
+                            toast.success("장소가 등록 되었습니다");
+                          }
+                        }
+                      }}
+                      autoComplete="off"
+                    />
+
+                    {!isManualLocation && isSearchingAddr && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+
+                    {!isManualLocation && addrResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-2 bg-white dark:bg-background border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto overflow-x-hidden animate-in fade-in zoom-in-95 duration-200 divide-y divide-border/40">
+                        {addrResults.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => selectAddress(item.placeName || item.address, item.lat, item.lng)}
+                            className="w-full text-left px-4 py-3 hover:bg-muted transition-colors text-sm flex flex-col gap-0.5 select-none"
+                          >
+                            <span className="font-semibold text-foreground">{item.placeName}</span>
+                            <span className="text-xs text-muted-foreground">{item.address}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (locationInput.trim()) {
+                        setLocations(prev => [...prev, { location: locationInput.trim(), latitude: null, longitude: null }]);
+                        setLocationInput("");
+                        toast.success("장소가 등록 되었습니다");
+                      }
+                    }}
+                    className="h-12 px-6 rounded-xl font-bold bg-purple-600 hover:bg-purple-700 text-white transition-all shrink-0 shadow-sm hover:shadow-md active:scale-95"
+                  >
+                    추가
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Admission Info */}
           {eventType === "offline" && (
             <div className="bg-background rounded-2xl p-6 border border-border shadow-sm space-y-4">
@@ -1732,6 +1726,19 @@ function NewEventPageContent() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Description */}
+          <div className="bg-background rounded-2xl p-6 border border-border shadow-sm space-y-6">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-1 h-4 bg-primary rounded-full" />
+              <h2 className="font-bold text-lg">설명</h2>
+            </div>
+            <RichTextEditor
+              value={description}
+              onChange={setDescription}
+              placeholder="행사에 대한 상세 정보를 입력해주세요"
+            />
           </div>
 
           {/* Submit Button */}
