@@ -580,15 +580,6 @@ export default function EditOnlineEventPage() {
             </div>
 
             <div className="space-y-3">
-              <Label htmlFor="description" className="text-sm font-semibold">설명</Label>
-              <RichTextEditor
-                value={description}
-                onChange={setDescription}
-                placeholder="행사에 대한 상세 정보를 입력해주세요"
-              />
-            </div>
-
-            <div className="space-y-3">
               <Label className="text-sm font-semibold">대표 이미지</Label>
               <div className="relative group">
                 {imageUrl ? (
@@ -763,6 +754,19 @@ export default function EditOnlineEventPage() {
                 <Plus className="w-4 h-4 mr-2" /> 관련 링크 추가
               </Button>
             </div>
+          </div>
+
+          {/* Description */}
+          <div className="bg-background rounded-2xl p-6 border border-border shadow-sm space-y-6">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-1 h-4 bg-primary rounded-full" />
+              <h2 className="font-bold text-lg">설명</h2>
+            </div>
+            <RichTextEditor
+              value={description}
+              onChange={setDescription}
+              placeholder="행사에 대한 상세 정보를 입력해주세요"
+            />
           </div>
 
           {/* Form Actions */}
