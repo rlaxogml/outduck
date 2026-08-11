@@ -31,7 +31,7 @@ export function EventProposalForm({ user, onSuccess }: EventProposalFormProps) {
   const defaultTemplate =
     `(다음과 같은 정보들을 기입해주세요)\n\n` +
     `주최 ip (게임 이름, 유튜버 이름 등): \n\n` +
-    `유형: (게임,유튜버 등)\n\n` +
+    `간단한 소개: \n\n` +
     `정보 확인가능한 링크: `;
 
   const [description, setDescription] = useState(defaultTemplate);
