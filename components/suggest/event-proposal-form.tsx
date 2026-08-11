@@ -25,6 +25,7 @@ export function EventProposalForm({ user, onSuccess }: EventProposalFormProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [location, setLocation] = useState("");
+  const [isAlways, setIsAlways] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
@@ -79,8 +80,8 @@ export function EventProposalForm({ user, onSuccess }: EventProposalFormProps) {
         links: null,
         channel_proposal_id: null,
         channel_ids: null,
-        start_date: isOffline && startDate ? startDate : null,
-        end_date: isOffline && endDate ? endDate : null,
+        start_date: isOffline && !isAlways && startDate ? startDate : null,
+        end_date: isOffline && !isAlways && endDate ? endDate : null,
         start_time: null,
         end_time: null,
         reservation_type: null,
@@ -153,12 +154,12 @@ export function EventProposalForm({ user, onSuccess }: EventProposalFormProps) {
         </div>
 
         {/* Title */}
-        <div className="space-y-3">
-          <Label htmlFor="event-title" className="text-sm font-semibold">행사 제목 <span className="text-destructive">*</span></Label>
+        <div className="flex items-center gap-3">
+          <Label htmlFor="event-title" className="w-20 shrink-0 text-sm font-semibold">행사 제목 <span className="text-destructive">*</span></Label>
           <Input
             id="event-title"
-            placeholder="제보할 행사 이름을 입력해 주세요"
-            className="h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
+            placeholder="행사 이름"
+            className="h-12 flex-1 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
@@ -168,38 +169,51 @@ export function EventProposalForm({ user, onSuccess }: EventProposalFormProps) {
         {/* Date (offline) */}
         {eventType === "offline" && (
           <div className="space-y-3">
-            <Label className="text-sm font-semibold">행사 날짜 <span className="text-xs font-normal text-muted-foreground">(선택)</span></Label>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">시작일</Label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">행사 날짜 <span className="text-xs font-normal text-muted-foreground">(선택)</span></Label>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isAlways}
+                  onChange={(e) => setIsAlways(e.target.checked)}
+                  className="w-4 h-4 accent-primary rounded cursor-pointer"
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">종료일</Label>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
-                />
-              </div>
+                <span className="text-xs font-bold text-muted-foreground">상시</span>
+              </label>
             </div>
+            {!isAlways && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">시작일</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">종료일</Label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* Location (offline) */}
         {eventType === "offline" && (
-          <div className="space-y-3">
-            <Label htmlFor="event-location" className="text-sm font-semibold">장소 <span className="text-xs font-normal text-muted-foreground">(선택)</span></Label>
+          <div className="flex items-center gap-3">
+            <Label htmlFor="event-location" className="w-20 shrink-0 text-sm font-semibold">장소</Label>
             <Input
               id="event-location"
-              placeholder="예: 더현대 서울 B1F 아이코닉"
-              className="h-12 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
+              placeholder="예: 더현대 서울 B1F (선택)"
+              className="h-12 flex-1 bg-muted/30 border-border/50 rounded-xl focus:ring-primary/20"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
             />

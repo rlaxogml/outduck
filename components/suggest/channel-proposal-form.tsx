@@ -158,7 +158,7 @@ export function ChannelProposalForm({ user, onSuccess }: ChannelProposalFormProp
             <Label htmlFor="name" className="text-base font-semibold">채널명 <span className="text-destructive">*</span></Label>
             <Input
               id="name"
-              placeholder="예: 침착맨, 우왁굳, 에스더 등 공식 활동명"
+              placeholder="채널명을 입력해주세요"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20"
@@ -176,7 +176,7 @@ export function ChannelProposalForm({ user, onSuccess }: ChannelProposalFormProp
                 <SelectItem value="game">게임</SelectItem>
                 <SelectItem value="youtuber">유튜버</SelectItem>
                 <SelectItem value="vtuber">버튜버</SelectItem>
-                <SelectItem value="festival">축제 / 행사</SelectItem>
+                <SelectItem value="festival">행사</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -189,7 +189,7 @@ export function ChannelProposalForm({ user, onSuccess }: ChannelProposalFormProp
                 <div key={link.id} className="flex gap-2 items-start animate-in fade-in duration-200">
                   <div className="flex-1 flex flex-col sm:flex-row gap-2">
                     <Input
-                      placeholder="링크 이름 (예: 유튜브)"
+                      placeholder="링크 이름"
                       value={link.name}
                       onChange={(e) => {
                         const newForm = [...linksForm];
