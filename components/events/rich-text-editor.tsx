@@ -99,6 +99,26 @@ export default function RichTextEditor({
   const lastSelectionRef = useRef<any>(null);
   const [floatingButtons, setFloatingButtons] = useState<FloatingButton[]>([]);
 
+  // react-quill controlled value의 커서/스크롤 튐 방지.
+  // 에디터에서 발생한 변경은 내부 상태(editorValue)에만 반영해 react-quill이 내용을 "다시 심지" 않게 하고,
+  // (붙여넣기 시 HTML 라운드트립 차이로 setEditorContents가 호출되면 선택영역이 리셋돼 스크롤이 맨 위로 튐)
+  // value가 "외부"에서 바뀔 때(수정 폼 비동기 로드 등)만 에디터에 반영한다.
+  const [editorValue, setEditorValue] = useState(value);
+  const lastEmittedRef = useRef(value);
+
+  useEffect(() => {
+    if (value !== lastEmittedRef.current) {
+      lastEmittedRef.current = value;
+      setEditorValue(value);
+    }
+  }, [value]);
+
+  const handleEditorChange = (content: string) => {
+    lastEmittedRef.current = content;
+    setEditorValue(content);
+    onChange(content);
+  };
+
   useEffect(() => {
     directFontSizeRef.current = directFontSize;
   }, [directFontSize]);
@@ -498,8 +518,8 @@ export default function RichTextEditor({
         <ReactQuill
           ref={quillRef}
           theme="snow"
-          value={value}
-          onChange={onChange}
+          value={editorValue}
+          onChange={handleEditorChange}
           modules={quillModules}
           formats={quillFormats}
           placeholder={placeholder}
