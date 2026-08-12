@@ -108,7 +108,6 @@ export default function RichTextEditor({
 
   useEffect(() => {
     if (value !== lastEmittedRef.current) {
-      console.log("[RTE-DEBUG] external value change → remount(key++). scrollY=", typeof window !== "undefined" ? window.scrollY : "-");
       lastEmittedRef.current = value;
       setExternalKey((k) => k + 1);
     }
@@ -119,47 +118,26 @@ export default function RichTextEditor({
     onChange(content);
   };
 
-  // ⚠️ DEBUG: 붙여넣기 스크롤 튐 원인 추적용 (원인 파악 후 제거). document 레벨로 확실히 잡는다.
+  // 붙여넣기 시 스크롤이 위로 튀는 문제 방지.
+  // Quill이 붙여넣기 처리 중 숨은 .ql-clipboard(및 .ql-editor)에 focus()를 호출하면
+  // 브라우저가 그 요소로 스크롤을 옮겨(위로 튐) 붙여넣던 위치를 잃는다.
+  // → 붙여넣기 직전 스크롤 위치를 저장했다가 직후(비동기 focus까지 끝난 뒤) 복원한다.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const log = (...a: any[]) => console.log("[RTE-DEBUG]", ...a);
-    const stk = () => "\n" + (new Error().stack?.split("\n").slice(3, 8).join("\n") || "");
-    log("DEBUG armed. scrollY=", window.scrollY);
-
-    const onPaste = () => {
-      const before = window.scrollY;
-      log("PASTE. scrollY before=", before, "active=", (document.activeElement as HTMLElement)?.className || document.activeElement?.tagName);
-      requestAnimationFrame(() => log("  paste rAF scrollY=", window.scrollY, "Δ=", window.scrollY - before));
-      setTimeout(() => log("  paste +200ms scrollY=", window.scrollY, "Δ=", window.scrollY - before), 200);
+    const container = editorContainerRef.current;
+    if (!container) return;
+    const onPaste = (e: Event) => {
+      const t = e.target as Node | null;
+      if (!(t && container.contains(t)) && !container.contains(document.activeElement)) return;
+      const x = window.scrollX;
+      const y = window.scrollY;
+      const restore = () => { if (Math.abs(window.scrollY - y) > 1) window.scrollTo(x, y); };
+      requestAnimationFrame(restore);
+      requestAnimationFrame(() => requestAnimationFrame(restore));
+      setTimeout(restore, 0);
+      setTimeout(restore, 60);
     };
     document.addEventListener("paste", onPaste, true);
-
-    let lastY = window.scrollY;
-    const onScroll = () => {
-      const y = window.scrollY;
-      if (Math.abs(y - lastY) > 15) { log("SCROLL", lastY, "→", y); lastY = y; }
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-
-    const origScrollTo = window.scrollTo.bind(window);
-    (window as any).scrollTo = (...args: any[]) => { log("scrollTo", args, stk()); return (origScrollTo as any)(...args); };
-    const origSIV = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (...args: any[]) { log("scrollIntoView", (this as HTMLElement).className || (this as HTMLElement).tagName, stk()); return (origSIV as any).apply(this, args); };
-    const origFocus = HTMLElement.prototype.focus;
-    HTMLElement.prototype.focus = function (...args: any[]) {
-      const b = window.scrollY;
-      const r = (origFocus as any).apply(this, args);
-      if (Math.abs(window.scrollY - b) > 15) log("focus()→SCROLL", (this as HTMLElement).className || (this as HTMLElement).tagName, b, "→", window.scrollY, stk());
-      return r;
-    };
-
-    return () => {
-      document.removeEventListener("paste", onPaste, true);
-      window.removeEventListener("scroll", onScroll);
-      (window as any).scrollTo = origScrollTo;
-      Element.prototype.scrollIntoView = origSIV;
-      HTMLElement.prototype.focus = origFocus;
-    };
+    return () => document.removeEventListener("paste", onPaste, true);
   }, []);
 
   useEffect(() => {
