@@ -314,6 +314,13 @@ export default function EditEventPage() {
     isScriptLoaded
   );
 
+  // 수정 페이지 진입 시 항상 맨 위에서 시작 (뒤로가기 후 재진입 시 이전 스크롤 복원 방지).
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const id = requestAnimationFrame(() => window.scrollTo(0, 0));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   // Wait for global Kakao Map Script to load
   useEffect(() => {
     if (isScriptLoaded) return;

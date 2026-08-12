@@ -79,6 +79,13 @@ export default function EditOnlineEventPage() {
   const [showCoHostSearch, setShowCoHostSearch] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 수정 페이지 진입 시 항상 맨 위에서 시작 (뒤로가기 후 재진입 시 이전 스크롤 복원 방지).
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const id = requestAnimationFrame(() => window.scrollTo(0, 0));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   // Auth + Fetch Owned Channels + Fetch Event Data
   useEffect(() => {
     const initPage = async () => {
