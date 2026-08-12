@@ -119,41 +119,48 @@ export default function RichTextEditor({
     onChange(content);
   };
 
-  // ⚠️ DEBUG: 붙여넣기 스크롤 튐 원인 추적용 (원인 파악 후 제거)
+  // ⚠️ DEBUG: 붙여넣기 스크롤 튐 원인 추적용 (원인 파악 후 제거). document 레벨로 확실히 잡는다.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const log = (...a: any[]) => console.log("[RTE-DEBUG]", ...a);
-    log("editor mounted/remounted. externalKey=", externalKey, "scrollY=", window.scrollY);
+    const stk = () => "\n" + (new Error().stack?.split("\n").slice(3, 8).join("\n") || "");
+    log("DEBUG armed. scrollY=", window.scrollY);
 
-    const qlEditor = editorContainerRef.current?.querySelector(".ql-editor");
     const onPaste = () => {
       const before = window.scrollY;
-      log("PASTE start. scrollY=", before, "active=", (document.activeElement as HTMLElement)?.className);
-      requestAnimationFrame(() => {
-        log("PASTE rAF. scrollY=", window.scrollY, "Δ=", window.scrollY - before);
-        setTimeout(() => log("PASTE +150ms. scrollY=", window.scrollY, "Δ=", window.scrollY - before), 150);
-      });
+      log("PASTE. scrollY before=", before, "active=", (document.activeElement as HTMLElement)?.className || document.activeElement?.tagName);
+      requestAnimationFrame(() => log("  paste rAF scrollY=", window.scrollY, "Δ=", window.scrollY - before));
+      setTimeout(() => log("  paste +200ms scrollY=", window.scrollY, "Δ=", window.scrollY - before), 200);
     };
-    qlEditor?.addEventListener("paste", onPaste, true);
+    document.addEventListener("paste", onPaste, true);
 
-    // 스크롤을 실제로 일으키는 호출자 추적
-    const origScrollTo = window.scrollTo.bind(window);
-    (window as any).scrollTo = (...args: any[]) => {
-      log("window.scrollTo", args, "\n" + (new Error().stack?.split("\n").slice(2, 7).join("\n") || ""));
-      return (origScrollTo as any)(...args);
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (Math.abs(y - lastY) > 15) { log("SCROLL", lastY, "→", y); lastY = y; }
     };
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    const origScrollTo = window.scrollTo.bind(window);
+    (window as any).scrollTo = (...args: any[]) => { log("scrollTo", args, stk()); return (origScrollTo as any)(...args); };
     const origSIV = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (...args: any[]) {
-      log("scrollIntoView on", (this as HTMLElement).className || (this as HTMLElement).tagName, args, "\n" + (new Error().stack?.split("\n").slice(2, 7).join("\n") || ""));
-      return (origSIV as any).apply(this, args);
+    Element.prototype.scrollIntoView = function (...args: any[]) { log("scrollIntoView", (this as HTMLElement).className || (this as HTMLElement).tagName, stk()); return (origSIV as any).apply(this, args); };
+    const origFocus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function (...args: any[]) {
+      const b = window.scrollY;
+      const r = (origFocus as any).apply(this, args);
+      if (Math.abs(window.scrollY - b) > 15) log("focus()→SCROLL", (this as HTMLElement).className || (this as HTMLElement).tagName, b, "→", window.scrollY, stk());
+      return r;
     };
 
     return () => {
-      qlEditor?.removeEventListener("paste", onPaste, true);
+      document.removeEventListener("paste", onPaste, true);
+      window.removeEventListener("scroll", onScroll);
       (window as any).scrollTo = origScrollTo;
       Element.prototype.scrollIntoView = origSIV;
+      HTMLElement.prototype.focus = origFocus;
     };
-  }, [externalKey]);
+  }, []);
 
   useEffect(() => {
     directFontSizeRef.current = directFontSize;
