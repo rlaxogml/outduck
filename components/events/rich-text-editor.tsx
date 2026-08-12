@@ -108,6 +108,7 @@ export default function RichTextEditor({
 
   useEffect(() => {
     if (value !== lastEmittedRef.current) {
+      console.log("[RTE-DEBUG] external value change → remount(key++). scrollY=", typeof window !== "undefined" ? window.scrollY : "-");
       lastEmittedRef.current = value;
       setExternalKey((k) => k + 1);
     }
@@ -117,6 +118,42 @@ export default function RichTextEditor({
     lastEmittedRef.current = content;
     onChange(content);
   };
+
+  // ⚠️ DEBUG: 붙여넣기 스크롤 튐 원인 추적용 (원인 파악 후 제거)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const log = (...a: any[]) => console.log("[RTE-DEBUG]", ...a);
+    log("editor mounted/remounted. externalKey=", externalKey, "scrollY=", window.scrollY);
+
+    const qlEditor = editorContainerRef.current?.querySelector(".ql-editor");
+    const onPaste = () => {
+      const before = window.scrollY;
+      log("PASTE start. scrollY=", before, "active=", (document.activeElement as HTMLElement)?.className);
+      requestAnimationFrame(() => {
+        log("PASTE rAF. scrollY=", window.scrollY, "Δ=", window.scrollY - before);
+        setTimeout(() => log("PASTE +150ms. scrollY=", window.scrollY, "Δ=", window.scrollY - before), 150);
+      });
+    };
+    qlEditor?.addEventListener("paste", onPaste, true);
+
+    // 스크롤을 실제로 일으키는 호출자 추적
+    const origScrollTo = window.scrollTo.bind(window);
+    (window as any).scrollTo = (...args: any[]) => {
+      log("window.scrollTo", args, "\n" + (new Error().stack?.split("\n").slice(2, 7).join("\n") || ""));
+      return (origScrollTo as any)(...args);
+    };
+    const origSIV = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (...args: any[]) {
+      log("scrollIntoView on", (this as HTMLElement).className || (this as HTMLElement).tagName, args, "\n" + (new Error().stack?.split("\n").slice(2, 7).join("\n") || ""));
+      return (origSIV as any).apply(this, args);
+    };
+
+    return () => {
+      qlEditor?.removeEventListener("paste", onPaste, true);
+      (window as any).scrollTo = origScrollTo;
+      Element.prototype.scrollIntoView = origSIV;
+    };
+  }, [externalKey]);
 
   useEffect(() => {
     directFontSizeRef.current = directFontSize;
