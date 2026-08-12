@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/image-compress";
@@ -20,7 +20,8 @@ import {
   AlertCircle, 
   Sparkles, 
   CheckCircle,
-  HelpCircle
+  HelpCircle,
+  X
 } from "lucide-react";
 import { AdManager } from "@/components/ad-manager";
 
@@ -207,6 +208,19 @@ export default function AdApplyPage() {
   // General loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 이번 세션에 업로드한 배너 이미지 경로(신청 미완료 시 정리용) + 신청 진행 여부.
+  const uploadedPathRef = useRef<string | null>(null);
+  const committedRef = useRef(false);
+
+  // 신청을 완료(결제/무료 진행)하지 않고 페이지를 떠나면 업로드된 배너를 스토리지에서 정리(orphan 방지).
+  useEffect(() => {
+    return () => {
+      if (uploadedPathRef.current && !committedRef.current) {
+        supabase.storage.from("ad_poster").remove([uploadedPathRef.current]);
+      }
+    };
+  }, []);
+
   // Handle extension of an existing expired ad
   const handleExtendAd = (ad: any) => {
     setAdvertiserName(ad.advertiser_name || ad.title || "");
@@ -378,20 +392,30 @@ export default function AdApplyPage() {
     setUploadProgress(10);
 
     try {
-      const fileExt = selectedFile.name.split(".").pop();
+      // 업로드 전 압축(webp 변환). 압축 결과의 확장자/타입에 맞춰 저장해 webp로 등록되게 한다.
+      const compressed = await compressImage(selectedFile);
+      const fileExt = compressed.name.split(".").pop() || "webp";
       const fileName = `ad-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
       setUploadProgress(30);
 
-      const { data, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("ad_poster")
-        .upload(filePath, await compressImage(selectedFile), {
+        .upload(filePath, compressed, {
           cacheControl: "3600",
-          upsert: false
+          upsert: false,
+          contentType: compressed.type,
         });
 
       if (uploadError) throw uploadError;
+
+      // 이전에 이 세션에서 올린 이미지가 있으면 정리(재선택 대체)
+      const prevPath = uploadedPathRef.current;
+      uploadedPathRef.current = filePath;
+      if (prevPath && prevPath !== filePath) {
+        supabase.storage.from("ad_poster").remove([prevPath]).catch(() => {});
+      }
 
       setUploadProgress(70);
 
@@ -408,6 +432,18 @@ export default function AdApplyPage() {
       setFile(null);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  // 업로드한 배너 제거(다시 선택 가능). 이번 세션에 올린 것이면 스토리지에서도 삭제.
+  const handleRemoveImage = async () => {
+    const path = uploadedPathRef.current;
+    uploadedPathRef.current = null;
+    setImageUrl(null);
+    setFile(null);
+    setUploadProgress(0);
+    if (path) {
+      await supabase.storage.from("ad_poster").remove([path]).catch(() => {});
     }
   };
 
@@ -464,6 +500,8 @@ export default function AdApplyPage() {
         days: durationDays
       };
       
+      // 신청 진행 확정 → 이탈 정리(unmount cleanup)가 배너를 지우지 않도록 표시.
+      committedRef.current = true;
       localStorage.setItem(`pending_ad_${orderId}`, JSON.stringify(pendingData));
 
       // 0원 무료 광고 신청 처리
@@ -580,7 +618,7 @@ export default function AdApplyPage() {
                 Outduck 광고 배너 신청
               </h1>
               <p className="text-muted-foreground text-sm max-w-lg mx-auto leading-relaxed">
-                아웃덕 메인 슬라이더 영역에 배너를 게재하여, 다양한 팬들과 주최자들에게 본인의 채널 및 축제를 입체적으로 알릴 수 있습니다.
+                아웃덕 메인 슬라이더 영역에 배너를 게재하여, 다양한 팬들과 주최자들에게 본인의 채널 및 행사를 입체적으로 알릴 수 있습니다.
               </p>
               <div className="inline-block mt-4 bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-xl text-sm font-bold shadow-sm">
                 💡 신청한 광고는 노출기간이 끝나기 전까지 언제든지 수정 가능합니다!
@@ -599,11 +637,19 @@ export default function AdApplyPage() {
           <CardContent className="space-y-4">
             {imageUrl ? (
               <div className="relative group rounded-2xl overflow-hidden border border-border bg-muted flex items-center justify-center w-full aspect-[16/9]">
-                <img 
-                  src={imageUrl} 
-                  alt="Uploaded Banner Preview" 
+                <img
+                  src={imageUrl}
+                  alt="Uploaded Banner Preview"
                   className="w-full h-full object-cover object-center animate-in fade-in duration-300"
                 />
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="absolute top-2 right-2 z-10 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+                  title="이미지 제거"
+                >
+                  <X className="w-4 h-4" />
+                </button>
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                   <p className="text-xs font-bold text-white">이미지 정상 수신됨</p>
                 </div>
