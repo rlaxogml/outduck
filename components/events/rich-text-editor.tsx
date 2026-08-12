@@ -100,22 +100,21 @@ export default function RichTextEditor({
   const [floatingButtons, setFloatingButtons] = useState<FloatingButton[]>([]);
 
   // react-quill controlled value의 커서/스크롤 튐 방지.
-  // 에디터에서 발생한 변경은 내부 상태(editorValue)에만 반영해 react-quill이 내용을 "다시 심지" 않게 하고,
-  // (붙여넣기 시 HTML 라운드트립 차이로 setEditorContents가 호출되면 선택영역이 리셋돼 스크롤이 맨 위로 튐)
-  // value가 "외부"에서 바뀔 때(수정 폼 비동기 로드 등)만 에디터에 반영한다.
-  const [editorValue, setEditorValue] = useState(value);
+  // 에디터를 uncontrolled(defaultValue)로 두어 "에디터 자체 편집"에는 react-quill이 내용을 다시 심지 않게 한다.
+  // (controlled value면 붙여넣기 시 HTML 라운드트립 차이로 setEditorContents가 호출되며 선택영역이 리셋돼 스크롤이 맨 위로 튐)
+  // 대신 value가 "외부"에서 바뀔 때(수정 폼 로드, 초기화 등)만 key를 바꿔 에디터를 새로 마운트해 반영한다.
   const lastEmittedRef = useRef(value);
+  const [externalKey, setExternalKey] = useState(0);
 
   useEffect(() => {
     if (value !== lastEmittedRef.current) {
       lastEmittedRef.current = value;
-      setEditorValue(value);
+      setExternalKey((k) => k + 1);
     }
   }, [value]);
 
   const handleEditorChange = (content: string) => {
     lastEmittedRef.current = content;
-    setEditorValue(content);
     onChange(content);
   };
 
@@ -516,9 +515,10 @@ export default function RichTextEditor({
 
         {/* 에디터 본문 */}
         <ReactQuill
+          key={externalKey}
           ref={quillRef}
           theme="snow"
-          value={editorValue}
+          defaultValue={value}
           onChange={handleEditorChange}
           modules={quillModules}
           formats={quillFormats}
