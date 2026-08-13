@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/image-compress";
+import { deleteStoragePaths } from "@/app/actions/events";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -216,7 +217,7 @@ export default function AdApplyPage() {
   useEffect(() => {
     return () => {
       if (uploadedPathRef.current && !committedRef.current) {
-        supabase.storage.from("ad_poster").remove([uploadedPathRef.current]);
+        deleteStoragePaths("ad_poster", [uploadedPathRef.current]);
       }
     };
   }, []);
@@ -414,7 +415,7 @@ export default function AdApplyPage() {
       const prevPath = uploadedPathRef.current;
       uploadedPathRef.current = filePath;
       if (prevPath && prevPath !== filePath) {
-        supabase.storage.from("ad_poster").remove([prevPath]).catch(() => {});
+        deleteStoragePaths("ad_poster", [prevPath]);
       }
 
       setUploadProgress(70);
@@ -443,7 +444,7 @@ export default function AdApplyPage() {
     setFile(null);
     setUploadProgress(0);
     if (path) {
-      await supabase.storage.from("ad_poster").remove([path]).catch(() => {});
+      await deleteStoragePaths("ad_poster", [path]);
     }
   };
 
