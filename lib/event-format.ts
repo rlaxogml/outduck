@@ -63,7 +63,7 @@ export const getCategory = (type?: string) => {
   if (t === "game") return "게임";
   if (t === "youtuber") return "유튜버";
   if (t === "vtuber") return "버튜버";
-  if (t === "festival") return "축제";
+  if (t === "festival") return "행사";
   return "기타";
 };
 

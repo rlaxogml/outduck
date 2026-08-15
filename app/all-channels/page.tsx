@@ -21,7 +21,7 @@ const FILTERS = [
   { id: "game", label: "게임" },
   { id: "youtuber", label: "유튜버" },
   { id: "vtuber", label: "버튜버" },
-  { id: "festival", label: "축제" },
+  { id: "festival", label: "행사" },
 ];
 
 // 화면 상태(검색어·필터)를 메모리에 보관 → SPA 이동 후 복원, 콜드 스타트엔 초기화.

@@ -19,7 +19,7 @@ const channelTypeLabel: Record<string, string> = {
   game: "게임",
   youtuber: "유튜버",
   vtuber: "버튜버",
-  festival: "축제",
+  festival: "행사",
 };
 
 function getChannelTypeText(type: string | null) {
@@ -192,7 +192,7 @@ export function OrganizerSection({ user }: { user: User | null }) {
           if (t === "game") return "게임";
           if (t === "youtuber") return "유튜버";
           if (t === "vtuber") return "버튜버";
-          if (t === "festival") return "축제";
+          if (t === "festival") return "행사";
           return "기타";
         };
 

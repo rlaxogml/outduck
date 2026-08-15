@@ -122,7 +122,7 @@ export default async function ChannelProfilePage({ params }: { params: Promise<{
     game: "게임",
     youtuber: "유튜버",
     vtuber: "버튜버",
-    festival: "축제",
+    festival: "행사",
   };
 
   function getChannelTypeText(type: string | null) {

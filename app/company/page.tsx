@@ -613,7 +613,7 @@ export default function CompanyPage() {
     if (t === "game") return "게임";
     if (t === "youtuber") return "유튜버";
     if (t === "vtuber") return "버튜버";
-    if (t === "festival") return "축제";
+    if (t === "festival") return "행사";
     return "기타";
   };
 
@@ -1567,7 +1567,7 @@ export default function CompanyPage() {
                               </div>
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 <Badge className="text-[9px] font-bold h-4.5 px-1.5 bg-muted border-border/50 text-muted-foreground hover:bg-muted">
-                                  {request.type === "youtuber" ? "유튜버" : request.type === "vtuber" ? "버튜버" : request.type === "festival" ? "축제" : "게임"}
+                                  {request.type === "youtuber" ? "유튜버" : request.type === "vtuber" ? "버튜버" : request.type === "festival" ? "행사" : "게임"}
                                 </Badge>
                                 {request.is_team && (
                                   <Badge className="text-[9px] font-bold h-4.5 px-1.5 bg-orange-500/5 border-orange-500/10 text-orange-600 hover:bg-orange-500/5">
@@ -1741,7 +1741,7 @@ export default function CompanyPage() {
                     <SelectItem value="game">게임</SelectItem>
                     <SelectItem value="youtuber">유튜버</SelectItem>
                     <SelectItem value="vtuber">버튜버</SelectItem>
-                    <SelectItem value="festival">축제</SelectItem>
+                    <SelectItem value="festival">행사</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -1965,7 +1965,7 @@ export default function CompanyPage() {
                   <SelectItem value="game">게임</SelectItem>
                   <SelectItem value="youtuber">유튜버</SelectItem>
                   <SelectItem value="vtuber">버튜버</SelectItem>
-                  <SelectItem value="festival">축제</SelectItem>
+                  <SelectItem value="festival">행사</SelectItem>
                 </SelectContent>
               </Select>
             </div>

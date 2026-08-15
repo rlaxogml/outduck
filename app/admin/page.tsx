@@ -1362,7 +1362,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-2">
                             <h4 className="font-extrabold text-base truncate">{channel.name}</h4>
                             <Badge variant="outline" className="bg-purple-500/5 text-purple-600 border-purple-500/10 text-[9px] font-bold py-0.5 px-1.5 shrink-0 select-none">
-                              {channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "축제" : "게임"}
+                              {channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "행사" : "게임"}
                             </Badge>
                           </div>
                           
@@ -1544,7 +1544,7 @@ export default function AdminPage() {
                             {req.request_type === "company" ? (
                               <div className="flex items-center font-bold text-orange-500"><Building2 className="w-3 h-3 mr-1" /> 관리자(회사)</div>
                             ) : (
-                              <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "축제" : "게임"}</div>
+                              <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "행사" : "게임"}</div>
                             )}
                             <div className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> {new Date(req.created_at).toLocaleDateString()}</div>
                           </div>
@@ -1843,7 +1843,7 @@ export default function AdminPage() {
                           {req.request_type === "company" ? (
                             <div className="flex items-center font-bold text-orange-500"><Building2 className="w-3 h-3 mr-1" /> 관리자(회사)</div>
                           ) : (
-                            <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "축제" : "게임"}</div>
+                            <div className="flex items-center"><User className="w-3 h-3 mr-1" /> {req.type === "youtuber" ? "유튜버" : req.type === "festival" ? "행사" : "게임"}</div>
                           )}
                           <div className="flex items-center"><Calendar className="w-3 h-3 mr-1" /> {new Date(req.created_at).toLocaleDateString()}</div>
                         </div>
@@ -2285,7 +2285,7 @@ CHECK (status IN ('pending', 'resolved', 'dismissed'));`}
                         <div className="flex items-center gap-2">
                           <h4 className="font-extrabold text-base truncate">{channel.name}</h4>
                           <Badge variant="outline" className="bg-purple-500/5 text-purple-600 border-purple-500/10 text-[9px] font-bold py-0.5 px-1.5 shrink-0 select-none">
-                            {channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "축제" : "게임"}
+                            {channel.type === "youtuber" ? "유튜버" : channel.type === "festival" ? "행사" : "게임"}
                           </Badge>
                         </div>
                         

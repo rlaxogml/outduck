@@ -10,7 +10,7 @@ const categories = [
   { id: "game", label: "게임" },
   { id: "youtuber", label: "유튜버" },
   { id: "vtuber", label: "버튜버" },
-  { id: "festival", label: "축제" },
+  { id: "festival", label: "행사" },
   { id: "always", label: "상시" },
 ];
 
