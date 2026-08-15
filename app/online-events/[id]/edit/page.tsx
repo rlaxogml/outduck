@@ -50,6 +50,7 @@ export default function EditOnlineEventPage() {
   const [endMonth, setEndMonth] = useState("");
   const [endDay, setEndDay] = useState("");
   const [isAlways, setIsAlways] = useState(false);
+  const [isSexual, setIsSexual] = useState(false);
   const [startTimeHour, setStartTimeHour] = useState("");
   const [startTimeMin, setStartTimeMin] = useState("");
   const [endTimeHour, setEndTimeHour] = useState("");
@@ -139,7 +140,7 @@ export default function EditOnlineEventPage() {
           const { data: event, error: eventError } = await supabase
             .from("online_events")
             .select(`
-              id, event_id, title, description, start_at, end_at, image_url, links,
+              id, event_id, title, description, start_at, end_at, image_url, links, is_sexual,
               events (
                 event_channels ( channels ( id, name, type, image_url, owner_id, company ) )
               )
@@ -190,6 +191,7 @@ export default function EditOnlineEventPage() {
 
             setTitle(event.title || "");
             setDescription(event.description || "");
+            setIsSexual((event as any).is_sexual || false);
             initialDescriptionRef.current = event.description || "";
             setImageUrl(event.image_url || null);
             if (event.image_url && event.image_url.includes("event_images/event-main-image/")) {
@@ -353,6 +355,7 @@ export default function EditOnlineEventPage() {
           end_at: endAt,
           image_url: imageUrl,
           links: linksObj,
+          is_sexual: isSexual,
         })
         .eq("id", eventId);
 
@@ -613,6 +616,29 @@ export default function EditOnlineEventPage() {
                     <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
                   </label>
                 )}
+              </div>
+            </div>
+
+            {/* 선정성 여부 */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">선정성 행사</Label>
+              <div
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer select-none
+                  ${isSexual
+                    ? 'bg-primary/5 border-primary/60'
+                    : 'bg-muted/30 border-border/50 hover:border-primary/40'
+                  }`}
+                onClick={() => setIsSexual(v => !v)}
+              >
+                <div className={`w-5 h-5 mt-0.5 rounded-[5px] border flex items-center justify-center transition-colors shrink-0
+                  ${isSexual ? "bg-primary border-primary text-primary-foreground" : "bg-background border-input"}`}
+                >
+                  {isSexual && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-bold text-foreground">선정성(성인 취향) 콘텐츠 포함</p>
+                  <p className="text-xs text-muted-foreground">체크하면, 설정에서 "선정성 필터"를 켠 사용자에게는 목록에서 숨겨집니다.</p>
+                </div>
               </div>
             </div>
           </div>

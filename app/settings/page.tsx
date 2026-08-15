@@ -37,7 +37,7 @@ const TOPIC_OPTIONS: { id: string; label: string }[] = [
   { id: "game", label: "게임" },
   { id: "youtuber", label: "유튜버" },
   { id: "vtuber", label: "버튜버" },
-  { id: "festival", label: "축제" },
+  { id: "festival", label: "행사" },
 ];
 
 function SettingsMenuRow({
@@ -80,6 +80,7 @@ let settingsCache: {
   notifyNewEvent: boolean;
   notifyBookmarkNotice: boolean;
   favoriteTopics: string[];
+  hideSexual: boolean;
 } | null = null;
 
 export default function SettingsPage() {
@@ -109,6 +110,9 @@ export default function SettingsPage() {
   // Favorite topic (preferred genres) state
   const [favoriteTopics, setFavoriteTopics] = useState<string[]>(() => settingsCache?.favoriteTopics ?? []);
   const [isUpdatingTopics, setIsUpdatingTopics] = useState(false);
+
+  // 선정성 필터: 켜면 선정성 행사를 발견 목록(홈/캘린더·지도 전체 스코프)에서 숨긴다.
+  const [hideSexual, setHideSexual] = useState(() => settingsCache?.hideSexual ?? false);
 
   // Advanced state
   const [ownerCode, setOwnerCode] = useState("");
@@ -271,7 +275,7 @@ export default function SettingsPage() {
         // Fetch notifications settings & favorite topics
         const { data: notifData } = await supabase
           .from("profiles")
-          .select("notify_new_event, notify_bookmark_notice, favorite_topic")
+          .select("notify_new_event, notify_bookmark_notice, favorite_topic, hide_sexual")
           .eq("id", currentUser.id)
           .maybeSingle();
 
@@ -280,8 +284,11 @@ export default function SettingsPage() {
           setNotifyBookmarkNotice(notifData.notify_bookmark_notice ?? true);
           const topics = Array.isArray(notifData.favorite_topic) ? notifData.favorite_topic : [];
           setFavoriteTopics(topics);
+          const hideSex = notifData.hide_sexual ?? false;
+          setHideSexual(hideSex);
           try {
             localStorage.setItem("outduck-interests", JSON.stringify(topics));
+            localStorage.setItem("outduck-hide-sexual", JSON.stringify(hideSex));
           } catch (e) {}
         }
       } catch (error) {
@@ -312,8 +319,9 @@ export default function SettingsPage() {
       notifyNewEvent,
       notifyBookmarkNotice,
       favoriteTopics,
+      hideSexual,
     };
-  }, [user, name, avatarUrl, favoritesCount, bookmarksCount, notifyNewEvent, notifyBookmarkNotice, favoriteTopics]);
+  }, [user, name, avatarUrl, favoritesCount, bookmarksCount, notifyNewEvent, notifyBookmarkNotice, favoriteTopics, hideSexual]);
 
   const handleAccountDelete = async () => {
     if (!user) return;
@@ -455,6 +463,24 @@ export default function SettingsPage() {
       toast.error("선호 장르 저장에 실패했습니다: " + error.message);
     } finally {
       setIsUpdatingTopics(false);
+    }
+  };
+
+  const handleToggleHideSexual = async (checked: boolean) => {
+    // Optimistic UI + 즉시 localStorage 동기화 → 홈/캘린더/지도가 바로 반영.
+    setHideSexual(checked);
+    try {
+      localStorage.setItem("outduck-hide-sexual", JSON.stringify(checked));
+    } catch (e) {}
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .upsert({ id: user.id, hide_sexual: checked }, { onConflict: "id" });
+      if (error) throw error;
+      toast.success("선정성 필터 설정이 업데이트되었습니다.");
+    } catch (error: any) {
+      toast.error("설정 저장에 실패했습니다: " + error.message);
     }
   };
 
@@ -740,7 +766,7 @@ export default function SettingsPage() {
                   <div>
                     <h4 className="text-base md:text-lg font-bold tracking-tight mb-0.5">선호 장르</h4>
                     <p className="text-xs md:text-sm text-muted-foreground">
-                      관심 있는 장르를 선택하면 추천순 정렬에 반영돼요.
+                      관심 있는 장르를 선택하면 메인 홈 추천에 반영돼요.
                     </p>
                   </div>
                   {isUpdatingTopics && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />}
@@ -764,6 +790,22 @@ export default function SettingsPage() {
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* 선정성 필터 */}
+              <div id="settings-row-sexual-filter" className="border border-slate-300 dark:border-slate-700 rounded-2xl p-4 md:p-6 bg-card shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-0.5 min-w-0">
+                    <h4 className="text-base md:text-lg font-bold tracking-tight">선정성 필터</h4>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      켜면 선정성(성인 취향)으로 표시된 행사를 메인 홈 노출에서 숨깁니다.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={hideSexual}
+                    onCheckedChange={handleToggleHideSexual}
+                  />
                 </div>
               </div>
 
@@ -1308,7 +1350,7 @@ export function ChannelSettingsCard({ channel, teams, onUpdated }: { channel: an
               <SelectItem value="game">게임</SelectItem>
               <SelectItem value="youtuber">유튜버</SelectItem>
               <SelectItem value="vtuber">버튜버</SelectItem>
-              <SelectItem value="festival">축제</SelectItem>
+              <SelectItem value="festival">행사</SelectItem>
             </SelectContent>
           </Select>
         </div>

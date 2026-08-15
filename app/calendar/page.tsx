@@ -16,7 +16,7 @@ import { imageColors, formatEventDate, formatOnlineEventDate, extractChannels, g
 const categoryLabelMap: Record<string, string> = {
   game: "게임",
   youtuber: "유튜버",
-  festival: "축제",
+  festival: "행사",
   vtuber: "버튜버",
 };
 
@@ -31,6 +31,7 @@ type Event = {
   reservationType: any;
   channels: { id: number; name: string; type: string; image_url: string }[];
   isAlways: boolean;
+  isSexual?: boolean;
   createdAt: string;
   startDateValue: string | null;
   endDateValue: string | null;
@@ -200,6 +201,7 @@ function CalendarContent() {
           end_date,
           image_url,
           reservation_type,
+          is_sexual,
           created_at,
           events(
             event_channels(
@@ -222,6 +224,7 @@ function CalendarContent() {
           start_at,
           end_at,
           image_url,
+          is_sexual,
           created_at,
           events(
             event_channels(
@@ -240,14 +243,17 @@ function CalendarContent() {
 
       let bookmarkedIds: number[] = [];
       let subscribedChannelIds: number[] = [];
+      let hideSexual = false;
 
       if (user) {
-        const [{ data: bookmarksData }, { data: favoritesData }] = await Promise.all([
+        const [{ data: bookmarksData }, { data: favoritesData }, { data: profileData }] = await Promise.all([
           trackPerformance("캘린더 북마크 조회 (Client)", "client", () => supabase.from("event_bookmarks").select("event_id").eq("user_id", user.id)),
           trackPerformance("캘린더 팔로우 채널 조회 (Client)", "client", () => supabase.from("favorites").select("channel_id").eq("user_id", user.id)),
+          trackPerformance("캘린더 선정성 필터 설정 조회 (Client)", "client", () => supabase.from("profiles").select("hide_sexual").eq("id", user.id).maybeSingle()),
         ]);
         bookmarkedIds = (bookmarksData || []).map((b) => b.event_id).filter(Boolean) as number[];
         subscribedChannelIds = (favoritesData || []).map((f) => f.channel_id).filter(Boolean);
+        hideSexual = (profileData as any)?.hide_sexual ?? false;
       }
 
       const formattedOffline: Event[] = (offlineEventsData || []).map((event, index) => {
@@ -265,6 +271,7 @@ function CalendarContent() {
           reservationType: event.reservation_type as any,
           channels: channels.map((c) => ({ id: c.id, name: c.name, type: c.type ?? "", image_url: c.image_url || "" })),
           isAlways: !event.start_date,
+          isSexual: (event as any).is_sexual ?? false,
           createdAt: event.created_at,
           startDateValue: event.start_date,
           endDateValue: event.end_date,
@@ -287,6 +294,7 @@ function CalendarContent() {
           reservationType: undefined,
           channels: channels.map((c) => ({ id: c.id, name: c.name, type: c.type ?? "", image_url: c.image_url || "" })),
           isAlways: !event.start_at,
+          isSexual: (event as any).is_sexual ?? false,
           createdAt: event.created_at,
           startDateValue: event.start_at,
           endDateValue: event.end_at,
@@ -298,6 +306,7 @@ function CalendarContent() {
         events: [...formattedOffline, ...formattedOnline],
         bookmarkedIds,
         subscribedChannelIds,
+        hideSexual,
       };
     },
   });
@@ -305,6 +314,7 @@ function CalendarContent() {
   const events = calendarData?.events ?? [];
   const userBookmarkedEventIds = calendarData?.bookmarkedIds ?? [];
   const userSubscribedChannelIds = calendarData?.subscribedChannelIds ?? [];
+  const hideSexual = calendarData?.hideSexual ?? false;
   const loading = isLoading;
 
   // highlight 파라미터가 있으면 데이터 로드 후 해당 행사 날짜로 선택/이동 (1회성 부수효과)
@@ -343,10 +353,15 @@ function CalendarContent() {
 
   // 1. Memoize filteredEvents to avoid looping the entire database list on unrelated ticks/scrolls
   const filteredEvents = useMemo(() => {
+    // 선정성 필터는 "발견" 화면에만 적용 — 팔로우/찜 스코프를 선택한 경우엔 적용하지 않는다.
+    const hasInteractionScope = activeFilters.some(f => f === "subscribed" || f === "bookmarks");
+    const applySexualFilter = hideSexual && !hasInteractionScope;
+
     return events.filter((event) => {
       if (focusEventId) {
         return event.id === focusEventId;
       }
+      if (applySexualFilter && event.isSexual) return false;
       if (activeFilters.includes("all")) return true;
 
       const activeModes = activeFilters.filter(f => f === "online" || f === "offline");
@@ -367,7 +382,7 @@ function CalendarContent() {
 
       return modeMatched && catMatched && intMatched;
     });
-  }, [events, focusEventId, activeFilters, userSubscribedChannelIds, userBookmarkedEventIds]);
+  }, [events, focusEventId, activeFilters, userSubscribedChannelIds, userBookmarkedEventIds, hideSexual]);
 
   // 2. Cache selectedDate to reduce infinite 'new Date()' creation overhead in rendering loops
   const selectedDateMidnight = useMemo(() => {
@@ -484,7 +499,7 @@ function CalendarContent() {
                   { id: "game", label: "게임", activeClass: "bg-blue-100 text-blue-800 border-blue-500 shadow-sm" },
                   { id: "youtuber", label: "유튜버", activeClass: "bg-red-100 text-red-800 border-red-500 shadow-sm" },
                   { id: "vtuber", label: "버튜버", activeClass: "bg-purple-100 text-purple-800 border-purple-500 shadow-sm" },
-                  { id: "festival", label: "축제", activeClass: "bg-amber-100 text-amber-800 border-amber-500 shadow-sm" },
+                  { id: "festival", label: "행사", activeClass: "bg-amber-100 text-amber-800 border-amber-500 shadow-sm" },
                 ].map((cat) => (
                   <button
                     key={cat.id}

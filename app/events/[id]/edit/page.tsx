@@ -63,6 +63,7 @@ export default function EditEventPage() {
   const [endTimeHour, setEndTimeHour] = useState("");
   const [endTimeMin, setEndTimeMin] = useState("");
   const [reservationType, setReservationType] = useState("자유 입장");
+  const [isSexual, setIsSexual] = useState(false);
   const [showResSchedule, setShowResSchedule] = useState(false);
   const [resStartYear, setResStartYear] = useState("");
   const [resStartMonth, setResStartMonth] = useState("");
@@ -394,7 +395,7 @@ export default function EditEventPage() {
             .from("offline_events")
             .select(`
               id, event_id, title, description, start_date, end_date, start_time, end_time, image_url, reservation_type,
-              reservation_starts_at, reservation_ends_at, is_reservation_always, links,
+              reservation_starts_at, reservation_ends_at, is_reservation_always, links, is_sexual,
               events (
                 event_channels ( channels ( id, name, type, image_url, owner_id, company ) ),
                 event_images ( id, image_url, order )
@@ -474,6 +475,7 @@ export default function EditEventPage() {
             }
 
             setReservationType(event.reservation_type || "자유 입장");
+            setIsSexual((event as any).is_sexual || false);
             setIsResAlways(event.is_reservation_always || false);
 
             if (event.reservation_starts_at) {
@@ -705,6 +707,7 @@ export default function EditEventPage() {
           is_reservation_always: isResAlways,
           image_url: imageUrl,
           links: linksObj,
+          is_sexual: isSexual,
         })
         .eq("id", eventId);
 
@@ -1044,6 +1047,29 @@ export default function EditEventPage() {
                     <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
                   </label>
                 )}
+              </div>
+            </div>
+
+            {/* 선정성 여부 */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">선정성 행사</Label>
+              <div
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer select-none
+                  ${isSexual
+                    ? 'bg-primary/5 border-primary/60'
+                    : 'bg-muted/30 border-border/50 hover:border-primary/40'
+                  }`}
+                onClick={() => setIsSexual(v => !v)}
+              >
+                <div className={`w-5 h-5 mt-0.5 rounded-[5px] border flex items-center justify-center transition-colors shrink-0
+                  ${isSexual ? "bg-primary border-primary text-primary-foreground" : "bg-background border-input"}`}
+                >
+                  {isSexual && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-bold text-foreground">선정성(성인 취향) 콘텐츠 포함</p>
+                  <p className="text-xs text-muted-foreground">체크하면, 설정에서 "선정성 필터"를 켠 사용자에게는 목록에서 숨겨집니다.</p>
+                </div>
               </div>
             </div>
 

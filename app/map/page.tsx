@@ -149,6 +149,7 @@ function MapContent() {
   const [user, setUser] = useState<any>(null);
   const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>(() => cachedMapUserIds?.bookmarked ?? []);
   const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>(() => cachedMapUserIds?.subscribed ?? []);
+  const [hideSexual, setHideSexual] = useState<boolean>(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(() => cachedMapFilters?.selectedCategories ?? []);
   const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing" | "within_weeks">(() => cachedMapFilters?.interactionFilter ?? "all");
   const [weeksThreshold, setWeeksThreshold] = useState<number>(() => cachedMapFilters?.weeksThreshold ?? 2);
@@ -458,6 +459,26 @@ function MapContent() {
     };
   }, []);
 
+  // 1-0. 선정성 필터 설정 로드 (로그인 유저 전용). 로그아웃/비로그인은 항상 false(=미적용).
+  useEffect(() => {
+    if (!user) {
+      setHideSexual(false);
+      return;
+    }
+    let alive = true;
+    supabase
+      .from("profiles")
+      .select("hide_sexual")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (alive) setHideSexual((data as any)?.hide_sexual ?? false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+
   // 1-1. Wait for global Kakao Map Script to load
   useEffect(() => {
     if (isScriptLoaded) return;
@@ -493,6 +514,7 @@ function MapContent() {
               start_date,
               end_date,
               image_url,
+              is_sexual,
               events(
                 event_channels(
                   channels(
@@ -554,6 +576,7 @@ function MapContent() {
               channelImage: channel?.image_url || null,
               channelType: channel?.type || null,
               channels,
+              isSexual: item.is_sexual ?? false,
             };
           });
 
@@ -661,10 +684,15 @@ function MapContent() {
 
   // Filter events
   const filteredEvents = useMemo(() => {
+    // 선정성 필터는 "발견" 화면에만 — 팔로우/찜 스코프에선 적용하지 않는다.
+    const applySexualFilter = hideSexual && interactionFilter !== "subscribed" && interactionFilter !== "bookmarks";
+
     return events.filter((event) => {
       if (focusedEventId) {
         return String(event.id) === String(focusedEventId);
       }
+
+      if (applySexualFilter && event.isSexual) return false;
 
       // 1. Category Filters
       let catMatched = true;
@@ -695,7 +723,7 @@ function MapContent() {
 
       return catMatched && intMatched;
     });
-  }, [events, selectedCategories, interactionFilter, userSubscribedChannelIds, userBookmarkedEventIds, focusedEventId, weeksThreshold]);
+  }, [events, selectedCategories, interactionFilter, userSubscribedChannelIds, userBookmarkedEventIds, focusedEventId, weeksThreshold, hideSexual]);
 
   const toggleCategory = (categoryId: string) => {
     setSelectedCategories(prev => {
@@ -1490,7 +1518,7 @@ function MapContent() {
                         {[
                           { id: "game", label: "게임", activeClass: "border-blue-500 bg-blue-100 text-blue-800" },
                           { id: "youtuber", label: "유튜버", activeClass: "border-red-500 bg-red-100 text-red-800" },
-                          { id: "festival", label: "축제", activeClass: "border-amber-500 bg-amber-100 text-amber-800" },
+                          { id: "festival", label: "행사", activeClass: "border-amber-500 bg-amber-100 text-amber-800" },
                         ].map((cat) => (
                           <button
                             key={cat.id}
@@ -1695,7 +1723,7 @@ function MapContent() {
                         {[
                           { id: "game", label: "게임", activeClass: "bg-blue-100 text-blue-800 border-2 border-blue-500 shadow-sm" },
                           { id: "youtuber", label: "유튜버", activeClass: "bg-red-100 text-red-800 border-2 border-red-500 shadow-sm" },
-                          { id: "festival", label: "축제", activeClass: "bg-amber-100 text-amber-800 border-2 border-amber-500 shadow-sm" },
+                          { id: "festival", label: "행사", activeClass: "bg-amber-100 text-amber-800 border-2 border-amber-500 shadow-sm" },
                         ].map((cat) => (
                           <button
                             key={cat.id}

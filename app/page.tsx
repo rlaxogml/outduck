@@ -16,6 +16,7 @@ type Event = {
   reservationType: "자유 입장" | "예약 필수" | "티켓팅" | "휴무" | undefined;
   channels: { id: number; name: string; image_url: string }[];
   isAlways: boolean;
+  isSexual?: boolean;
   createdAt: string;
   startDateValue: string | null;
   endDateValue: string | null;
@@ -70,6 +71,7 @@ export default async function Home() {
       end_date,
       image_url,
       reservation_type,
+      is_sexual,
       created_at,
       events(
         event_channels(
@@ -99,6 +101,7 @@ export default async function Home() {
       start_at,
       end_at,
       image_url,
+      is_sexual,
       created_at,
       events(
         event_channels(
@@ -174,6 +177,7 @@ export default async function Home() {
         reservationType: event.reservation_type as Event["reservationType"],
         channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
         isAlways: !event.start_date,
+        isSexual: (event as any).is_sexual ?? false,
         createdAt: event.created_at,
         startDateValue: event.start_date,
         endDateValue: event.end_date,
@@ -203,6 +207,7 @@ export default async function Home() {
         reservationType: undefined,
         channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
         isAlways: !event.start_at,
+        isSexual: (event as any).is_sexual ?? false,
         createdAt: event.created_at,
         startDateValue: event.start_at,
         endDateValue: event.end_at,

@@ -100,6 +100,7 @@ export async function fetchMoreEvents(
             end_date,
             image_url,
             reservation_type,
+            is_sexual,
             created_at,
             events(
               event_channels(
@@ -137,6 +138,7 @@ export async function fetchMoreEvents(
           reservationType: event.reservation_type as any,
           channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
           isAlways: !event.start_date,
+          isSexual: (event as any).is_sexual ?? false,
           createdAt: event.created_at,
           startDateValue: event.start_date,
           endDateValue: event.end_date,
@@ -157,6 +159,7 @@ export async function fetchMoreEvents(
             start_at,
             end_at,
             image_url,
+            is_sexual,
             created_at,
             events(
               event_channels(
@@ -191,6 +194,7 @@ export async function fetchMoreEvents(
           reservationType: undefined,
           channels: channels.map(c => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
           isAlways: !event.start_at,
+          isSexual: (event as any).is_sexual ?? false,
           createdAt: event.created_at,
           startDateValue: event.start_at,
           endDateValue: event.end_at,
@@ -221,6 +225,7 @@ export async function fetchLatestEvents(limit: number = 40) {
         end_date,
         image_url,
         reservation_type,
+        is_sexual,
         created_at,
         events(
           event_channels(
@@ -242,6 +247,7 @@ export async function fetchLatestEvents(limit: number = 40) {
         start_at,
         end_at,
         image_url,
+        is_sexual,
         created_at,
         events(
           event_channels(
@@ -274,6 +280,7 @@ export async function fetchLatestEvents(limit: number = 40) {
         reservationType: event.reservation_type as any,
         channels: channels.map((c) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
         isAlways: !event.start_date,
+        isSexual: (event as any).is_sexual ?? false,
         createdAt: event.created_at,
         startDateValue: event.start_date,
         endDateValue: event.end_date,
@@ -294,6 +301,7 @@ export async function fetchLatestEvents(limit: number = 40) {
         reservationType: undefined,
         channels: channels.map((c) => ({ id: c.id, name: c.name, image_url: c.image_url || "" })),
         isAlways: !event.start_at,
+        isSexual: (event as any).is_sexual ?? false,
         createdAt: event.created_at,
         startDateValue: event.start_at,
         endDateValue: event.end_at,

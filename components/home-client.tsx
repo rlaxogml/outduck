@@ -29,6 +29,7 @@ type Event = {
   reservationType: "자유 입장" | "예약 필수" | "티켓팅" | "휴무" | undefined;
   channels: { id: number; name: string; image_url: string }[];
   isAlways: boolean;
+  isSexual?: boolean;
   createdAt: string;
   startDateValue: string | null;
   endDateValue: string | null;
@@ -253,6 +254,18 @@ export function HomeClient({
       } catch (e) {}
     }
     return null;
+  });
+
+  // 선정성 필터 설정(로그인 유저 전용). settings에서 저장 시 localStorage에도 동기화되므로
+  // 여기선 즉시 초기화(스피너 없이 반영)하고, user 데이터 로드 시 DB값으로 재확정한다.
+  const [hideSexual, setHideSexual] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const v = localStorage.getItem("outduck-hide-sexual");
+        if (v) return JSON.parse(v) === true;
+      } catch (e) {}
+    }
+    return false;
   });
 
   const [visibleCount, setVisibleCount] = useState(() => cachedHomeState?.visibleCount ?? 10);
@@ -590,17 +603,20 @@ export function HomeClient({
         }
       });
 
-      // 5. 선호 장르 동기화 (추천순 정렬에 반영되도록 localStorage로 캐싱)
+      // 5. 선호 장르 + 선정성 필터 동기화 (localStorage 캐싱 → 추천 정렬/필터에 반영)
       supabase
         .from("profiles")
-        .select("favorite_topic")
+        .select("favorite_topic, hide_sexual")
         .eq("id", userId)
         .maybeSingle()
         .then(({ data }) => {
           if (!isMounted || !data) return;
           const topics = Array.isArray(data.favorite_topic) ? data.favorite_topic : [];
+          const hideSex = data.hide_sexual ?? false;
+          setHideSexual(hideSex);
           try {
             localStorage.setItem("outduck-interests", JSON.stringify(topics));
+            localStorage.setItem("outduck-hide-sexual", JSON.stringify(hideSex));
           } catch (e) {}
         });
     };
@@ -648,6 +664,11 @@ export function HomeClient({
       result = base;
     }
 
+    // 0. 선정성 필터 (로그인 유저가 설정에서 켠 경우에만). 홈은 발견 화면이라 전체 목록에 적용.
+    if (user && hideSexual) {
+      result = result.filter((e) => !e.isSexual);
+    }
+
     // 1. Category Filter
     if (activeCategory === "always") {
       result = result.filter(e => e.isAlways);
@@ -658,7 +679,7 @@ export function HomeClient({
         game: "게임",
         youtuber: "유튜버",
         vtuber: "버튜버",
-        festival: "축제",
+        festival: "행사",
       };
       result = result.filter(e => e.category === catMap[activeCategory]);
     }
@@ -798,7 +819,7 @@ export function HomeClient({
             (event.category === "유튜버" && userInterests.includes("youtuber")) ||
             (event.category === "게임" && userInterests.includes("game")) ||
             (event.category === "버튜버" && userInterests.includes("vtuber")) ||
-            (event.category === "축제" && userInterests.includes("festival"));
+            (event.category === "행사" && userInterests.includes("festival"));
 
           if (isInterestCategory) {
             score += 30;

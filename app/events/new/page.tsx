@@ -306,6 +306,9 @@ function NewEventPageContent() {
   // Toggle between online and offline
   const [eventType, setEventType] = useState<"offline" | "online">("offline");
 
+  // 선정성(성인 취향) 여부 — 유저의 "선정성 필터"가 켜져 있으면 목록에서 숨겨진다.
+  const [isSexual, setIsSexual] = useState(false);
+
   // Online specific schedule states
   const [isOnlineAlways, setIsOnlineAlways] = useState(false);
   const [onlineStartYear, setOnlineStartYear] = useState(currentYear);
@@ -570,6 +573,7 @@ function NewEventPageContent() {
             is_reservation_always: isResAlways,
             image_url: imageUrl,
             links: linksObj,
+            is_sexual: isSexual,
           })
           .select()
           .single();
@@ -737,6 +741,7 @@ function NewEventPageContent() {
             end_at: onlineEndsAt,
             image_url: imageUrl,
             links: linksObj,
+            is_sexual: isSexual,
           })
           .select()
           .single();
@@ -1006,6 +1011,29 @@ function NewEventPageContent() {
                     <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
                   </label>
                 )}
+              </div>
+            </div>
+
+            {/* 선정성 여부 */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">선정성 행사</Label>
+              <div
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer select-none
+                  ${isSexual
+                    ? 'bg-primary/5 border-primary/60'
+                    : 'bg-muted/30 border-border/50 hover:border-primary/40'
+                  }`}
+                onClick={() => setIsSexual(v => !v)}
+              >
+                <div className={`w-5 h-5 mt-0.5 rounded-[5px] border flex items-center justify-center transition-colors shrink-0
+                  ${isSexual ? "bg-primary border-primary text-primary-foreground" : "bg-background border-input"}`}
+                >
+                  {isSexual && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-bold text-foreground">선정성(성인 취향) 콘텐츠 포함</p>
+                  <p className="text-xs text-muted-foreground">체크하면, 설정에서 "선정성 필터"를 켠 사용자에게는 목록에서 숨겨집니다.</p>
+                </div>
               </div>
             </div>
 
