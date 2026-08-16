@@ -21,6 +21,12 @@ export function Footer() {
           <Link href="/privacy" className="hover:text-primary transition-colors font-bold text-foreground/80">
             개인정보처리방침
           </Link>
+          <a
+            href="mailto:gkimth7@gmail.com?subject=%5B%EA%B6%8C%EB%A6%AC%EC%B9%A8%ED%95%B4%20%EC%8B%A0%EA%B3%A0%5D"
+            className="hover:text-primary transition-colors"
+          >
+            권리침해 신고
+          </a>
         </div>
         
         <div className="text-xs text-muted-foreground/60 space-y-1">

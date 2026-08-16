@@ -911,6 +911,7 @@ export default function SettingsPage() {
                         <SelectItem value="기능 제안">기능 제안</SelectItem>
                         <SelectItem value="버그 제보">버그 제보</SelectItem>
                         <SelectItem value="광고/제휴">광고 및 제휴</SelectItem>
+                        <SelectItem value="권리침해 신고">권리침해 신고</SelectItem>
                         <SelectItem value="기타">기타</SelectItem>
                       </SelectContent>
                     </Select>
