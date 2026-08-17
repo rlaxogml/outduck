@@ -149,7 +149,7 @@ function MapContent() {
   const [user, setUser] = useState<any>(null);
   const [userBookmarkedEventIds, setUserBookmarkedEventIds] = useState<number[]>(() => cachedMapUserIds?.bookmarked ?? []);
   const [userSubscribedChannelIds, setUserSubscribedChannelIds] = useState<number[]>(() => cachedMapUserIds?.subscribed ?? []);
-  const [hideSexual, setHideSexual] = useState<boolean>(false);
+  const [hideSexual, setHideSexual] = useState<boolean>(true); // opt-out: 기본 숨김
   const [selectedCategories, setSelectedCategories] = useState<string[]>(() => cachedMapFilters?.selectedCategories ?? []);
   const [interactionFilter, setInteractionFilter] = useState<"all" | "subscribed" | "bookmarks" | "ongoing" | "within_weeks">(() => cachedMapFilters?.interactionFilter ?? "all");
   const [weeksThreshold, setWeeksThreshold] = useState<number>(() => cachedMapFilters?.weeksThreshold ?? 2);
@@ -462,7 +462,7 @@ function MapContent() {
   // 1-0. 선정성 필터 설정 로드 (로그인 유저 전용). 로그아웃/비로그인은 항상 false(=미적용).
   useEffect(() => {
     if (!user) {
-      setHideSexual(false);
+      setHideSexual(true); // 비로그인은 기본 숨김
       return;
     }
     let alive = true;
@@ -472,7 +472,7 @@ function MapContent() {
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (alive) setHideSexual((data as any)?.hide_sexual ?? false);
+        if (alive) setHideSexual((data as any)?.hide_sexual ?? true);
       });
     return () => {
       alive = false;

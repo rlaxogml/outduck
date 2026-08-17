@@ -265,7 +265,7 @@ export function HomeClient({
         if (v) return JSON.parse(v) === true;
       } catch (e) {}
     }
-    return false;
+    return true; // 기본 숨김(opt-out). 선정성을 보려면 로그인 후 설정에서 필터를 꺼야 함.
   });
 
   const [visibleCount, setVisibleCount] = useState(() => cachedHomeState?.visibleCount ?? 10);
@@ -612,7 +612,7 @@ export function HomeClient({
         .then(({ data }) => {
           if (!isMounted || !data) return;
           const topics = Array.isArray(data.favorite_topic) ? data.favorite_topic : [];
-          const hideSex = data.hide_sexual ?? false;
+          const hideSex = data.hide_sexual ?? true;
           setHideSexual(hideSex);
           try {
             localStorage.setItem("outduck-interests", JSON.stringify(topics));
@@ -664,8 +664,9 @@ export function HomeClient({
       result = base;
     }
 
-    // 0. 선정성 필터 (로그인 유저가 설정에서 켠 경우에만). 홈은 발견 화면이라 전체 목록에 적용.
-    if (user && hideSexual) {
+    // 0. 선정성 필터 (opt-out: 기본 숨김). 홈은 발견 화면이라 전체 목록에 적용.
+    // 로그인 유저가 설정에서 필터를 끄면(hideSexual=false) 노출. 비로그인은 항상 숨김.
+    if (hideSexual) {
       result = result.filter((e) => !e.isSexual);
     }
 

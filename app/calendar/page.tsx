@@ -243,7 +243,7 @@ function CalendarContent() {
 
       let bookmarkedIds: number[] = [];
       let subscribedChannelIds: number[] = [];
-      let hideSexual = false;
+      let hideSexual = true; // opt-out: 기본 숨김(비로그인 포함). 로그인 유저 설정으로만 해제.
 
       if (user) {
         const [{ data: bookmarksData }, { data: favoritesData }, { data: profileData }] = await Promise.all([
@@ -253,7 +253,7 @@ function CalendarContent() {
         ]);
         bookmarkedIds = (bookmarksData || []).map((b) => b.event_id).filter(Boolean) as number[];
         subscribedChannelIds = (favoritesData || []).map((f) => f.channel_id).filter(Boolean);
-        hideSexual = (profileData as any)?.hide_sexual ?? false;
+        hideSexual = (profileData as any)?.hide_sexual ?? true;
       }
 
       const formattedOffline: Event[] = (offlineEventsData || []).map((event, index) => {
@@ -314,7 +314,7 @@ function CalendarContent() {
   const events = calendarData?.events ?? [];
   const userBookmarkedEventIds = calendarData?.bookmarkedIds ?? [];
   const userSubscribedChannelIds = calendarData?.subscribedChannelIds ?? [];
-  const hideSexual = calendarData?.hideSexual ?? false;
+  const hideSexual = calendarData?.hideSexual ?? true;
   const loading = isLoading;
 
   // highlight 파라미터가 있으면 데이터 로드 후 해당 행사 날짜로 선택/이동 (1회성 부수효과)

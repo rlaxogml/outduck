@@ -112,7 +112,7 @@ export default function SettingsPage() {
   const [isUpdatingTopics, setIsUpdatingTopics] = useState(false);
 
   // 선정성 필터: 켜면 선정성 행사를 발견 목록(홈/캘린더·지도 전체 스코프)에서 숨긴다.
-  const [hideSexual, setHideSexual] = useState(() => settingsCache?.hideSexual ?? false);
+  const [hideSexual, setHideSexual] = useState(() => settingsCache?.hideSexual ?? true);
 
   // Advanced state
   const [ownerCode, setOwnerCode] = useState("");
@@ -284,7 +284,7 @@ export default function SettingsPage() {
           setNotifyBookmarkNotice(notifData.notify_bookmark_notice ?? true);
           const topics = Array.isArray(notifData.favorite_topic) ? notifData.favorite_topic : [];
           setFavoriteTopics(topics);
-          const hideSex = notifData.hide_sexual ?? false;
+          const hideSex = notifData.hide_sexual ?? true;
           setHideSexual(hideSex);
           try {
             localStorage.setItem("outduck-interests", JSON.stringify(topics));
