@@ -15,9 +15,8 @@ import {
   Loader2, 
   UploadCloud, 
   Calendar, 
-  Building2, 
-  PhoneCall, 
-  ExternalLink, 
+  Building2,
+  ExternalLink,
   AlertCircle, 
   Sparkles, 
   CheckCircle,
@@ -167,7 +166,6 @@ export default function AdApplyPage() {
   
   // Form fields
   const [advertiserName, setAdvertiserName] = useState("");
-  const [contact, setContact] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -454,10 +452,6 @@ export default function AdApplyPage() {
       toast.error("광고주 이름을 입력해주세요.");
       return;
     }
-    if (!contact.trim()) {
-      toast.error("연락처를 입력해주세요.");
-      return;
-    }
     if (!imageUrl) {
       toast.error("광고 이미지를 선택하고 업로드를 대기해주세요.");
       return;
@@ -492,7 +486,6 @@ export default function AdApplyPage() {
       // Store pending form data in localStorage before redirecting to checkout
       const pendingData = {
         advertiser_name: advertiserName,
-        contact: contact,
         image_url: imageUrl,
         link_url: linkUrl || null,
         start_date: startDate,
@@ -711,20 +704,6 @@ export default function AdApplyPage() {
                   />
                 </div>
 
-                {/* 2. Contact Info */}
-                <div className="space-y-2">
-                  <Label htmlFor="contact" className="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                    <PhoneCall className="w-3.5 h-3.5 text-muted-foreground" /> 연락처 (이메일 또는 전화번호) <span className="text-destructive font-black">*</span>
-                  </Label>
-                  <Input 
-                    id="contact"
-                    value={contact}
-                    onChange={(e) => setContact(e.target.value)}
-                    placeholder="담당자 연락처 또는 이메일을 작성해주세요."
-                    className="rounded-xl h-11 border-border/80 focus:border-orange-500/50"
-                  />
-                </div>
-
                 {/* 3. Link URL */}
                 <div className="space-y-2">
                   <Label htmlFor="linkUrl" className="text-xs font-extrabold text-slate-700 dark:text-slate-300 flex items-center gap-1">
@@ -829,9 +808,8 @@ export default function AdApplyPage() {
                     isUploading || 
                     isValidatingSlots || 
                     fullyBookedDates.length > 0 || 
-                    !advertiserName.trim() || 
-                    !contact.trim() || 
-                    !imageUrl || 
+                    !advertiserName.trim() ||
+                    !imageUrl ||
                     !isDateValid
                   }
                   className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-black dark:hover:bg-white/90 font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 group text-sm disabled:opacity-50"

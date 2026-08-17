@@ -85,7 +85,6 @@ function SuccessContent() {
               start_date: pending.start_date,
               end_date: pending.end_date,
               advertiser_name: pending.advertiser_name,
-              contact: pending.contact,
               payment_status: "paid",
               user_id: userId
             }
@@ -198,10 +197,6 @@ function SuccessContent() {
               <div className="flex justify-between items-center text-muted-foreground">
                 <span>광고주명</span>
                 <span className="text-foreground font-bold">{successData?.advertiser_name}</span>
-              </div>
-              <div className="flex justify-between items-center text-muted-foreground">
-                <span>담당자 연락처</span>
-                <span className="text-foreground">{successData?.contact}</span>
               </div>
               <div className="flex justify-between items-center text-muted-foreground">
                 <span>광고 시작 날짜</span>

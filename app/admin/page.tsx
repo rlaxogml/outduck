@@ -48,8 +48,7 @@ type ChannelRequest = {
   image_url: string | null;
   status: "pending" | "approved" | "rejected";
   request_type?: "organizer" | "company";
-  contact?: string | null;
-  business_number?: string | null;
+  email?: string | null;
 };
 
 const moveStorageImage = async (imageUrl: string): Promise<string> => {
@@ -980,9 +979,6 @@ export default function AdminPage() {
           <h4 className="font-extrabold text-sm text-slate-800 dark:text-slate-200">
             {poster.advertiser_name || poster.title || "알 수 없는 광고주"}
           </h4>
-          <p className="text-[10px] text-muted-foreground font-semibold mt-0.5 flex items-center gap-1">
-            연락처: {poster.contact || "미기재"}
-          </p>
         </div>
         <Button
           variant="ghost"
@@ -1552,15 +1548,9 @@ export default function AdminPage() {
                       </div>
                       <div className="space-y-3 mb-6 flex-1 bg-muted/20 rounded-2xl p-4 border border-border/50">
                         {req.request_type === "company" ? (
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <div className="text-[10px] font-bold text-muted-foreground mb-1">연락처</div>
-                              <div className="font-semibold flex items-center gap-1.5">{req.contact || "미기재"}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] font-bold text-muted-foreground mb-1">사업자등록번호</div>
-                              <div className="font-semibold flex items-center gap-1.5">{req.business_number || "미기재"}</div>
-                            </div>
+                          <div className="text-sm">
+                            <div className="text-[10px] font-bold text-muted-foreground mb-1">이메일</div>
+                            <div className="font-semibold flex items-center gap-1.5">{req.email || "미기재"}</div>
                           </div>
                         ) : (
                           <>
@@ -1851,15 +1841,9 @@ export default function AdminPage() {
                     </div>
                     <div className="space-y-3 mb-6 flex-1 bg-muted/20 rounded-2xl p-4 border border-border/50">
                       {req.request_type === "company" ? (
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <div className="text-[10px] font-bold text-muted-foreground mb-1">연락처</div>
-                            <div className="font-semibold flex items-center gap-1.5">{req.contact || "미기재"}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] font-bold text-muted-foreground mb-1">사업자등록번호</div>
-                            <div className="font-semibold flex items-center gap-1.5">{req.business_number || "미기재"}</div>
-                          </div>
+                        <div className="text-sm">
+                          <div className="text-[10px] font-bold text-muted-foreground mb-1">이메일</div>
+                          <div className="font-semibold flex items-center gap-1.5">{req.email || "미기재"}</div>
                         </div>
                       ) : (
                         <>

@@ -13,7 +13,6 @@ import {
   ArrowLeft
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
-import { formatPhoneNumber } from "@/lib/utils";
 import { useImageUpload } from "@/hooks/use-image-upload";
 
 interface CompanyApplyFormProps {
@@ -24,9 +23,8 @@ interface CompanyApplyFormProps {
 
 export function CompanyApplyForm({ user, onBack, onSuccess }: CompanyApplyFormProps) {
   const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
-  const [businessNumber, setBusinessNumber] = useState("");
-  
+  const [email, setEmail] = useState(user.email ?? "");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -49,12 +47,8 @@ export function CompanyApplyForm({ user, onBack, onSuccess }: CompanyApplyFormPr
       toast.error("회사명을 입력해주세요.");
       return;
     }
-    if (!contact.trim()) {
-      toast.error("연락처를 입력해주세요.");
-      return;
-    }
-    if (!businessNumber.trim()) {
-      toast.error("사업자등록번호를 입력해주세요.");
+    if (!email.trim()) {
+      toast.error("이메일을 입력해주세요.");
       return;
     }
 
@@ -64,8 +58,7 @@ export function CompanyApplyForm({ user, onBack, onSuccess }: CompanyApplyFormPr
         user_id: user.id,
         name: name.trim(),
         image_url: imageUrl,
-        contact: contact.trim(),
-        business_number: businessNumber.trim(),
+        email: email.trim(),
         request_type: "company",
         status: "pending",
       };
@@ -168,25 +161,13 @@ export function CompanyApplyForm({ user, onBack, onSuccess }: CompanyApplyFormPr
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contact" className="text-base font-semibold">연락처 <span className="text-destructive">*</span></Label>
+              <Label htmlFor="email" className="text-base font-semibold">이메일 <span className="text-destructive">*</span></Label>
               <Input
-                id="contact"
-                placeholder="담당자 연락처 또는 회사 대표 번호"
-                value={contact}
-                onChange={(e) => setContact(formatPhoneNumber(e.target.value))}
-                maxLength={13}
-                className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="businessNumber" className="text-base font-semibold">사업자등록번호 <span className="text-destructive">*</span></Label>
-              <Input
-                id="businessNumber"
-                placeholder="사업자등록번호(단체의 경우 고유번호 등)를 입력하세요"
-                value={businessNumber}
-                onChange={(e) => setBusinessNumber(e.target.value)}
+                id="email"
+                type="email"
+                placeholder="답변받으실 이메일 주소를 입력하세요"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:ring-primary/20"
                 required
               />
