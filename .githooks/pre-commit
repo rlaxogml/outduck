@@ -1,0 +1,20 @@
+#!/bin/sh
+# 시크릿 "값"이 커밋되는 것을 차단한다. (변수명 process.env.X 는 통과, 실제 키/토큰만 차단)
+# 오탐이 확실하면: git commit --no-verify
+
+# JWT(Supabase anon/service_role), Supabase 신규 secret 키, 개인키 블록
+PATTERN='eyJhbGci[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|sb_secret_[A-Za-z0-9]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----'
+
+# 스테이징된 "추가된 줄"만 검사 (+++ 헤더 제외)
+added=$(git diff --cached --no-color | grep '^+' | grep -v '^+++')
+hits=$(printf '%s\n' "$added" | grep -Eo "$PATTERN")
+
+if [ -n "$hits" ]; then
+  echo "🚫 커밋 차단: 시크릿으로 보이는 값이 스테이징되었습니다."
+  echo "$hits" | sed 's/\(.\{16\}\).*/\1.../' | sort -u
+  echo ""
+  echo "→ 키/토큰을 코드에서 제거하고 .env.local(로컬, gitignore됨)로 옮기세요."
+  echo "  정말 오탐이라면: git commit --no-verify"
+  exit 1
+fi
+exit 0
